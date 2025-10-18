@@ -1,31 +1,56 @@
+// tailwind.config.ts
 import type { Config } from "tailwindcss";
+import colors from "tailwindcss/colors";
 
 const config: Config = {
   darkMode: "class",
   content: [
-    "./src/app/**/*.{ts,tsx}",
-    "./src/components/**/*.{ts,tsx}",
+    "./app/**/*.{ts,tsx,mdx}",
+    "./components/**/*.{ts,tsx,mdx}",
+    "./pages/**/*.{ts,tsx,mdx}",
+    "./src/app/**/*.{ts,tsx,mdx}",
+    "./src/components/**/*.{ts,tsx,mdx}",
+    "./src/pages/**/*.{ts,tsx,mdx}",
   ],
   theme: {
     extend: {
       fontFamily: {
-        // usa as vars que você aplica no layout via next/font
         sans: ["var(--font-sans)"],
         grotesk: ["var(--font-grotesk)"],
       },
       colors: {
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
-        card: { DEFAULT: "hsl(var(--card))", foreground: "hsl(var(--card-foreground))" },
-        popover: { DEFAULT: "hsl(var(--popover))", foreground: "hsl(var(--popover-foreground))" },
-        primary: { DEFAULT: "hsl(var(--primary))", foreground: "hsl(var(--primary-foreground))" },
-        secondary: { DEFAULT: "hsl(var(--secondary))", foreground: "hsl(var(--secondary-foreground))" },
-        muted: { DEFAULT: "hsl(var(--muted))", foreground: "hsl(var(--muted-foreground))" },
-        accent: { DEFAULT: "hsl(var(--accent))", foreground: "hsl(var(--accent-foreground))" },
-        destructive: { DEFAULT: "hsl(var(--destructive))", foreground: "hsl(var(--destructive-foreground))" },
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
+        /* tokens semânticos (shadcn) - já tinha, mantemos */
+        background: "var(--background)",
+        foreground: "var(--foreground)",
+        card: { DEFAULT: "var(--card)", foreground: "var(--card-foreground)" },
+        popover: { DEFAULT: "var(--popover)", foreground: "var(--popover-foreground)" },
+        primary: { DEFAULT: "var(--primary)", foreground: "var(--primary-foreground)" },
+        secondary: { DEFAULT: "var(--secondary)", foreground: "var(--secondary-foreground)" },
+        muted: { DEFAULT: "var(--muted)", foreground: "var(--muted-foreground)" },
+        accent: { DEFAULT: "var(--accent)", foreground: "var(--accent-foreground)" },
+        destructive: { DEFAULT: "var(--destructive)", foreground: "var(--destructive-foreground)" },
+        border: "var(--border)",
+        input: "var(--input)",
+        ring: "var(--ring)",
+
+        /* NOVOS tokens semânticos */
+        success: { DEFAULT: "var(--success)", foreground: "var(--success-foreground)" },
+        warning: { DEFAULT: "var(--warning)", foreground: "var(--warning-foreground)" },
+        info:    { DEFAULT: "var(--info)",    foreground: "var(--info-foreground)" },
+
+        /* PALETA DE MARCA (tons) — usa a escala red do Tailwind */
+        brand: {
+          50:  colors.red[50],
+          100: colors.red[100],
+          200: colors.red[200],
+          300: colors.red[300],
+          400: colors.red[400],
+          500: colors.red[500],
+          600: colors.red[600], // próximo do #C62828 em percepção
+          700: colors.red[700],
+          800: colors.red[800],
+          900: colors.red[900],
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -34,6 +59,6 @@ const config: Config = {
       },
     },
   },
-  plugins: [],
+  
 };
 export default config;

@@ -1,11 +1,43 @@
+// app/login/page.tsx
 "use client";
 
 import { useMemo, useState } from "react";
-import { Mail, Lock, ArrowRight, Shield, Eye, EyeOff, Info } from "lucide-react";
+import { Mail, Lock, ArrowRight, Eye, EyeOff, Info } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
 type Mode = "email" | "ra";
+
+type Usuario = {
+  id: string;
+  nome?: string | null;
+  ra?: string | null;
+  papel?: "USUARIO" | "BACKOFFICE" | "TECNICO" | "ADMINISTRADOR";
+};
+
+// Decide a rota pós-login
+function getRedirectPath(params: { mode: Mode; user?: Usuario | null }) {
+  const { mode, user } = params;
+
+  // 1) Login por RA => dashboard do aluno
+  if (mode === "ra") return "/aluno";
+
+  // 2) Backend indicou RA => aluno
+  if (user?.ra) return "/aluno";
+
+  // 3) Papel do Prisma
+  switch (user?.papel) {
+    case "ADMINISTRADOR":
+    case "BACKOFFICE":
+      return "/admin";
+    case "TECNICO":
+      // ajuste se tiver um painel de técnico separado
+      return "/admin";
+    case "USUARIO":
+    default:
+      return "/aluno";
+  }
+}
 
 export default function LoginPage() {
   const [mode, setMode] = useState<Mode>("email"); // "email" (funcionário) | "ra" (aluno)
@@ -35,43 +67,32 @@ export default function LoginPage() {
           ? { email: identifier.trim(), password }
           : { ra: identifier.trim(), password };
 
-      const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/login`;
-
-      // Logs de debug
-      console.log("🔹 Enviando login para backend:", url);
-      console.log("🔸 Body:", body);
+      const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/login`;
 
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include", // se seu backend usa cookies httpOnly
         body: JSON.stringify(body),
       });
 
-      console.log("🔹 Status da resposta:", res.status);
-
       if (!res.ok) {
         const text = await res.text();
-        console.error("❌ Erro na resposta:", text);
-        throw new Error("Credenciais inválidas ou erro no servidor");
+        throw new Error(text || "Credenciais inválidas ou erro no servidor");
       }
 
-      const data = await res.json();
-      console.log("✅ Resposta do backend:", data);
+      const data = (await res.json()) as { user?: Usuario | null };
 
       toast.success("Login realizado com sucesso!", {
         description: `Bem-vindo(a), ${data?.user?.nome ?? "usuário"} 👋`,
       });
 
-      // Exemplo de roteamento simples (ajuste conforme papel)
-      // if (data.user.papel === "ALUNO") window.location.href = "/dashboard/aluno";
-      // else window.location.href = "/dashboard/admin";
-
+      const to = getRedirectPath({ mode, user: data?.user });
+      window.location.href = to;
     } catch (e: any) {
-      console.error("🔥 Erro no login:", e);
-      setErr(e?.message ?? "Erro ao autenticar");
-      toast.error("Falha no login", {
-        description: e?.message ?? "Verifique suas credenciais e tente novamente.",
-      });
+      const msg = e?.message ?? "Erro ao autenticar";
+      setErr(msg);
+      toast.error("Falha no login", { description: msg });
     } finally {
       setLoading(false);
     }
@@ -79,7 +100,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-dvh bg-[radial-gradient(ellipse_at_top,_rgba(198,40,40,0.08),_transparent_55%)] flex flex-col items-center justify-center px-4">
-      {/* Header compacto (título do tamanho do logo + centralizado) */}
+      {/* Header compacto */}
       <div className="mb-6 grid place-items-center select-none">
         <div className="flex items-center gap-2">
           <div className="size-8 rounded-lg bg-primary grid place-items-center text-primary-foreground text-xs font-bold">
@@ -89,14 +110,14 @@ export default function LoginPage() {
             Workflow Fatec
           </span>
         </div>
-        <p className="text-muted-foreground text-sm mt-1">Portal do Aluno</p>
+        <p className="text-muted-foreground text-sm mt-1">Acessar o portal</p>
       </div>
 
       {/* Card */}
       <div className="w-full max-w-md rounded-2xl bg-card shadow-sm ring-1 ring-border">
         <form onSubmit={onSubmit} className="p-5 sm:p-6">
           {/* Toggle modo de login */}
-          <div className="mb-4 grid grid-cols-2 gap-1 rounded-lg bg-[hsl(var(--muted))]/60 p-1">
+          <div className="mb-4 grid grid-cols-2 gap-1 rounded-lg bg-[var(--muted)]/60 p-1">
             <button
               type="button"
               onClick={() => setMode("email")}
@@ -180,7 +201,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPass((v) => !v)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-[hsl(var(--muted))]/60"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-[var(--muted)]/60"
                   aria-label={showPass ? "Ocultar senha" : "Mostrar senha"}
                   title={showPass ? "Ocultar senha" : "Mostrar senha"}
                 >
@@ -213,7 +234,6 @@ export default function LoginPage() {
               <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
             </button>
           </div>
-
         </form>
       </div>
 
