@@ -1,185 +1,175 @@
-/* ===========================
-   IMPORTS – devem vir primeiro
-   =========================== */
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-/* 
-  Se você usar next/font no layout, 
-  não precisa importar fontes aqui.
-*/
+/* ===== Vars (OKLCH) – Claro ===== */
+:root{
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
 
-/* ===========================
-   VARIÁVEIS DO TEMA – Modo Claro
-   =========================== */
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+
+  --radius: 0.625rem;
+}
+
+/* ===== Vars – Escuro ===== */
+.dark{
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.985 0 0);
+
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+}
+
+/* Base mínima */
+html{ scroll-behavior:smooth; }
+body{ background:var(--background); color:var(--foreground); }
+*{ border-color:var(--border); }
+
+/* Tailwind base helpers (v3) */
+@layer base{
+  body{ @apply bg-background text-foreground; }
+}
+
+/* =========================
+   PALETA FATEC – SEM ANIMAÇÕES
+   ========================= */
+
+/* Cores base da marca */
 :root {
-  --background: 0 0% 99%;
-  --foreground: 0 0% 8%;
+  --brand-teal: #004854;
+  --brand-cyan: #00C1CF;
+  --brand-navy: #243E63;
+  --brand-red:  #B20000;
+  --brand-white:#FFFFFF;
+  --ui-gray:    #E6E6E6;
 
-  --card: 0 0% 100%;
-  --card-foreground: 0 0% 8%;
+  /* ======= Tokens shadcn (modo claro) ======= */
+  --background: var(--brand-white);
+  --foreground: var(--brand-navy);
 
-  --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 8%;
+  --card:       #FFFFFF;
+  --card-foreground: var(--brand-navy);
 
-  /* FATEC Red #C62828 = hsl(2, 71%, 44%) */
-  --primary: 2 71% 44%;
-  --primary-foreground: 0 0% 100%;
+  --popover:    #FFFFFF;
+  --popover-foreground: var(--brand-navy);
 
-  --secondary: 0 0% 95%;
-  --secondary-foreground: 0 0% 8%;
+  /* Primária = vermelho da marca */
+  --primary: var(--brand-red);
+  --primary-foreground: #FFFFFF;
 
-  --muted: 0 0% 93%;
-  --muted-foreground: 0 0% 45%;
+  /* Secundária = teal institucional */
+  --secondary: var(--brand-teal);
+  --secondary-foreground: #FFFFFF;
 
-  --accent: 2 71% 44%;
-  --accent-foreground: 0 0% 100%;
+  /* Acento = ciano */
+  --accent: var(--brand-cyan);
+  --accent-foreground: #00343A; /* alto contraste sobre ciano */
 
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 210 40% 98%;
+  /* Estados neutros */
+  --muted: #F6F7F9;              /* cinza bem claro para fundos */
+  --muted-foreground: #5B6472;   /* cinza texto secundário */
 
-  --border: 0 0% 90%;
-  --input: 0 0% 95%;
-  --ring: 2 71% 44%;
+  /* Bordas/inputs/ring */
+  --border: var(--ui-gray);
+  --input:  #F1F3F5;
+  --ring:   #BAC2CF;
 
-  --radius: 0.5rem;
-
-  --sidebar-background: 0 0% 98%;
-  --sidebar-foreground: 0 0% 8%;
-  --sidebar-primary: 2 71% 44%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 0 0% 92%;
-  --sidebar-accent-foreground: 0 0% 8%;
-  --sidebar-border: 0 0% 88%;
-  --sidebar-ring: 2 71% 44%;
+  /* Raio padrão (shadcn) */
+  --radius: 0.625rem;
 }
 
-/* ===========================
-   VARIÁVEIS DO TEMA – Modo Escuro
-   =========================== */
+/* ======= Modo Escuro ======= */
 .dark {
-  --background: 0 0% 10%;
-  --foreground: 0 0% 98%;
+  --background: #0F1724;                 /* azul petróleo escuro */
+  --foreground: #F5F7FA;
 
-  --card: 0 0% 15%;
-  --card-foreground: 0 0% 98%;
+  --card:       #141C2B;
+  --card-foreground: #EBEEF3;
 
-  --popover: 0 0% 15%;
-  --popover-foreground: 0 0% 98%;
+  --popover:    #141C2B;
+  --popover-foreground: #EBEEF3;
 
-  --primary: 2 71% 55%;
-  --primary-foreground: 0 0% 8%;
+  /* Mantemos o vermelho da marca como primary */
+  --primary: var(--brand-red);
+  --primary-foreground: #FFFFFF;
 
-  --secondary: 0 0% 20%;
-  --secondary-foreground: 0 0% 98%;
+  /* Secundária e acento seguem a marca */
+  --secondary: var(--brand-teal);
+  --secondary-foreground: #EAF6F7;
 
-  --muted: 0 0% 25%;
-  --muted-foreground: 0 0% 65%;
+  --accent: var(--brand-cyan);
+  --accent-foreground: #072227;
 
-  --accent: 2 71% 55%;
-  --accent-foreground: 0 0% 8%;
+  /* Neutros escuros */
+  --muted: #1B2434;
+  --muted-foreground: #A9B3C3;
 
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 210 40% 98%;
-
-  --border: 0 0% 25%;
-  --input: 0 0% 20%;
-  --ring: 2 71% 55%;
-
-  --sidebar-background: 0 0% 12%;
-  --sidebar-foreground: 0 0% 98%;
-  --sidebar-primary: 2 71% 55%;
-  --sidebar-primary-foreground: 0 0% 8%;
-  --sidebar-accent: 0 0% 20%;
-  --sidebar-accent-foreground: 0 0% 98%;
-  --sidebar-border: 0 0% 22%;
-  --sidebar-ring: 2 71% 55%;
+  /* Bordas/inputs/ring no escuro */
+  --border: #2A3447;
+  --input:  #222C40;
+  --ring:   #3C4B68;
 }
 
-/* =========================================
-   TOKENS PARA UTILITÁRIOS (Tailwind v4)
-   Isto cria classes como bg-background, text-primary, etc.
-   ========================================= */
-@theme {
-  /* Variáveis de fonte (capturadas pelo next/font) */
-  --font-sans: var(--font-sans);
-  --font-grotesk: var(--font-grotesk);
+/* ===== Utilitários opcionais (usáveis sem Tailwind)
+   Ex.: <div class="bg-brand-red text-white"> ... </div>
+*/
+.bg-brand-red    { background-color: var(--brand-red);    }
+.text-brand-red  { color:            var(--brand-red);    }
+.bg-brand-teal   { background-color: var(--brand-teal);   }
+.text-brand-teal { color:            var(--brand-teal);   }
+.bg-brand-cyan   { background-color: var(--brand-cyan);   }
+.text-brand-cyan { color:            var(--brand-cyan);   }
+.bg-brand-navy   { background-color: var(--brand-navy);   }
+.text-brand-navy { color:            var(--brand-navy);   }
 
-  /* Cores */
-  --color-background: hsl(var(--background));
-  --color-foreground: hsl(var(--foreground));
-  --color-card: hsl(var(--card));
-  --color-card-foreground: hsl(var(--card-foreground));
-  --color-popover: hsl(var(--popover));
-  --color-popover-foreground: hsl(var(--popover-foreground));
-  --color-primary: hsl(var(--primary));
-  --color-primary-foreground: hsl(var(--primary-foreground));
-  --color-secondary: hsl(var(--secondary));
-  --color-secondary-foreground: hsl(var(--secondary-foreground));
-  --color-muted: hsl(var(--muted));
-  --color-muted-foreground: hsl(var(--muted-foreground));
-  --color-accent: hsl(var(--accent));
-  --color-accent-foreground: hsl(var(--accent-foreground));
-  --color-destructive: hsl(var(--destructive));
-  --color-destructive-foreground: hsl(var(--destructive-foreground));
-  --color-border: hsl(var(--border));
-  --color-input: hsl(var(--input));
-  --color-ring: hsl(var(--ring));
-
-  --radius: 0.5rem;
-}
-
-/* =========================================
-   ESTILOS BASE / RESET
-   ========================================= */
-html {
-  scroll-behavior: smooth;
-}
-
-body {
-  background: var(--color-background);
-  color: var(--color-foreground);
-}
-
-/* Define cor de borda para todos os elementos */
-* {
-  border-color: var(--color-border);
-}
-
-/* Tipografia padrão para títulos */
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  font-family: var(--font-grotesk);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-h1 {
-  font-size: clamp(2.5rem, 6vw, 6rem);
-  line-height: 1.1;
-}
-
-h2 {
-  font-size: clamp(2rem, 4.5vw, 4rem);
-  line-height: 1.1;
-}
-
-h3 {
-  font-size: clamp(1.5rem, 3vw, 2.5rem);
-  line-height: 1.15;
-}
-
-/* Faz o texto quebrar adequadamente em vários elementos */
-:where(p, span, li, h1, h2, h3, h4, h5, h6, a, button, label, td, th) {
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
-
-pre,
-code {
-  overflow-x: auto;
-  white-space: pre;
+/* Exemplo de foco consistente (sem plugins/anim) */
+:where(button, input, select, textarea):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
