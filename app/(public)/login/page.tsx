@@ -81,14 +81,21 @@ export default function LoginPage() {
         throw new Error(text || "Credenciais inválidas ou erro no servidor");
       }
 
-      const data = (await res.json()) as { user?: Usuario | null };
+      const data = await res.json();
 
       toast.success("Login realizado com sucesso!", {
         description: `Bem-vindo(a), ${data?.user?.nome ?? "usuário"} 👋`,
       });
-
+      
+      if (data?.accessToken) {
+        localStorage.setItem("accessToken", data.accessToken);
+      }
+      if (data?.refreshToken) {
+        localStorage.setItem("refreshToken", data.refreshToken);
+      }
+      
       const to = getRedirectPath({ mode, user: data?.user });
-      window.location.href = to;
+      window.location.href = to;      
     } catch (e: any) {
       const msg = e?.message ?? "Erro ao autenticar";
       setErr(msg);
