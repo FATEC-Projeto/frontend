@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, ReactNode } from "react";
+import { useMemo, useState, useEffect, ReactNode } from "react";
 import {
   LayoutDashboard,
   Ticket,
@@ -347,7 +347,42 @@ function MobileSidebarTriggerAluno() {
 
 /* ------------------------- PÁGINA ------------------------- */
 export default function AlunoPage() {
-  const alunoNome = "Olá, Alessandra 👋";
+  const [alunoNome, setAlunoNome] = useState<string>("Olá 👋");
+
+  useEffect(() => {
+    async function fetchUsuario() {
+      try {
+        const token = localStorage.getItem("accessToken");
+        console.log("🔹 Token no localStorage:", token);
+        if (!token) return;
+  
+        const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/me`;
+        console.log("🔹 Chamando:", url);
+  
+        const res = await fetch(url, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        console.log("🔹 Status:", res.status);
+  
+        const data = await res.json();
+        console.log("🔹 Resposta /auth/me:", data);
+  
+        if (data?.nome) {
+          const primeiroNome = data.nome.split(" ")[0];
+          setAlunoNome(`Olá, ${primeiroNome} 👋`);
+        } else {
+          setAlunoNome("Olá 👋");
+        }
+      } catch (err) {
+        console.error("💥 Erro na requisição /auth/me:", err);
+        setAlunoNome("Olá 👋");
+      }
+    }
+  
+    fetchUsuario();
+  }, []);
+  
+
 
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<Status | "ALL">("ALL");
