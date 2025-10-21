@@ -5,8 +5,6 @@ import Link from "next/link";
 export default function Home() {
   return (
     <main className="min-h-screen">
-      {/* Só para checar Tailwind v4 no ar */}
-      <div className="test-tailwind-v4">Tailwind v4 ON?</div>
 
       {/* Header / Navbar */}
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur border-b">
