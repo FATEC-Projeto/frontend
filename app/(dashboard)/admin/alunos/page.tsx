@@ -43,14 +43,16 @@ const ALUNO_DETAIL_PREFIX = "/admin/alunos/";
 function cx(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
 }
+
 function StatusBadge({ status }: { status: StatusAtivo }) {
   const map: Record<StatusAtivo, string> = {
     ATIVO: "bg-[var(--success)]/12 text-[var(--success)] border-[var(--success)]/30",
     INATIVO: "bg-[var(--muted)] text-muted-foreground border-[var(--border)]",
   };
+  const label = status === "ATIVO" ? "Ativo" : "Inativo";
   return (
     <span className={cx("inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium border", map[status])}>
-      {status === "ATIVO" ? "Ativo" : "Inativo"}
+      {label}
     </span>
   );
 }
@@ -120,17 +122,19 @@ export default function AdminAlunosPage() {
 
       setRows(mapped);
       setTotal(totalCount);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
+      const message = e instanceof Error ? e.message : String(e);
       setRows([]);
       setTotal(0);
-      setError(String(e?.message ?? e));
+      setError(message);
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
+    // evita primeira chamada sem API_URL em SSR; mas como é "use client", ok.
     fetchAlunos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, status, page]);
@@ -154,12 +158,13 @@ export default function AdminAlunosPage() {
   const nextEnabled = total ? page * perPage < total : rows.length === perPage;
 
   const visibleRows = useMemo(() => {
+    const query = q.trim().toLowerCase();
     return rows.filter((a) => {
       const matchQ =
-        !q ||
-        (a.ra && a.ra.toLowerCase().includes(q.toLowerCase())) ||
-        a.emailEducacional.toLowerCase().includes(q.toLowerCase()) ||
-        (a.nome?.toLowerCase().includes(q.toLowerCase()) ?? false);
+        !query ||
+        (a.ra && a.ra.toLowerCase().includes(query)) ||
+        a.emailEducacional.toLowerCase().includes(query) ||
+        (a.nome?.toLowerCase().includes(query) ?? false);
       const matchStatus = status === "ALL" || a.status === status;
       return matchQ && matchStatus;
     });
