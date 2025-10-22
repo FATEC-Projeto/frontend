@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Search, Layers, BookOpen, Plus, Loader2 } from "lucide-react";
 import MobileSidebarTriggerAluno from "../_components/MobileSidebarTriggerAluno";
 
+/* ----------------------------- Tipos ----------------------------- */
 type Servico = {
   id: string;
   nome: string;
@@ -24,11 +26,12 @@ type CatalogResponse = {
   categorias: Categoria[];
 };
 
+/* ----------------------------- Utils ----------------------------- */
 function cx(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
 }
 
-/** --------- MOCK (fallback) --------- */
+/* ----------------------------- MOCK (fallback) ----------------------------- */
 const MOCK: CatalogResponse = {
   categorias: [
     {
@@ -38,7 +41,7 @@ const MOCK: CatalogResponse = {
       servicos: [
         { id: "s1", nome: "Revisão de nota", descricao: "Solicite revisão da avaliação", ativo: true },
         { id: "s2", nome: "Histórico escolar", descricao: "Gere histórico/declarações", ativo: true },
-        { id: "s3", nome: "Aproveitamento de estudos", descricao: "Solicite análise", ativo: false },
+        { id: "s3", nome: "Aproveitamento de estudos", descricao: "Solicite análise de equivalência curricular", ativo: false },
       ],
     },
     {
@@ -47,7 +50,7 @@ const MOCK: CatalogResponse = {
       descricao: "Pagamentos e documentos financeiros",
       servicos: [
         { id: "s4", nome: "2ª via de boleto", descricao: "Emissão de boleto atualizado", ativo: true },
-        { id: "s5", nome: "Negociação", descricao: "Abra uma negociação", ativo: true },
+        { id: "s5", nome: "Negociação de débito", descricao: "Abra uma negociação financeira", ativo: true },
       ],
     },
     {
@@ -62,7 +65,7 @@ const MOCK: CatalogResponse = {
   ],
 };
 
-/** --------- UI --------- */
+/* ----------------------------- Componentes ----------------------------- */
 function CategoriaPill({ label, active, onClick }: { label: string; active?: boolean; onClick: () => void }) {
   return (
     <button
@@ -77,7 +80,48 @@ function CategoriaPill({ label, active, onClick }: { label: string; active?: boo
   );
 }
 
+/* ----------------------------- Card de Serviço ----------------------------- */
 function ServicoCard({ s }: { s: Servico }) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+
+  async function handleAbrirChamado() {
+    if (!s.ativo) return;
+    try {
+      setLoading(true);
+      const token = localStorage.getItem("accessToken");
+      if (!token) throw new Error("Sessão expirada. Faça login novamente.");
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/tickets`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          titulo: s.nome,
+          descricao: s.descricao || "Solicitação aberta via catálogo",
+          servicoId: s.id,
+          nivel: "N1",
+          prioridade: "MEDIA",
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Erro ao criar chamado");
+      }
+
+      const data = await res.json();
+      toast.success("Chamado criado com sucesso!");
+      router.push(`/aluno/chamados/${data.id}`);
+    } catch (err: any) {
+      toast.error(err.message || "Falha ao criar chamado");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="rounded-xl border border-[var(--border)] bg-card p-4 flex flex-col justify-between">
       <div className="mb-4">
@@ -89,41 +133,48 @@ function ServicoCard({ s }: { s: Servico }) {
             </span>
           )}
         </div>
-        {s.descricao && <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{s.descricao}</p>}
+        {s.descricao && (
+          <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{s.descricao}</p>
+        )}
       </div>
 
       <div className="flex items-center justify-between">
         <div className="text-xs text-muted-foreground">ID: {s.id}</div>
-        <Link
-          href={`/aluno/novo-chamado?servicoId=${encodeURIComponent(s.id)}`}
+        <button
+          disabled={!s.ativo || loading}
+          onClick={handleAbrirChamado}
           className={cx(
-            "inline-flex items-center gap-1.5 h-9 px-3 rounded-md text-sm",
+            "inline-flex items-center gap-1.5 h-9 px-3 rounded-md text-sm transition",
             s.ativo
-              ? "bg-primary text-primary-foreground hover:opacity-90"
-              : "bg-[var(--muted)] text-muted-foreground cursor-not-allowed pointer-events-none"
+              ? "bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-60"
+              : "bg-[var(--muted)] text-muted-foreground cursor-not-allowed"
           )}
-          aria-disabled={!s.ativo}
         >
-          <Plus className="size-4" />
-          Abrir chamado
-        </Link>
+          {loading ? (
+            <>
+              <Loader2 className="size-4 animate-spin" /> Abrindo...
+            </>
+          ) : (
+            <>
+              <Plus className="size-4" /> Abrir chamado
+            </>
+          )}
+        </button>
       </div>
     </div>
   );
 }
 
-/** --------- Página --------- */
+/* ----------------------------- Página Principal ----------------------------- */
 export default function CatalogoAlunoPage() {
   const [loading, setLoading] = useState(true);
   const [catalog, setCatalog] = useState<CatalogResponse>(MOCK);
   const [q, setQ] = useState("");
   const [catId, setCatId] = useState<string | "ALL">("ALL");
-
-  // Saudação
   const [saudacao, setSaudacao] = useState("Olá 👋");
 
+  /* Saudação com nome do aluno */
   useEffect(() => {
-    // pega nome do usuário para “Olá, {nome}”
     async function fetchUsuario() {
       try {
         const token = localStorage.getItem("accessToken");
@@ -142,7 +193,7 @@ export default function CatalogoAlunoPage() {
     fetchUsuario();
   }, []);
 
-  // catálogo
+  /* Buscar catálogo */
   useEffect(() => {
     async function fetchCatalog() {
       try {
@@ -188,13 +239,14 @@ export default function CatalogoAlunoPage() {
     return { total, ativos, indisponiveis };
   }, [flatServicos]);
 
+  /* ----------------------------- Render ----------------------------- */
   return (
     <>
-      {/* Topbar com saudação */}
+      {/* Topbar */}
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="font-grotesk text-2xl sm:text-3xl font-semibold tracking-tight">{saudacao}</h1>
-          <p className="text-muted-foreground">Acompanhe e gerencie seus chamados abertos por você.</p>
+          <p className="text-muted-foreground">Selecione um serviço para abrir um novo chamado.</p>
           <p className="text-xs text-muted-foreground mt-2">
             Catálogo: {kpis.ativos} serviços disponíveis • {kpis.indisponiveis} indisponíveis
           </p>
@@ -222,7 +274,7 @@ export default function CatalogoAlunoPage() {
         </div>
       </div>
 
-      {/* KPIs simples */}
+      {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
         <div className="rounded-xl border border-[var(--border)] bg-card p-4 flex items-center gap-3">
           <Layers className="size-5 text-muted-foreground" />
@@ -247,7 +299,7 @@ export default function CatalogoAlunoPage() {
         </div>
       </div>
 
-      {/* Lista */}
+      {/* Lista de serviços */}
       <div className="rounded-xl border border-[var(--border)] bg-card p-4">
         {loading ? (
           <div className="flex items-center justify-center py-10 text-muted-foreground gap-2">
