@@ -199,12 +199,11 @@ export default function MeusChamadosPage() {
       {/* Ações rápidas + Filtros (igual vibe da home) */}
       <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex gap-2">
-          <Link
-            href="/aluno/novo-chamado"
-            className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground hover:opacity-90"
-          >
-            <Plus className="size-4" /> Abrir novo chamado
-          </Link>
+        <Link
+           href="/aluno/chamados/novo-chamado"
+          className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground hover:opacity-90">
+          <Plus className="size-4" /> Abrir novo chamado
+        </Link>
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row">
