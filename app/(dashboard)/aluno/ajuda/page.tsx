@@ -1,5 +1,5 @@
 "use client";
-
+import { apiFetch } from "../../../../utils/api"
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { HelpCircle, Search, MessageSquare, BookOpenCheck, ExternalLink, Loader2 } from "lucide-react";
@@ -121,13 +121,9 @@ export default function AjudaAlunoPage() {
   useEffect(() => {
     async function loadUser() {
       try {
-        const token = localStorage.getItem("accessToken");
-        if (!token) return;
-        const res = await fetch(`${apiBase}/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: "no-store",
-        });
+        const res = await apiFetch(`${apiBase}/auth/me`, { cache: "no-store" });
         const data = await res.json();
+
         if (data?.nome) {
           const primeiro = String(data.nome).split(" ")[0];
           setSaudacao(`Olá, ${primeiro} 👋`);

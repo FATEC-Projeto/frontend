@@ -1,5 +1,5 @@
 "use client";
-
+import { apiFetch } from "../../../../../utils/api"
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -162,32 +162,31 @@ export default function PageAlunoDetalhe() {
     });
   }, [chamados, q, status, prioridade, nivel]);
 
-  async function onExcluirUsuario() {
-    if (!aluno) return;
-    if (delConfirmText !== (aluno.emailEducacional ?? aluno.emailPessoal)) {
-      toast("Digite exatamente o e-mail do usuário para confirmar.");
-      return;
+    async function onExcluirUsuario() {
+      if (!aluno) return;
+
+      if (delConfirmText !== (aluno.emailEducacional ?? aluno.emailPessoal)) {
+        toast("Digite exatamente o e-mail do usuário para confirmar.");
+        return;
+      }
+
+      try {
+        const res = await apiFetch(`${API_URL}/usuarios/${aluno.id}`, {
+          method: "DELETE",
+        });
+
+        if (!res.ok) throw new Error("Erro ao excluir");
+
+        toast("Usuário excluído com sucesso.");
+        router.push("/admin/alunos");
+      } catch (e) {
+        console.error(e);
+        toast("Não foi possível excluir o usuário.");
+      } finally {
+        setDelOpen(false);
+        setDelConfirmText("");
+      }
     }
-    try {
-      const token =
-        (typeof window !== "undefined" && localStorage.getItem("accessToken")) ||
-        process.env.NEXT_PUBLIC_ACCESS_TOKEN ||
-        "";
-      const res = await fetch(`${API_URL}/usuarios/${aluno.id}`, {
-        method: "DELETE",
-        headers: { Authorization: token ? `Bearer ${token}` : "" },
-      });
-      if (!res.ok) throw new Error("Erro ao excluir");
-      toast("Usuário excluído com sucesso.");
-      router.push("/admin/alunos");
-    } catch (e) {
-      console.error(e);
-      toast("Não foi possível excluir o usuário.");
-    } finally {
-      setDelOpen(false);
-      setDelConfirmText("");
-    }
-  }
 
   function onResetSenha() {
     // aqui você pode chamar seu endpoint de reset e disparar email via Resend
