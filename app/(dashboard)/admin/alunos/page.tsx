@@ -11,6 +11,7 @@ import FormAlunoCreate from "./../_components/FormAlunoCreate";
 import ImportAlunos from "./../_components/ImportAlunos";
 
 /* ========= Tipos ========= */
+type Papel = "USUARIO" | "BACKOFFICE" | "TECNICO" | "ADMINISTRADOR";
 type StatusAtivo = "ATIVO" | "INATIVO";
 
 type Usuario = {
@@ -21,6 +22,7 @@ type Usuario = {
   ra: string | null;
   ativo: boolean;
   criadoEm: string; // ISO
+  papel?: Papel | null; // pode vir ausente do backend
 };
 
 type AlunoRow = {
@@ -87,7 +89,7 @@ export default function AdminAlunosPage() {
       if (token) headers.Authorization = `Bearer ${token}`;
 
       const qs = new URLSearchParams();
-      // força papel=USUARIO no servidor (aluno = usuário)
+      // ainda enviamos a intenção para o backend (caso ele já suporte)
       qs.set("papel", "USUARIO");
       if (q) qs.set("search", q);
       if (status !== "ALL") qs.set("ativo", String(status === "ATIVO"));
@@ -108,10 +110,13 @@ export default function AdminAlunosPage() {
 
       const json = await res.json();
       const usuarios: Usuario[] = Array.isArray(json) ? json : (json.data ?? []);
-      const totalCount: number =
-        Array.isArray(json) ? usuarios.length : (typeof json.total === "number" ? json.total : usuarios.length);
 
-      const mapped: AlunoRow[] = usuarios.map((u) => ({
+      // === FILTRO CLIENT-SIDE: somente alunos ===
+      // Regra: é aluno se papel === "USUARIO" OU se papel estiver ausente/null.
+      const alunosApenas = usuarios.filter((u) => (u.papel ?? "USUARIO") === "USUARIO");
+
+      // Mapeia linhas
+      const mapped: AlunoRow[] = alunosApenas.map((u) => ({
         id: u.id,
         ra: u.ra ?? "",
         emailEducacional: u.emailEducacional ?? u.emailPessoal,
@@ -119,6 +124,13 @@ export default function AdminAlunosPage() {
         status: u.ativo ? "ATIVO" : "INATIVO",
         criadoEm: u.criadoEm,
       }));
+
+      // Ajusta total de forma resiliente (se o backend já filtra, o total dele bate;
+      // se não filtra, mostramos o total pós-filtro local).
+      const totalCount: number =
+        Array.isArray(json)
+          ? alunosApenas.length
+          : (typeof json.total === "number" ? json.total : alunosApenas.length);
 
       setRows(mapped);
       setTotal(totalCount);
