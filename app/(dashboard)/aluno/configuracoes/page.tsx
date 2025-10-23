@@ -1,5 +1,5 @@
 "use client";
-
+import { apiFetch } from "../../../../utils/api"
 import { useEffect, useState } from "react";
 import { Bell, Globe, Loader2, Moon, Save, Settings, Sun, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -19,28 +19,25 @@ export default function ConfiguracoesAlunoPage() {
 
   const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-  useEffect(() => {
-    async function loadUser() {
-      try {
-        const token = localStorage.getItem("accessToken");
-        if (!token) return;
-        const res = await fetch(`${apiBase}/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: "no-store",
-        });
-        const data = await res.json();
-        if (data?.nome) {
-          const primeiro = String(data.nome).split(" ")[0];
-          setSaudacao(`Olá, ${primeiro} 👋`);
+      useEffect(() => {
+        async function loadUser() {
+          try {
+            const res = await apiFetch(`${apiBase}/auth/me`, { cache: "no-store" });
+            const data = await res.json();
+
+            if (data?.nome) {
+              const primeiro = String(data.nome).split(" ")[0];
+              setSaudacao(`Olá, ${primeiro} 👋`);
+            }
+          } catch {
+            // ignora — apiFetch já cuida de redirecionar se o token estiver inválido
+          } finally {
+            setLoading(false);
+          }
         }
-      } catch {
-        /* ignora */
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadUser();
-  }, [apiBase]);
+
+        loadUser();
+      }, [apiBase]);
 
   async function saveConfig(e: React.FormEvent) {
     e.preventDefault();
