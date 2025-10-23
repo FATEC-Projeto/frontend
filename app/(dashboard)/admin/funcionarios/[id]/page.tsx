@@ -1,5 +1,5 @@
 "use client";
-
+import { apiFetch } from "../../../../../utils/api"
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -223,29 +223,33 @@ export default function FuncionarioDetalhePage() {
     toast("Reset de senha enviado (stub).");
   }
 
-  async function onExcluirUsuario() {
-    if (!func) return;
-    const expected = func.emailEducacional ?? func.emailPessoal ?? "";
-    if (delConfirmText !== expected) {
-      toast("Digite exatamente o e-mail do usuário para confirmar.");
-      return;
+    async function onExcluirUsuario() {
+      if (!func) return;
+
+      const expected = func.emailEducacional ?? func.emailPessoal ?? "";
+      if (delConfirmText !== expected) {
+        toast("Digite exatamente o e-mail do usuário para confirmar.");
+        return;
+      }
+
+      try {
+        const res = await apiFetch(`${API_URL}/usuarios/${encodeURIComponent(func.id)}`, {
+          method: "DELETE",
+        });
+
+        if (!res.ok) throw new Error("Erro ao excluir funcionário.");
+
+        toast("Funcionário excluído com sucesso.");
+        router.push(FUNC_LIST); // ex.: "/admin/funcionarios"
+      } catch (err) {
+        console.error(err);
+        // se for 401/403, o apiFetch já terá redirecionado; o toast ainda ajuda
+        toast("Não foi possível excluir o funcionário.");
+      } finally {
+        setDelOpen(false);
+        setDelConfirmText("");
+      }
     }
-    try {
-      const res = await fetch(`${API_URL}/usuarios/${encodeURIComponent(func.id)}`, {
-        method: "DELETE",
-        headers: authHeaders,
-      });
-      if (!res.ok) throw new Error("Erro ao excluir funcionário.");
-      toast("Funcionário excluído com sucesso.");
-      router.push(FUNC_LIST);
-    } catch (err) {
-      console.error(err);
-      toast("Não foi possível excluir o funcionário.");
-    } finally {
-      setDelOpen(false);
-      setDelConfirmText("");
-    }
-  }
 
   async function onAddSetor(e: React.FormEvent) {
     e.preventDefault();

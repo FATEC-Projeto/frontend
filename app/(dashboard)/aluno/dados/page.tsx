@@ -1,5 +1,5 @@
 "use client";
-
+import { apiFetch } from "../../../../utils/api"
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, Save, Shield, User, Mail, IdCard } from "lucide-react";
 import { toast } from "sonner";
@@ -56,35 +56,32 @@ export default function MeusDadosPage() {
 
   const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-  /* ---------- FETCH DADOS DO ALUNO ---------- */
-  useEffect(() => {
-    async function load() {
-      try {
-        const token = localStorage.getItem("accessToken");
-        if (!token) {
+    useEffect(() => {
+      async function load() {
+        try {
+          const res = await apiFetch(`${apiBase}/auth/me`);
+          if (!res.ok) throw new Error("Falha ao carregar usuário");
+
+          const data = (await res.json()) as Usuario;
+
+          setUser(data);
+          setNome(data.nome ?? "");
+          setEmailPessoal(data.emailPessoal ?? "");
+          setEmailEducacional(data.emailEducacional ?? "");
+
+          if (data?.nome) {
+            const primeiro = data.nome.split(" ")[0];
+            setSaudacao(`Olá, ${primeiro} 👋`);
+          }
+        } catch {
+          toast.error("Não foi possível carregar seus dados");
+        } finally {
           setLoading(false);
-          return;
         }
-        const res = await fetch(`${apiBase}/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = (await res.json()) as Usuario;
-        setUser(data);
-        setNome(data.nome ?? "");
-        setEmailPessoal(data.emailPessoal ?? "");
-        setEmailEducacional(data.emailEducacional ?? "");
-        if (data?.nome) {
-          const primeiro = data.nome.split(" ")[0];
-          setSaudacao(`Olá, ${primeiro} 👋`);
-        }
-      } catch {
-        toast.error("Não foi possível carregar seus dados");
-      } finally {
-        setLoading(false);
       }
-    }
-    load();
-  }, [apiBase]);
+
+      load();
+    }, [apiBase]);
 
   /* ---------- VALIDAÇÕES ---------- */
   const canSave = useMemo(() => {
@@ -112,18 +109,15 @@ export default function MeusDadosPage() {
       const token = localStorage.getItem("accessToken");
       if (!token) throw new Error("Não autenticado.");
 
-      const res = await fetch(`${apiBase}/usuarios/${user.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          nome: nome.trim(),
-          emailPessoal: emailPessoal.trim(),
-          emailEducacional: emailEducacional.trim(),
-        }),
-      });
+
+     const res = await apiFetch(`${apiBase}/usuarios/${user.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            nome: nome.trim(),
+            emailPessoal: emailPessoal.trim(),
+            emailEducacional: emailEducacional.trim(),
+          }),
+        });
 
       if (!res.ok) throw new Error("Erro ao salvar alterações");
 
@@ -137,35 +131,36 @@ export default function MeusDadosPage() {
     }
   }
 
-  const canChangePass =
-    currentPass.length >= 6 && newPass.length >= 6 && newPass === newPass2;
+const canChangePass =
+  currentPass.length >= 6 && newPass.length >= 6 && newPass === newPass2;
 
-  async function changePassword(e: React.FormEvent) {
-    e.preventDefault();
-    if (!canChangePass) return;
-    try {
-      setChanging(true);
-      const token = localStorage.getItem("accessToken");
-      if (!token) throw new Error("Não autenticado.");
-      const res = await fetch(`${apiBase}/auth/change-password`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ currentPassword: currentPass, newPassword: newPass }),
-      });
-      if (!res.ok) throw new Error("Erro ao alterar senha");
-      toast.success("Senha alterada com sucesso!");
-      setCurrentPass("");
-      setNewPass("");
-      setNewPass2("");
-    } catch (e: any) {
-      toast.error("Falha ao alterar senha", { description: e?.message });
-    } finally {
-      setChanging(false);
-    }
+async function changePassword(e: React.FormEvent) {
+  e.preventDefault();
+  if (!canChangePass) return;
+
+  try {
+    setChanging(true);
+
+    const res = await apiFetch(`${apiBase}/auth/change-password`, {
+      method: "POST",
+      body: JSON.stringify({
+        currentPassword: currentPass,
+        newPassword: newPass,
+      }),
+    });
+
+    if (!res.ok) throw new Error("Erro ao alterar senha");
+
+    toast.success("Senha alterada com sucesso!");
+    setCurrentPass("");
+    setNewPass("");
+    setNewPass2("");
+  } catch (e: any) {
+    toast.error("Falha ao alterar senha", { description: e?.message });
+  } finally {
+    setChanging(false);
   }
+}
 
   /* ---------- RENDER ---------- */
   return (

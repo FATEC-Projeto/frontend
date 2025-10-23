@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "../../../../utils/api"
 
 import { useState } from "react";
 import { BadgeCheck, Loader2, KeyRound, Sparkles } from "lucide-react";
@@ -46,21 +47,20 @@ export default function FormAlunoCreate({ onSuccess, onCancel }: Props) {
         process.env.NEXT_PUBLIC_ACCESS_TOKEN ||
         "";
 
-      const res = await fetch(`${API_URL}/usuarios`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          nome: nome || null,
-          emailEducacional,
-          emailPessoal: emailEducacional,
-          ra,
-          papel: "USUARIO", // aluno sempre é USUARIO
-          senha: senha || undefined, // opcional — backend pode gerar
-        }),
-      });
+        const res = await apiFetch(`${API_URL}/usuarios`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            nome: nome || null,
+            emailEducacional,
+            emailPessoal: emailEducacional,
+            ra,
+            papel: "USUARIO", // aluno sempre é USUARIO
+            senha: senha || undefined, // opcional — backend pode gerar
+          }),
+        });
 
       if (!res.ok) {
         const text = await res.text().catch(() => "");
