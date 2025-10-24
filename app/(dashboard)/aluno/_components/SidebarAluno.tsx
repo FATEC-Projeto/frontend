@@ -37,7 +37,7 @@ export default function SidebarAluno({
   const router = useRouter();
 
   const items: NavItemProps[] = [
-    { href: "/home/aluno", label: "Visão Geral", icon: <LayoutDashboard className="size-4" /> },
+    { href: "/aluno/home", label: "Visão Geral", icon: <LayoutDashboard className="size-4" /> },
     { href: "/aluno/chamados", label: "Meus chamados", icon: <Ticket className="size-4" />, badge: meusChamadosCount },
     { href: "/aluno/catalogo", label: "Catálogo de serviços", icon: <BookOpen className="size-4" /> },
     { href: "/aluno/dados", label: "Meus dados", icon: <User className="size-4" /> },
