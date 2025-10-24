@@ -53,16 +53,6 @@ function StatusBadge({ status }: { status: Status }) {
   );
 }
 
-function PrioridadeDot({ p }: { p: Prioridade }) {
-  const map: Record<Prioridade, string> = {
-    BAIXA: "bg-[var(--muted-foreground)]",
-    MEDIA: "bg-[var(--brand-cyan)]",
-    ALTA: "bg-[var(--brand-teal)]",
-    URGENTE: "bg-[var(--brand-red)]",
-  };
-  return <span className={cx("inline-block size-2 rounded-full", map[p])} />;
-}
-
 function AcoesChamado({ c }: { c: Chamado }) {
   const base =
     "inline-flex items-center h-9 px-3 rounded-md border border-[var(--border)] bg-background hover:bg-[var(--muted)] text-sm";
@@ -124,22 +114,39 @@ export default function MeusChamadosPage() {
     fetchUsuario();
   }, []);
 
-  // Buscar chamados (só do aluno)
   useEffect(() => {
     async function fetchChamados() {
       try {
         setLoading(true);
         const token = localStorage.getItem("accessToken");
-        const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/tickets?include=setor,criadoPor&meus=true`;
-        const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-        const data = await res.json();
+        if (!token) return;
+
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        const userId = payload.sub;
+
+        const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/tickets?include=setor,criadoPor&feitoPorId=${userId}`;
+        console.log("🔍 URL chamada:", url);
+
+        const res = await fetch(url, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        const text = await res.text(); // força ler texto cru para inspecionar
+        console.log("🔍 Status:", res.status);
+        console.log("🔍 Resposta:", text);
+
+        if (!res.ok) throw new Error(`Erro HTTP ${res.status}`);
+
+        const data = JSON.parse(text);
         setDados(data.items ?? []);
       } catch (err) {
+        console.error("💥 Erro ao buscar chamados:", err);
         toast.error("Erro ao carregar chamados");
       } finally {
         setLoading(false);
       }
     }
+
     fetchChamados();
   }, []);
 
@@ -200,7 +207,7 @@ export default function MeusChamadosPage() {
       <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex gap-2">
         <Link
-           href="/aluno/chamados/novo-chamado"
+           href="/aluno/catalogo"
           className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground hover:opacity-90">
           <Plus className="size-4" /> Abrir novo chamado
         </Link>
@@ -264,7 +271,6 @@ export default function MeusChamadosPage() {
                     <th className="text-left font-medium px-4 py-3">Título</th>
                     <th className="text-left font-medium px-4 py-3">Setor</th>
                     <th className="text-left font-medium px-4 py-3">Status</th>
-                    <th className="text-left font-medium px-4 py-3">Prioridade</th>
                     <th className="text-left font-medium px-4 py-3">Criado em</th>
                     <th className="text-right font-medium px-4 py-3">Ações</th>
                   </tr>
@@ -283,12 +289,6 @@ export default function MeusChamadosPage() {
                       </td>
                       <td className="px-4 py-3">{c.setor?.nome ?? "—"}</td>
                       <td className="px-4 py-3"><StatusBadge status={c.status} /></td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="inline-flex items-center gap-2">
-                          <PrioridadeDot p={c.prioridade} />
-                          <span>{c.prioridade}</span>
-                        </span>
-                      </td>
                       <td className="px-4 py-3">
                         {new Date(c.criadoEm).toLocaleDateString("pt-BR")}
                       </td>
@@ -316,11 +316,6 @@ export default function MeusChamadosPage() {
                   <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
                     <div className="text-muted-foreground">Setor</div>
                     <div>{c.setor?.nome ?? "—"}</div>
-                    <div className="text-muted-foreground">Prioridade</div>
-                    <div className="inline-flex items-center gap-2">
-                      <PrioridadeDot p={c.prioridade} />
-                      <span>{c.prioridade}</span>
-                    </div>
                     <div className="text-muted-foreground">Criado em</div>
                     <div>{new Date(c.criadoEm).toLocaleDateString("pt-BR")}</div>
                   </div>
