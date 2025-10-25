@@ -38,7 +38,7 @@ export default function SidebarAluno({
 
   const items: NavItemProps[] = [
     { href: "/aluno/home", label: "Visão Geral", icon: <LayoutDashboard className="size-4" /> },
-    { href: "/aluno/chamados", label: "Meus chamados", icon: <Ticket className="size-4" />, badge: meusChamadosCount },
+    { href: "/aluno/chamados", label: "Meus chamados", icon: <Ticket className="size-4" />},
     { href: "/aluno/catalogo", label: "Catálogo de serviços", icon: <BookOpen className="size-4" /> },
     { href: "/aluno/dados", label: "Meus dados", icon: <User className="size-4" /> },
     { href: "/aluno/notificacoes", label: "Notificações", icon: <Bell className="size-4" />, badge: aguardandoCount },

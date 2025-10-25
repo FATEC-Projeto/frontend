@@ -63,9 +63,7 @@ export default function Home() {
               <a href="#sobre" className="underline underline-offset-4">Rolar para conhecer</a>
             </div>
 
-            {/* Infos de ambiente (opcional) */}
-            {/* <p>Ambiente: <strong>{ENV.NEXT_PUBLIC_ENV}</strong></p>
-            <p>API base: <strong>{ENV.NEXT_PUBLIC_API_BASE_URL}</strong></p> */}
+           
           </div>
 
           <div className="relative">
