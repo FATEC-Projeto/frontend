@@ -129,31 +129,11 @@ function Kpi({
 
 /* ------------------------- PÁGINA ------------------------- */
 export default function AlunoHomePage() {
-  const [alunoNome, setAlunoNome] = useState<string>("Olá 👋");
+  
   const [chamados, setChamados] = useState<Chamado[]>([]);
   const [loading, setLoading] = useState(true);
   const [limite, setLimite] = useState(20);
 
-  // Buscar nome do aluno
-  useEffect(() => {
-    async function fetchUsuario() {
-      try {
-        const token = localStorage.getItem("accessToken");
-        if (!token) return;
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-        if (data?.nome) {
-          const primeiroNome = data.nome.split(" ")[0];
-          setAlunoNome(`Olá, ${primeiroNome} 👋`);
-        }
-      } catch {
-        setAlunoNome("Olá 👋");
-      }
-    }
-    fetchUsuario();
-  }, []);
 
   // Buscar chamados e atualizar a cada 60s
   useEffect(() => {
@@ -229,14 +209,6 @@ export default function AlunoHomePage() {
     <>
       {/* Topbar */}
       <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="font-grotesk text-2xl sm:text-3xl font-semibold tracking-tight">
-            {alunoNome}
-          </h1>
-          <p className="text-muted-foreground">
-            Acompanhe seus chamados e ações pendentes.
-          </p>
-        </div>
         <MobileSidebarTriggerAluno />
       </div>
 

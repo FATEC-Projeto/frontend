@@ -1,5 +1,5 @@
 "use client";
-import { apiFetch } from "../../../../utils/api"
+import { apiFetch } from "../../../../utils/api";
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, Save, Shield, User, Mail, IdCard } from "lucide-react";
 import { toast } from "sonner";
@@ -52,36 +52,31 @@ export default function MeusDadosPage() {
   const [currentPass, setCurrentPass] = useState("");
   const [newPass, setNewPass] = useState("");
   const [newPass2, setNewPass2] = useState("");
-  const [saudacao, setSaudacao] = useState("Olá 👋");
 
   const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-    useEffect(() => {
-      async function load() {
-        try {
-          const res = await apiFetch(`${apiBase}/auth/me`);
-          if (!res.ok) throw new Error("Falha ao carregar usuário");
-
-          const data = (await res.json()) as Usuario;
-
-          setUser(data);
-          setNome(data.nome ?? "");
-          setEmailPessoal(data.emailPessoal ?? "");
-          setEmailEducacional(data.emailEducacional ?? "");
-
-          if (data?.nome) {
-            const primeiro = data.nome.split(" ")[0];
-            setSaudacao(`Olá, ${primeiro} 👋`);
-          }
-        } catch {
-          toast.error("Não foi possível carregar seus dados");
-        } finally {
-          setLoading(false);
-        }
+  // Carrega o usuário e preenche o formulário (sem saudação)
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await apiFetch(`${apiBase}/auth/me`, { cache: "no-store" });
+        const data: Usuario = await res.json();
+        if (!alive) return;
+        setUser(data);
+        setNome(data?.nome ?? "");
+        setEmailPessoal(data?.emailPessoal ?? "");
+        setEmailEducacional(data?.emailEducacional ?? "");
+      } catch (e: any) {
+        toast.error("Falha ao carregar seus dados", { description: e?.message });
+      } finally {
+        if (alive) setLoading(false);
       }
-
-      load();
-    }, [apiBase]);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [apiBase]);
 
   /* ---------- VALIDAÇÕES ---------- */
   const canSave = useMemo(() => {
@@ -106,21 +101,15 @@ export default function MeusDadosPage() {
 
     try {
       setSaving(true);
-      const token = localStorage.getItem("accessToken");
-      if (!token) throw new Error("Não autenticado.");
-
-
-     const res = await apiFetch(`${apiBase}/usuarios/${user.id}`, {
-          method: "PATCH",
-          body: JSON.stringify({
-            nome: nome.trim(),
-            emailPessoal: emailPessoal.trim(),
-            emailEducacional: emailEducacional.trim(),
-          }),
-        });
-
+      const res = await apiFetch(`${apiBase}/usuarios/${user.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          nome: nome.trim(),
+          emailPessoal: emailPessoal.trim(),
+          emailEducacional: emailEducacional.trim(),
+        }),
+      });
       if (!res.ok) throw new Error("Erro ao salvar alterações");
-
       const updated = (await res.json()) as Usuario;
       setUser(updated);
       toast.success("Dados atualizados com sucesso!");
@@ -131,48 +120,38 @@ export default function MeusDadosPage() {
     }
   }
 
-const canChangePass =
-  currentPass.length >= 6 && newPass.length >= 6 && newPass === newPass2;
+  const canChangePass =
+    currentPass.length >= 6 && newPass.length >= 6 && newPass === newPass2;
 
-async function changePassword(e: React.FormEvent) {
-  e.preventDefault();
-  if (!canChangePass) return;
-
-  try {
-    setChanging(true);
-
-    const res = await apiFetch(`${apiBase}/auth/change-password`, {
-      method: "POST",
-      body: JSON.stringify({
-        currentPassword: currentPass,
-        newPassword: newPass,
-      }),
-    });
-
-    if (!res.ok) throw new Error("Erro ao alterar senha");
-
-    toast.success("Senha alterada com sucesso!");
-    setCurrentPass("");
-    setNewPass("");
-    setNewPass2("");
-  } catch (e: any) {
-    toast.error("Falha ao alterar senha", { description: e?.message });
-  } finally {
-    setChanging(false);
+  async function changePassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canChangePass) return;
+    try {
+      setChanging(true);
+      const res = await apiFetch(`${apiBase}/auth/change-password`, {
+        method: "POST",
+        body: JSON.stringify({
+          currentPassword: currentPass,
+          newPassword: newPass,
+        }),
+      });
+      if (!res.ok) throw new Error("Erro ao alterar senha");
+      toast.success("Senha alterada com sucesso!");
+      setCurrentPass("");
+      setNewPass("");
+      setNewPass2("");
+    } catch (e: any) {
+      toast.error("Falha ao alterar senha", { description: e?.message });
+    } finally {
+      setChanging(false);
+    }
   }
-}
 
   /* ---------- RENDER ---------- */
   return (
     <div className="space-y-6">
-      {/* Topbar */}
-      <div className="mb-2 flex items-center justify-between">
-        <div>
-          <h1 className="font-grotesk text-2xl sm:text-3xl font-semibold tracking-tight">{saudacao}</h1>
-          <p className="text-muted-foreground">
-            Confira e mantenha suas informações pessoais e de acesso atualizadas.
-          </p>
-        </div>
+      {/* Apenas o trigger mobile da sidebar; sem boas-vindas */}
+      <div className="xl:hidden">
         <MobileSidebarTriggerAluno />
       </div>
 

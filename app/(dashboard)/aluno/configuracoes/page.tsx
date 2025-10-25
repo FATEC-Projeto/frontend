@@ -1,5 +1,5 @@
 "use client";
-import { apiFetch } from "../../../../utils/api"
+
 import { useEffect, useState } from "react";
 import { Bell, Globe, Loader2, Moon, Save, Settings, Sun, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -9,76 +9,77 @@ function cx(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
 }
 
+const LS_KEYS = {
+  theme: "theme",
+  lang: "lang",
+  emailNotif: "email_notifications",
+} as const;
+
+function getInitialTheme(): "light" | "dark" {
+  if (typeof window === "undefined") return "light";
+  const stored = localStorage.getItem(LS_KEYS.theme) as "light" | "dark" | null;
+  if (stored === "light" || stored === "dark") return stored;
+  const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+  return prefersDark ? "dark" : "light";
+}
+
 export default function ConfiguracoesAlunoPage() {
-  const [saudacao, setSaudacao] = useState("Olá 👋");
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
-  const [lang, setLang] = useState("pt-BR");
-  const [notificacoes, setNotificacoes] = useState(true);
+  const [theme, setTheme] = useState<"light" | "dark">(getInitialTheme);
+  const [lang, setLang] = useState<string>(() => localStorage.getItem(LS_KEYS.lang) || "pt-BR");
+  const [emailNotif, setEmailNotif] = useState<boolean>(() => {
+    const v = localStorage.getItem(LS_KEYS.emailNotif);
+    return v ? v === "1" : true; // default: ligado
+  });
 
-  const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL;
+  // aplica o tema no <html> e persiste
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const root = document.documentElement;
+    if (theme === "dark") root.classList.add("dark");
+    else root.classList.remove("dark");
+    localStorage.setItem(LS_KEYS.theme, theme);
+  }, [theme]);
 
-      useEffect(() => {
-        async function loadUser() {
-          try {
-            const res = await apiFetch(`${apiBase}/auth/me`, { cache: "no-store" });
-            const data = await res.json();
+  function handleThemeToggle() {
+    setTheme((t) => (t === "dark" ? "light" : "dark"));
+  }
 
-            if (data?.nome) {
-              const primeiro = String(data.nome).split(" ")[0];
-              setSaudacao(`Olá, ${primeiro} 👋`);
-            }
-          } catch {
-            // ignora — apiFetch já cuida de redirecionar se o token estiver inválido
-          } finally {
-            setLoading(false);
-          }
-        }
-
-        loadUser();
-      }, [apiBase]);
+  function handleClearCache() {
+    // limpa apenas as chaves locais desta página
+    localStorage.removeItem(LS_KEYS.theme);
+    localStorage.removeItem(LS_KEYS.lang);
+    localStorage.removeItem(LS_KEYS.emailNotif);
+    toast.info("Preferências locais limpas!");
+    // re-aplica defaults
+    setTheme(getInitialTheme());
+    setLang("pt-BR");
+    setEmailNotif(true);
+  }
 
   async function saveConfig(e: React.FormEvent) {
     e.preventDefault();
     try {
       setSaving(true);
-      // opcional: salvar preferências no backend futuramente
+      // persistência local
+      localStorage.setItem(LS_KEYS.lang, lang);
+      localStorage.setItem(LS_KEYS.emailNotif, emailNotif ? "1" : "0");
+
+      // se quiser, aqui dá pra chamar o backend no futuro (/me/preferences)
+      // await apiFetch(`${apiBase}/me/preferences`, { method: "PATCH", body: JSON.stringify({ theme, lang, emailNotif }) })
+
       toast.success("Configurações salvas com sucesso!");
-    } catch {
+    } catch (e) {
       toast.error("Falha ao salvar configurações");
     } finally {
       setSaving(false);
     }
   }
 
-  function handleThemeChange() {
-    const newMode = !darkMode;
-    setDarkMode(newMode);
-    document.documentElement.classList.toggle("dark", newMode);
-  }
-
-  function handleClearCache() {
-    localStorage.clear();
-    toast.info("Cache e sessões locais limpos!");
-  }
-
   return (
     <div className="space-y-6">
-      {/* Topbar */}
-      <div className="mb-2 flex items-center justify-between">
-        <div>
-          <h1 className="font-grotesk text-2xl sm:text-3xl font-semibold tracking-tight">
-            {loading ? (
-              <span className="inline-flex items-center gap-2 text-muted-foreground">
-                <Loader2 className="size-4 animate-spin" /> Carregando…
-              </span>
-            ) : (
-              saudacao
-            )}
-          </h1>
-          <p className="text-muted-foreground">Gerencie preferências da sua conta e da plataforma.</p>
-        </div>
+      {/* Topbar mínima (sem saudação; o layout já tem cabeçalho global) */}
+      <div className="mb-2 flex items-center justify-end">
         <MobileSidebarTriggerAluno />
       </div>
 
@@ -95,7 +96,7 @@ export default function ConfiguracoesAlunoPage() {
         {/* Tema */}
         <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
           <div className="flex items-center gap-3">
-            {darkMode ? (
+            {theme === "dark" ? (
               <Moon className="size-5 text-muted-foreground" />
             ) : (
               <Sun className="size-5 text-muted-foreground" />
@@ -111,8 +112,8 @@ export default function ConfiguracoesAlunoPage() {
             <input
               type="checkbox"
               className="sr-only peer"
-              checked={darkMode}
-              onChange={handleThemeChange}
+              checked={theme === "dark"}
+              onChange={handleThemeToggle}
             />
             <div className="w-10 h-5 bg-[var(--muted)] rounded-full peer peer-checked:bg-primary transition-all relative">
               <span className="absolute top-[2px] left-[2px] w-4 h-4 bg-background rounded-full transition-all peer-checked:translate-x-5" />
@@ -157,8 +158,8 @@ export default function ConfiguracoesAlunoPage() {
             <input
               type="checkbox"
               className="sr-only peer"
-              checked={notificacoes}
-              onChange={() => setNotificacoes(!notificacoes)}
+              checked={emailNotif}
+              onChange={() => setEmailNotif((v) => !v)}
             />
             <div className="w-10 h-5 bg-[var(--muted)] rounded-full peer peer-checked:bg-primary transition-all relative">
               <span className="absolute top-[2px] left-[2px] w-4 h-4 bg-background rounded-full transition-all peer-checked:translate-x-5" />
