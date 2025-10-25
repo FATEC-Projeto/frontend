@@ -5,19 +5,20 @@ import { useMemo, useState, useEffect, ReactNode } from "react";
 import {
   Ticket,
   Plus,
-  Search,
   Clock,
   CheckCircle2,
   AlertTriangle,
-  MessageSquareText,
-  Paperclip,
-  ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import MobileSidebarTriggerAluno from "../_components/MobileSidebarTriggerAluno";
 
 /* ------------------------- TIPOS ------------------------- */
-type Status = "ABERTO" | "EM_ATENDIMENTO" | "AGUARDANDO_USUARIO" | "RESOLVIDO" | "ENCERRADO";
+type Status =
+  | "ABERTO"
+  | "EM_ATENDIMENTO"
+  | "AGUARDANDO_USUARIO"
+  | "RESOLVIDO"
+  | "ENCERRADO";
 type Prioridade = "BAIXA" | "MEDIA" | "ALTA" | "URGENTE";
 
 type Chamado = {
@@ -28,16 +29,14 @@ type Chamado = {
   status: Status;
   prioridade: Prioridade;
   setor?: { nome?: string } | null;
-  precisaAcaoDoAluno?: boolean;
-  mensagensNaoLidas?: number;
 };
 
-/* ------------------------- UTILS ------------------------- */
+/* ------------------------- UTIL ------------------------- */
 function cx(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
 }
 
-/* ------------------------- BADGES ------------------------- */
+/* ------------------------- COMPONENTES ------------------------- */
 function StatusBadge({ status }: { status: Status }) {
   const map: Record<Status, { label: string; cls: string }> = {
     ABERTO: {
@@ -63,23 +62,17 @@ function StatusBadge({ status }: { status: Status }) {
   };
   const v = map[status];
   return (
-    <span className={cx("inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium border", v.cls)}>
+    <span
+      className={cx(
+        "inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium border",
+        v.cls
+      )}
+    >
       {v.label}
     </span>
   );
 }
 
-function PrioridadeDot({ p }: { p: Prioridade }) {
-  const map: Record<Prioridade, string> = {
-    BAIXA: "bg-[var(--muted-foreground)]",
-    MEDIA: "bg-[var(--brand-cyan)]",
-    ALTA: "bg-[var(--brand-teal)]",
-    URGENTE: "bg-[var(--brand-red)]",
-  };
-  return <span className={cx("inline-block size-2 rounded-full", map[p])} />;
-}
-
-/* ------------------------- KPI ------------------------- */
 function Kpi({
   icon,
   label,
@@ -114,8 +107,20 @@ function Kpi({
           <div className="text-2xl font-semibold">{value}</div>
           {hint && <div className="text-xs text-muted-foreground/80">{hint}</div>}
         </div>
-        <div className={cx("size-10 rounded-lg grid place-items-center", tone ? bgMap[tone] : "bg-[var(--muted)]")}>
-          <div className={cx("opacity-90", tone ? textMap[tone] : "text-muted-foreground")}>{icon}</div>
+        <div
+          className={cx(
+            "size-10 rounded-lg grid place-items-center",
+            tone ? bgMap[tone] : "bg-[var(--muted)]"
+          )}
+        >
+          <div
+            className={cx(
+              "opacity-90",
+              tone ? textMap[tone] : "text-muted-foreground"
+            )}
+          >
+            {icon}
+          </div>
         </div>
       </div>
     </div>
@@ -127,9 +132,7 @@ export default function AlunoHomePage() {
   const [alunoNome, setAlunoNome] = useState<string>("Olá 👋");
   const [chamados, setChamados] = useState<Chamado[]>([]);
   const [loading, setLoading] = useState(true);
-  const [q, setQ] = useState("");
-  const [status, setStatus] = useState<Status | "ALL">("ALL");
-  const [prioridade, setPrioridade] = useState<Prioridade | "ALL">("ALL");
+  const [limite, setLimite] = useState(20);
 
   // Buscar nome do aluno
   useEffect(() => {
@@ -152,20 +155,37 @@ export default function AlunoHomePage() {
     fetchUsuario();
   }, []);
 
-  // Buscar chamados REAIS
+  // Buscar chamados e atualizar a cada 60s
   useEffect(() => {
     async function fetchChamados() {
       try {
         setLoading(true);
         const token = localStorage.getItem("accessToken");
         if (!token) throw new Error("Token não encontrado");
-
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/tickets`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error("Erro ao buscar chamados");
-        const data = await res.json();
-        setChamados(Array.isArray(data) ? data : []);
+    
+        const base = `${process.env.NEXT_PUBLIC_API_BASE_URL}/tickets?include=setor`;
+        const pageSize = 100; // limite do backend
+        let page = 1;
+        let total = 0;
+        const all: any[] = [];
+    
+        while (true) {
+          const res = await fetch(`${base}&page=${page}&pageSize=${pageSize}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) throw new Error("Erro ao buscar chamados");
+          const data = await res.json(); // { total, page, pageSize, items }
+          if (page === 1) total = data.total ?? 0;
+    
+          const items = Array.isArray(data.items) ? data.items : [];
+          all.push(...items);
+    
+          const fetched = all.length;
+          if (fetched >= total || items.length < pageSize) break; 
+          page += 1;
+        }
+    
+        setChamados(all);
       } catch (err) {
         console.error(err);
         toast.error("Erro ao carregar chamados");
@@ -173,55 +193,90 @@ export default function AlunoHomePage() {
         setLoading(false);
       }
     }
-    fetchChamados();
-  }, []);
+    
 
-  // Filtros
-  const dados = useMemo(() => {
-    return chamados.filter((c) => {
-      const matchQ =
-        !q ||
-        c.titulo.toLowerCase().includes(q.toLowerCase()) ||
-        c.protocolo?.toLowerCase().includes(q.toLowerCase());
-      const matchS = status === "ALL" || c.status === status;
-      const matchP = prioridade === "ALL" || c.prioridade === prioridade;
-      return matchQ && matchS && matchP;
-    });
-  }, [chamados, q, status, prioridade]);
+    fetchChamados();
+    const interval = setInterval(fetchChamados, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   // KPIs
   const kpi = useMemo(() => {
-    const abertos = chamados.filter((d) => ["ABERTO", "EM_ATENDIMENTO"].includes(d.status)).length;
-    const aguardandoEu = chamados.filter((d) => d.status === "AGUARDANDO_USUARIO").length;
-    const emAtendimento = chamados.filter((d) => d.status === "EM_ATENDIMENTO").length;
+    const abertos = chamados.filter((d) =>
+      ["ABERTO", "EM_ATENDIMENTO"].includes(d.status)
+    ).length;
+    const aguardandoEu = chamados.filter(
+      (d) => d.status === "AGUARDANDO_USUARIO"
+    ).length;
+    const emAtendimento = chamados.filter(
+      (d) => d.status === "EM_ATENDIMENTO"
+    ).length;
     const resolvidos = chamados.filter((d) => d.status === "RESOLVIDO").length;
     return { abertos, aguardandoEu, emAtendimento, resolvidos };
   }, [chamados]);
 
+  // Chamados visíveis (somente os ativos)
+  const chamadosAtivos = chamados.filter(
+    (d) =>
+      d.status === "ABERTO" ||
+      d.status === "EM_ATENDIMENTO" ||
+      d.status === "AGUARDANDO_USUARIO"
+  );
+  const chamadosVisiveis = chamadosAtivos.slice(0, limite);
+
+  /* ------------------------- RENDER ------------------------- */
   return (
     <>
       {/* Topbar */}
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="font-grotesk text-2xl sm:text-3xl font-semibold tracking-tight">{alunoNome}</h1>
-          <p className="text-muted-foreground">Acompanhe seus chamados e ações pendentes.</p>
+          <h1 className="font-grotesk text-2xl sm:text-3xl font-semibold tracking-tight">
+            {alunoNome}
+          </h1>
+          <p className="text-muted-foreground">
+            Acompanhe seus chamados e ações pendentes.
+          </p>
         </div>
         <MobileSidebarTriggerAluno />
       </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Kpi icon={<Ticket className="size-4" />} label="Meus abertos" value={kpi.abertos} tone="brand-cyan" hint="Aberto + Em atendimento" />
-        <Kpi icon={<AlertTriangle className="size-4" />} label="Aguardando minha ação" value={kpi.aguardandoEu} tone="warning" hint="Responda ou anexe arquivos" />
-        <Kpi icon={<Clock className="size-4" />} label="Em atendimento" value={kpi.emAtendimento} tone="brand-teal" />
-        <Kpi icon={<CheckCircle2 className="size-4" />} label="Resolvidos" value={kpi.resolvidos} tone="success" />
+        <Kpi
+          icon={<Ticket className="size-4" />}
+          label="Abertos"
+          value={kpi.abertos}
+          tone="brand-cyan"
+          hint="Chamados em aberto"
+        />
+        <Kpi
+          icon={<AlertTriangle className="size-4" />}
+          label="Aguardando minha ação"
+          value={kpi.aguardandoEu}
+          tone="warning"
+          hint="Responda ou anexe arquivos"
+        />
+        <Kpi
+          icon={<Clock className="size-4" />}
+          label="Em atendimento"
+          value={kpi.emAtendimento}
+          tone="brand-teal"
+        />
+        <Kpi
+          icon={<CheckCircle2 className="size-4" />}
+          label="Resolvidos"
+          value={kpi.resolvidos}
+          tone="success"
+        />
       </div>
 
       {/* Lista de chamados */}
       <div className="rounded-xl border border-[var(--border)] bg-card overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-muted-foreground">Carregando chamados...</div>
-        ) : dados.length === 0 ? (
+          <div className="p-8 text-center text-muted-foreground">
+            Carregando chamados...
+          </div>
+        ) : chamadosVisiveis.length === 0 ? (
           <div className="p-8 text-center text-muted-foreground">
             Nenhum chamado encontrado.
           </div>
@@ -232,22 +287,24 @@ export default function AlunoHomePage() {
                 <tr>
                   <th className="text-left font-medium px-4 py-3">Protocolo</th>
                   <th className="text-left font-medium px-4 py-3">Título</th>
+                  <th className="text-left font-medium px-4 py-3">Setor</th>
                   <th className="text-left font-medium px-4 py-3">Status</th>
-                  <th className="text-left font-medium px-4 py-3">Prioridade</th>
                   <th className="text-left font-medium px-4 py-3">Criado em</th>
                 </tr>
               </thead>
               <tbody>
-                {dados.map((c) => (
-                  <tr key={c.id} className="border-t border-[var(--border)]">
-                    <td className="px-4 py-3 font-medium">{c.protocolo ?? `#${c.id}`}</td>
+                {chamadosVisiveis.map((c) => (
+                  <tr
+                    key={c.id}
+                    className="border-t border-[var(--border)] hover:bg-[var(--muted)]/40"
+                  >
+                    <td className="px-4 py-3 font-medium">
+                      {c.protocolo ?? `#${c.id}`}
+                    </td>
                     <td className="px-4 py-3">{c.titulo}</td>
-                    <td className="px-4 py-3"><StatusBadge status={c.status} /></td>
+                    <td className="px-4 py-3">{c.setor?.nome ?? "—"}</td>
                     <td className="px-4 py-3">
-                      <span className="inline-flex items-center gap-2">
-                        <PrioridadeDot p={c.prioridade} />
-                        <span>{c.prioridade}</span>
-                      </span>
+                      <StatusBadge status={c.status} />
                     </td>
                     <td className="px-4 py-3">
                       {new Date(c.criadoEm).toLocaleDateString("pt-BR")}
@@ -256,6 +313,28 @@ export default function AlunoHomePage() {
                 ))}
               </tbody>
             </table>
+
+            {/* Botões Ver mais / Mostrar menos */}
+            {chamadosAtivos.length > limite && (
+              <div className="p-4 text-center">
+                <button
+                  onClick={() => setLimite(chamadosAtivos.length)}
+                  className="text-sm font-medium text-[var(--brand-red)] hover:underline"
+                  >
+                  Ver todos os {chamadosAtivos.length} chamados
+                </button>
+              </div>
+            )}
+            {limite > 20 && (
+              <div className="p-4 text-center">
+                <button
+                  onClick={() => setLimite(20)}
+                  className="text-sm font-medium text-[var(--brand-red)] hover:underline"
+                  >
+                  Mostrar menos
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
