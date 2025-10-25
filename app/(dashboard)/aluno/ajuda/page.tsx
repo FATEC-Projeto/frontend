@@ -1,8 +1,8 @@
 "use client";
-import { apiFetch } from "../../../../utils/api"
-import { useEffect, useMemo, useState } from "react";
+
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { HelpCircle, Search, MessageSquare, BookOpenCheck, ExternalLink, Loader2 } from "lucide-react";
+import { HelpCircle, Search, MessageSquare, BookOpenCheck, ExternalLink } from "lucide-react";
 import MobileSidebarTriggerAluno from "../_components/MobileSidebarTriggerAluno";
 
 type FAQ = {
@@ -49,13 +49,6 @@ const FAQS: FAQ[] = [
       { label: "Meus Chamados", href: "/aluno/chamados" },
     ],
   },
-//   {
-//     id: "faq-5",
-//     categoria: "Financeiro",
-//     pergunta: "Como consigo 2ª via de boleto?",
-//     resposta:
-//       "Entre em Catálogo → Financeiro → ‘2ª via de boleto’. Informe os dados do período vigente e aguarde o processamento.",
-//   },
   {
     id: "faq-6",
     categoria: "Plataforma",
@@ -109,33 +102,8 @@ function FAQItem({ f }: { f: FAQ }) {
 }
 
 export default function AjudaAlunoPage() {
-  const [saudacao, setSaudacao] = useState("Olá 👋");
   const [q, setQ] = useState("");
-  const [cat, setCat] = useState<
-    "ALL" | "Acesso & Senha" | "Acadêmico"| "Documentos" | "Plataforma"
-  >("ALL");
-  const [loadingUser, setLoadingUser] = useState(true);
-
-  const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL;
-
-  useEffect(() => {
-    async function loadUser() {
-      try {
-        const res = await apiFetch(`${apiBase}/auth/me`, { cache: "no-store" });
-        const data = await res.json();
-
-        if (data?.nome) {
-          const primeiro = String(data.nome).split(" ")[0];
-          setSaudacao(`Olá, ${primeiro} 👋`);
-        }
-      } catch {
-        /* segue com saudação padrão */
-      } finally {
-        setLoadingUser(false);
-      }
-    }
-    loadUser();
-  }, [apiBase]);
+  const [cat, setCat] = useState<"ALL" | "Acesso & Senha" | "Acadêmico" | "Documentos" | "Plataforma">("ALL");
 
   const categorias = useMemo(
     () => ["Acesso & Senha", "Acadêmico", "Documentos", "Plataforma"] as FAQ["categoria"][],
@@ -157,22 +125,8 @@ export default function AjudaAlunoPage() {
 
   return (
     <div className="space-y-6">
-      {/* Topbar */}
-      <div className="mb-2 flex items-center justify-between">
-        <div>
-          <h1 className="font-grotesk text-2xl sm:text-3xl font-semibold tracking-tight">
-            {loadingUser ? (
-              <span className="inline-flex items-center gap-2 text-muted-foreground">
-                <Loader2 className="size-4 animate-spin" /> Carregando…
-              </span>
-            ) : (
-              saudacao
-            )}
-          </h1>
-          <p className="text-muted-foreground">
-            Encontre respostas rápidas ou abra um chamado se precisar de ajuda.
-          </p>
-        </div>
+      {/* Trigger da sidebar para mobile (sem saudação aqui; está no layout) */}
+      <div className="flex items-center justify-end">
         <MobileSidebarTriggerAluno />
       </div>
 
@@ -249,7 +203,7 @@ export default function AjudaAlunoPage() {
             Ir ao Catálogo
           </Link>
           <Link
-            href="/aluno/novo-chamado"
+            href="/aluno/chamados"
             className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground hover:opacity-90"
           >
             <MessageSquare className="size-4" />

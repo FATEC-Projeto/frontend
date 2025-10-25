@@ -3,45 +3,72 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  Ticket,
   Search,
   AlertTriangle,
-  CheckCircle2,
-  Clock,
-  Plus,
-  MessageSquareText,
   ChevronRight,
   Paperclip,
+  Plus,
+  Loader2,
+  MessageSquareText,
 } from "lucide-react";
 import { toast } from "sonner";
 import MobileSidebarTriggerAluno from "../_components/MobileSidebarTriggerAluno";
+import { apiFetch } from "../../../../utils/api";
 
-// Tipos
-type Status = "ABERTO" | "EM_ATENDIMENTO" | "AGUARDANDO_USUARIO" | "RESOLVIDO" | "ENCERRADO";
+/* ---------- Tipos ---------- */
+type Status =
+  | "ABERTO"
+  | "EM_ATENDIMENTO"
+  | "AGUARDANDO_USUARIO"
+  | "RESOLVIDO"
+  | "ENCERRADO";
 
 type Chamado = {
   id: string;
-  protocolo?: string;
+  protocolo?: string | null;
   titulo: string;
   criadoEm: string;
   status: Status;
-  setor?: { nome?: string };
-  precisaAcaoDoAluno?: boolean;
-  mensagensNaoLidas?: number;
+  setor?: { nome?: string | null } | null;
+  precisaAcaoDoAluno?: boolean | null;
+  mensagensNaoLidas?: number | null;
 };
 
+type PageResp = {
+  total: number;
+  page: number;
+  pageSize: number;
+  items: Chamado[];
+};
+
+/* ---------- Utils ---------- */
 function cx(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
 }
 
-// Badges
+/* ---------- Badges ---------- */
 function StatusBadge({ status }: { status: Status }) {
   const map: Record<Status, { label: string; cls: string }> = {
-    ABERTO: { label: "Aberto", cls: "bg-[var(--brand-cyan)]/12 text-[var(--brand-cyan)] border-[var(--brand-cyan)]/30" },
-    EM_ATENDIMENTO: { label: "Em atendimento", cls: "bg-[var(--brand-teal)]/12 text-[var(--brand-teal)] border-[var(--brand-teal)]/30" },
-    AGUARDANDO_USUARIO: { label: "Aguardando você", cls: "bg-[var(--warning)]/12 text-[var(--warning)] border-[var(--warning)]/30" },
-    RESOLVIDO: { label: "Resolvido", cls: "bg-[var(--success)]/12 text-[var(--success)] border-[var(--success)]/30" },
-    ENCERRADO: { label: "Encerrado", cls: "bg-[var(--muted)] text-muted-foreground border-[var(--border)]" },
+    ABERTO: {
+      label: "Aberto",
+      cls: "bg-[var(--brand-cyan)]/12 text-[var(--brand-cyan)] border-[var(--brand-cyan)]/30",
+    },
+    EM_ATENDIMENTO: {
+      label: "Em atendimento",
+      cls: "bg-[var(--brand-teal)]/12 text-[var(--brand-teal)] border-[var(--brand-teal)]/30",
+    },
+    AGUARDANDO_USUARIO: {
+      label: "Aguardando você",
+      cls: "bg-[var(--warning)]/12 text-[var(--warning)] border-[var(--warning)]/30",
+    },
+    RESOLVIDO: {
+      label: "Resolvido",
+      cls: "bg-[var(--success)]/12 text-[var(--success)] border-[var(--success)]/30",
+    },
+    ENCERRADO: {
+      label: "Encerrado",
+      cls: "bg-[var(--muted)] text-muted-foreground border-[var(--border)]",
+    },
   };
   const v = map[status];
   return (
@@ -57,9 +84,9 @@ function AcoesChamado({ c }: { c: Chamado }) {
 
   return (
     <div className="flex gap-2 justify-end">
-      <Link href={`/aluno/chamados/${c.id}`} className={base}>
+      {/* <Link href={`/aluno/chamados/${c.id}`} className={base}>
         Detalhes <ChevronRight className="size-4 ml-1" />
-      </Link>
+      </Link> */}
 
       {["ABERTO", "EM_ATENDIMENTO", "AGUARDANDO_USUARIO"].includes(c.status) && (
         <Link
@@ -73,7 +100,10 @@ function AcoesChamado({ c }: { c: Chamado }) {
       {c.precisaAcaoDoAluno && (
         <Link
           href={`/aluno/chamados/${c.id}#anexos`}
-          className={cx(base, "border-[var(--warning)]/40 text-[var(--warning)] hover:bg-[var(--warning)]/10")}
+          className={cx(
+            base,
+            "border-[var(--warning)]/40 text-[var(--warning)] hover:bg-[var(--warning)]/10"
+          )}
         >
           <Paperclip className="size-4 mr-1" /> Enviar arquivo
         </Link>
@@ -82,99 +112,65 @@ function AcoesChamado({ c }: { c: Chamado }) {
   );
 }
 
+/* ---------- Página ---------- */
 export default function MeusChamadosPage() {
-  const [alunoNome, setAlunoNome] = useState<string>("Olá 👋");
   const [dados, setDados] = useState<Chamado[]>([]);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<Status | "ALL">("ALL");
   const [loading, setLoading] = useState(true);
 
-  // Cabeçalho com nome (mesma lógica da home)
+  // Busca tickets do usuário autenticado.
+  // O backend já usa o JWT para filtrar (não precisamos mandar feitoPorId).
   useEffect(() => {
-    async function fetchUsuario() {
-      try {
-        const token = localStorage.getItem("accessToken");
-        if (!token) return;
-        const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/me`;
-        const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-        const data = await res.json();
-        if (data?.nome) {
-          const primeiroNome = data.nome.split(" ")[0];
-          setAlunoNome(`Olá, ${primeiroNome} 👋`);
-        } else {
-          setAlunoNome("Olá 👋");
-        }
-      } catch {
-        setAlunoNome("Olá 👋");
-      }
-    }
-    fetchUsuario();
-  }, []);
-
-  useEffect(() => {
-    async function fetchChamados() {
+    let alive = true;
+    (async () => {
       try {
         setLoading(true);
-        const token = localStorage.getItem("accessToken");
-        if (!token) return;
-
-        const payload = JSON.parse(atob(token.split(".")[1]));
-        const userId = payload.sub;
-
-        const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/tickets?include=setor,criadoPor&feitoPorId=${userId}`;
-        console.log("🔍 URL chamada:", url);
-
-        const res = await fetch(url, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        const text = await res.text(); // força ler texto cru para inspecionar
-        console.log("🔍 Status:", res.status);
-        console.log("🔍 Resposta:", text);
-
-        if (!res.ok) throw new Error(`Erro HTTP ${res.status}`);
-
-        const data = JSON.parse(text);
-        setDados(data.items ?? []);
-      } catch (err) {
-        console.error("💥 Erro ao buscar chamados:", err);
-        toast.error("Erro ao carregar chamados");
+        const res = await apiFetch(
+          `${process.env.NEXT_PUBLIC_API_BASE_URL}/tickets?include=setor`
+        );
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err?.error || `Erro HTTP ${res.status}`);
+        }
+        const data: PageResp = await res.json();
+        if (alive) setDados(data.items ?? []);
+      } catch (err: any) {
+        toast.error("Erro ao carregar chamados", { description: err?.message });
       } finally {
-        setLoading(false);
+        if (alive) setLoading(false);
       }
-    }
-
-    fetchChamados();
+    })();
+    return () => {
+      alive = false;
+    };
   }, []);
 
   const filtrados = useMemo(() => {
+    const termo = q.trim().toLowerCase();
     return dados.filter((c) => {
       const qOk =
-        !q ||
-        c.titulo.toLowerCase().includes(q.toLowerCase()) ||
-        c.protocolo?.toLowerCase().includes(q.toLowerCase());
+        !termo ||
+        c.titulo.toLowerCase().includes(termo) ||
+        (c.protocolo ?? "").toLowerCase().includes(termo);
       const sOk = status === "ALL" || c.status === status;
       return qOk && sOk;
     });
   }, [dados, q, status]);
 
-  const aguardandoCount = filtrados.filter((d) => d.status === "AGUARDANDO_USUARIO").length;
+  const aguardandoCount = useMemo(
+    () => filtrados.filter((d) => d.status === "AGUARDANDO_USUARIO").length,
+    [filtrados]
+  );
 
   return (
     <>
-      {/* Topbar (igual à home) */}
+      {/* Topbar mínima (sem saudação; cabeçalho global está no layout) */}
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="font-grotesk text-2xl sm:text-3xl font-semibold tracking-tight">{alunoNome}</h1>
-          <p className="text-muted-foreground">Acompanhe e gerencie seus chamados abertos por você.</p>
+          <p className="text-muted-foreground">Acompanhe e gerencie seus chamados.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="hidden sm:flex flex-col items-end mr-2">
-            <div className="text-sm font-medium">Aluno(a)</div>
-            <div className="text-xs text-muted-foreground">aluno@fatec.sp.gov.br</div>
-          </div>
-          <MobileSidebarTriggerAluno />
-        </div>
+        <MobileSidebarTriggerAluno />
       </div>
 
       {/* Banner aguardando ação (se houver) */}
@@ -185,7 +181,9 @@ export default function MeusChamadosPage() {
               <AlertTriangle className="size-5 text-[var(--warning)] mt-0.5" />
               <div>
                 <div className="font-medium">Você tem {aguardandoCount} chamado(s) aguardando sua ação.</div>
-                <div className="text-sm text-muted-foreground">Envie documentos, responda mensagens ou conclua a tarefa.</div>
+                <div className="text-sm text-muted-foreground">
+                  Envie documentos, responda mensagens ou conclua a tarefa.
+                </div>
               </div>
             </div>
             <button
@@ -199,14 +197,15 @@ export default function MeusChamadosPage() {
         </div>
       )}
 
-      {/* Ações rápidas + Filtros (igual vibe da home) */}
+      {/* Ações + Filtros */}
       <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex gap-2">
-        <Link
-           href="/aluno/catalogo"
-          className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground hover:opacity-90">
-          <Plus className="size-4" /> Abrir novo chamado
-        </Link>
+          <Link
+            href="/aluno/catalogo"
+            className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground hover:opacity-90"
+          >
+            <Plus className="size-4" /> Abrir novo chamado
+          </Link>
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -233,15 +232,16 @@ export default function MeusChamadosPage() {
             <option value="RESOLVIDO">Resolvido</option>
             <option value="ENCERRADO">Encerrado</option>
           </select>
-
-          
         </div>
       </div>
 
       {/* Lista */}
       <div className="rounded-xl border border-[var(--border)] bg-card overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-muted-foreground">Carregando...</div>
+          <div className="p-8 text-center text-muted-foreground">
+            <Loader2 className="size-4 animate-spin inline-block mr-2" />
+            Carregando...
+          </div>
         ) : filtrados.length === 0 ? (
           <div className="p-8 text-center text-muted-foreground">
             Nenhum chamado encontrado com os filtros atuais.
@@ -274,7 +274,9 @@ export default function MeusChamadosPage() {
                         )}
                       </td>
                       <td className="px-4 py-3">{c.setor?.nome ?? "—"}</td>
-                      <td className="px-4 py-3"><StatusBadge status={c.status} /></td>
+                      <td className="px-4 py-3">
+                        <StatusBadge status={c.status} />
+                      </td>
                       <td className="px-4 py-3">
                         {new Date(c.criadoEm).toLocaleDateString("pt-BR")}
                       </td>
@@ -293,7 +295,9 @@ export default function MeusChamadosPage() {
                 <div key={c.id} className="p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <div className="text-xs text-muted-foreground">{c.protocolo ?? `#${c.id}`}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {c.protocolo ?? `#${c.id}`}
+                      </div>
                       <div className="font-medium">{c.titulo}</div>
                     </div>
                     <StatusBadge status={c.status} />
