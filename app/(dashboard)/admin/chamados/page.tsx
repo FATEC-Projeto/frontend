@@ -1,18 +1,21 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Search, Filter, LayoutList, LayoutGrid, ChevronRight,
   Tag, User, Building2, Clock, ArrowUpDown
 } from "lucide-react";
+import { apiFetch } from "../../../../utils/api"; 
+import Link from "next/link";
 
+/* ===== Tipos ===== */
 type Status = "ABERTO" | "EM_ATENDIMENTO" | "AGUARDANDO_USUARIO" | "RESOLVIDO" | "ENCERRADO";
 type Prioridade = "BAIXA" | "MEDIA" | "ALTA" | "URGENTE";
 type Nivel = "N1" | "N2" | "N3";
 
-type Chamado = {
+type ChamadoUI = {
   id: string;
-  protocolo?: string;
+  protocolo?: string | null;
   titulo: string;
   criadoEm: string; // ISO
   status: Status;
@@ -23,19 +26,48 @@ type Chamado = {
   setor?: string | null;
 };
 
-const MOCK: Chamado[] = [
-  { id: "1", protocolo: "WF-2025-0101", titulo: "Acesso bloqueado ao SIGA", criadoEm: "2025-10-18T09:12:00Z", status: "ABERTO", prioridade: "ALTA", nivel: "N1", solicitante: "João Silva", responsavel: null, setor: "TI Acadêmica" },
-  { id: "2", protocolo: "WF-2025-0102", titulo: "Erro emissão de boleto", criadoEm: "2025-10-16T15:38:00Z", status: "AGUARDANDO_USUARIO", prioridade: "MEDIA", nivel: "N2", solicitante: "Maria Souza", responsavel: "Ana", setor: "Financeiro" },
-  { id: "3", protocolo: "WF-2025-0103", titulo: "Solicitação histórico escolar", criadoEm: "2025-10-14T11:05:00Z", status: "EM_ATENDIMENTO", prioridade: "BAIXA", nivel: "N1", solicitante: "Carlos Lima", responsavel: "Bruno", setor: "Secretaria" },
-  { id: "4", protocolo: "WF-2025-0104", titulo: "Integração SSO — falha OIDC", criadoEm: "2025-10-13T08:21:00Z", status: "EM_ATENDIMENTO", prioridade: "URGENTE", nivel: "N3", solicitante: "Equipe Infra", responsavel: "Carla", setor: "TI Acadêmica" },
-  { id: "5", protocolo: "WF-2025-0105", titulo: "Alteração de matrícula", criadoEm: "2025-10-12T08:21:00Z", status: "RESOLVIDO", prioridade: "MEDIA", nivel: "N2", solicitante: "Ana Pereira", responsavel: "Diego", setor: "Secretaria" },
-];
+type ApiChamado = {
+  id: string;
+  protocolo?: string | null;
+  titulo: string;
+  descricao?: string | null;
+  nivel: Nivel;
+  status: Status;
+  prioridade: Prioridade;
+  criadoEm: string;
+  criadoPor?: { nome?: string | null } | null;
+  responsavel?: { nome?: string | null } | null;
+  setor?: { nome?: string | null } | null;
+};
 
+type PageResp = {
+  total: number;
+  page: number;
+  pageSize: number;
+  items: ApiChamado[];
+};
+
+/* ===== Utils ===== */
 function cx(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
 }
 
-/* Badges / Chips */
+function toUI(x: ApiChamado): ChamadoUI {
+  return {
+    id: x.id,
+    protocolo: x.protocolo ?? undefined,
+    titulo: x.titulo,
+    criadoEm: x.criadoEm,
+    status: x.status,
+    prioridade: x.prioridade,
+    nivel: x.nivel,
+    solicitante: x.criadoPor?.nome || "—",
+    responsavel: x.responsavel?.nome || null,
+    setor: x.setor?.nome || null,
+  };
+}
+
+/* ===== Badges / Chips ===== */
 function StatusBadge({ status }: { status: Status }) {
   const map: Record<Status, { label: string; cls: string }> = {
     ABERTO: { label: "Aberto", cls: "bg-[var(--brand-cyan)]/12 text-[var(--brand-cyan)] border-[var(--brand-cyan)]/30" },
@@ -84,18 +116,51 @@ export default function AdminChamadosPage() {
   const [setor, setSetor] = useState<string | "ALL">("ALL");
   const [sortDesc, setSortDesc] = useState(true);
 
-  const setoresDisponiveis = useMemo(() => {
-    const s = new Set(MOCK.map(c => c.setor).filter(Boolean) as string[]);
-    return Array.from(s);
+  const [loading, setLoading] = useState(true);
+  const [dadosApi, setDadosApi] = useState<ChamadoUI[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  /* Fetch real */
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/tickets?include=setor,criadoPor,responsavel&pageSize=20`;
+        const res = await apiFetch(url, { cache: "no-store" });
+        if (!res.ok) {
+          const msg = await res.text().catch(() => "");
+          throw new Error(msg || `HTTP ${res.status}`);
+        }
+        const data: PageResp = await res.json();
+        const items = (data?.items ?? []).map(toUI);
+        if (alive) setDadosApi(items);
+      } catch (e: any) {
+        if (alive) setError(e?.message || "Falha ao carregar chamados");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
   }, []);
 
+  const setoresDisponiveis = useMemo(() => {
+    const s = new Set(dadosApi.map(c => c.setor).filter(Boolean) as string[]);
+    return Array.from(s);
+  }, [dadosApi]);
+
   const dados = useMemo(() => {
-    let arr = MOCK.filter((c) => {
+    const base = dadosApi.slice();
+    let arr = base.filter((c) => {
+      const ql = q.trim().toLowerCase();
       const matchQ =
-        !q ||
-        c.titulo.toLowerCase().includes(q.toLowerCase()) ||
-        c.protocolo?.toLowerCase().includes(q.toLowerCase()) ||
-        c.solicitante.toLowerCase().includes(q.toLowerCase());
+        !ql ||
+        c.titulo.toLowerCase().includes(ql) ||
+        (c.protocolo ?? "").toLowerCase().includes(ql) ||
+        c.solicitante.toLowerCase().includes(ql) ||
+        (c.responsavel ?? "").toLowerCase().includes(ql);
       const matchS = status === "ALL" || c.status === status;
       const matchP = prioridade === "ALL" || c.prioridade === prioridade;
       const matchN = nivel === "ALL" || c.nivel === nivel;
@@ -106,7 +171,7 @@ export default function AdminChamadosPage() {
       (sortDesc ? +new Date(b.criadoEm) - +new Date(a.criadoEm) : +new Date(a.criadoEm) - +new Date(b.criadoEm))
     );
     return arr;
-  }, [q, status, prioridade, nivel, setor, sortDesc]);
+  }, [dadosApi, q, status, prioridade, nivel, setor, sortDesc]);
 
   return (
     <div className="space-y-6">
@@ -117,7 +182,7 @@ export default function AdminChamadosPage() {
           <div className="relative sm:w-[360px]">
             <Search className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
             <input
-              placeholder="Buscar por protocolo, título ou solicitante"
+              placeholder="Buscar por protocolo, título, solicitante ou responsável"
               className="w-full h-10 rounded-lg border border-[var(--border)] bg-input px-9 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
               value={q}
               onChange={(e) => setQ(e.target.value)}
@@ -203,14 +268,27 @@ export default function AdminChamadosPage() {
         </div>
       </div>
 
-      {view === "LIST" ? <Lista dados={dados} sortDesc={sortDesc} setSortDesc={setSortDesc} /> : <Kanban dados={dados} />}
+      {/* Conteúdo */}
+      {loading ? (
+        <div className="rounded-xl border border-[var(--border)] bg-card p-10 text-center text-muted-foreground">
+          Carregando chamados...
+        </div>
+      ) : error ? (
+        <div className="rounded-xl border border-[var(--border)] bg-card p-10 text-center text-destructive">
+          Falha ao carregar: {error}
+        </div>
+      ) : view === "LIST" ? (
+        <Lista dados={dados} sortDesc={sortDesc} setSortDesc={setSortDesc} />
+      ) : (
+        <Kanban dados={dados} />
+      )}
     </div>
   );
 }
 
 /* ====================== LISTA ====================== */
 function Lista({ dados, sortDesc, setSortDesc }: {
-  dados: Chamado[];
+  dados: ChamadoUI[];
   sortDesc: boolean;
   setSortDesc: (v: boolean) => void;
 }) {
@@ -267,10 +345,14 @@ function Lista({ dados, sortDesc, setSortDesc }: {
                   <span className="inline-flex items-center gap-1 text-xs text-muted-foreground ml-1"><Clock className="size-3" /> {new Date(c.criadoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <button className="inline-flex items-center h-9 px-3 rounded-md hover:bg-[var(--muted)]">
+                  <Link
+                    href={`/admin/chamados/${c.id}`}
+                    className="inline-flex items-center h-9 px-3 rounded-md hover:bg-[var(--muted)]"
+                  >
                     Detalhes <ChevronRight className="size-4 ml-1" />
-                  </button>
+                  </Link>
                 </td>
+
               </tr>
             ))}
             {dados.length === 0 && (
@@ -288,9 +370,8 @@ function Lista({ dados, sortDesc, setSortDesc }: {
 }
 
 /* ====================== KANBAN ====================== */
-function Kanban({ dados }: { dados: Chamado[] }) {
-  // agrupa por status nas colunas
-  const byStatus: Record<Status, Chamado[]> = {
+function Kanban({ dados }: { dados: ChamadoUI[] }) {
+  const byStatus: Record<Status, ChamadoUI[]> = {
     ABERTO: [], EM_ATENDIMENTO: [], AGUARDANDO_USUARIO: [], RESOLVIDO: [], ENCERRADO: [],
   };
   for (const c of dados) byStatus[c.status]?.push(c);
@@ -304,7 +385,6 @@ function Kanban({ dados }: { dados: Chamado[] }) {
               <StatusBadge status={col} />
               <span className="text-muted-foreground font-normal">({byStatus[col]?.length ?? 0})</span>
             </div>
-            {/* Dica: você pode colocar um botão “+ Novo” aqui por coluna, se fizer sentido */}
           </div>
 
           <div className="p-3 space-y-3 min-h-[120px]">
@@ -323,13 +403,20 @@ function Kanban({ dados }: { dados: Chamado[] }) {
   );
 }
 
-function CardKanban({ c }: { c: Chamado }) {
+function CardKanban({ c }: { c: ChamadoUI }) {
   return (
-    <div className="rounded-lg border border-[var(--border)] bg-background p-3 hover:border-[var(--ring)] transition">
+    <Link
+      href={`/admin/chamados/${c.id}`}
+      className="block rounded-lg border border-[var(--border)] bg-background p-3 hover:border-[var(--ring)] transition"
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="text-xs text-muted-foreground">{c.protocolo ?? `#${c.id}`}</div>
-          <div className="font-medium leading-tight line-clamp-2">{c.titulo}</div>
+          <div className="text-xs text-muted-foreground">
+            {c.protocolo ?? `#${c.id}`}
+          </div>
+          <div className="font-medium leading-tight line-clamp-2">
+            {c.titulo}
+          </div>
         </div>
         <NivelBadge n={c.nivel} />
       </div>
@@ -343,6 +430,6 @@ function CardKanban({ c }: { c: Chamado }) {
           <User className="size-3" /> {c.responsavel ?? "—"}
         </span>
       </div>
-    </div>
+    </Link>
   );
 }
