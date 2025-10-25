@@ -13,6 +13,7 @@ import {
   Building2,
   Bell,
   LogOut,
+  MessageCircleMore, // 💬 ícone de mensagens
 } from "lucide-react";
 import { useMemo } from "react";
 
@@ -31,14 +32,13 @@ export default function SidebarAdmin({
   chamadosAbertosCount = 0,
   notificacoesCount = 0,
   pendenciasCount = 0,
+  mensagensCount = 0, // ✅ novo badge opcional
   onClose,
 }: {
-  /** Chamados em aberto (para badge do menu Chamados) */
   chamadosAbertosCount?: number;
-  /** Notificações (para badge do menu Comunicações) */
   notificacoesCount?: number;
-  /** Pendências gerais (ex.: aprovações) */
   pendenciasCount?: number;
+  mensagensCount?: number;
   onClose?: () => void;
 }) {
   const pathname = usePathname();
@@ -50,16 +50,16 @@ export default function SidebarAdmin({
       { href: "/admin/chamados", label: "Todos os Chamados", icon: <Ticket className="size-4" />, badge: chamadosAbertosCount },
       { href: "/admin/alunos", label: "Gerenciar Alunos", icon: <Users className="size-4" />, badge: pendenciasCount || undefined },
       { href: "/admin/funcionarios", label: "Gerenciar Funcionários", icon: <UserPlus className="size-4" /> },
+      { href: "/admin/mensagens", label: "Mensagens", icon: <MessageCircleMore className="size-4" />, badge: mensagensCount || undefined }, // 💬 nova rota
       { href: "/admin/comunicacoes", label: "Comunicações", icon: <MessageSquareText className="size-4" />, badge: notificacoesCount },
       { href: "/admin/relatorios", label: "Relatórios", icon: <FileChartColumn className="size-4" /> },
       { href: "/admin/setores", label: "Setores", icon: <Building2 className="size-4" /> },
       { href: "/admin/configuracoes", label: "Configurações", icon: <Settings className="size-4" /> },
     ],
-    [chamadosAbertosCount, notificacoesCount, pendenciasCount]
+    [chamadosAbertosCount, notificacoesCount, pendenciasCount, mensagensCount]
   );
 
   function isActive(href: string) {
-    // marca ativo por prefixo (ex.: /admin/chamados/123 continua ativo em /admin/chamados)
     if (href === "/admin") return pathname === "/admin";
     return pathname === href || pathname.startsWith(href + "/");
   }
@@ -89,7 +89,9 @@ export default function SidebarAdmin({
 
         {/* Navegação */}
         <nav className="space-y-1">
-          <div className="px-2 py-1 text-[11px] uppercase tracking-wide text-muted-foreground">Visão Geral</div>
+          <div className="px-2 py-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+            Visão Geral
+          </div>
 
           {items.map((it) => (
             <Link
@@ -104,7 +106,9 @@ export default function SidebarAdmin({
               onClick={onClose}
             >
               <span className="flex items-center gap-3">
-                <span className="inline-grid place-items-center size-5 opacity-90">{it.icon}</span>
+                <span className="inline-grid place-items-center size-5 opacity-90">
+                  {it.icon}
+                </span>
                 <span>{it.label}</span>
               </span>
               {it.badge != null && (
@@ -135,7 +139,7 @@ export default function SidebarAdmin({
           </ul>
         </div>
 
-        {/* Sair (rodapé) */}
+        {/* Sair */}
         <div className="mt-auto pt-3">
           <button
             type="button"

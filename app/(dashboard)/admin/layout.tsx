@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import SidebarAdmin from "./_components/SidebarAdmin";
 import MobileSidebarTriggerAdmin from "./_components/MobileSidebarTriggerAdmin";
+import SistemaTopbar from "./_components/SistemaTopbar";
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
@@ -13,10 +14,20 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
         {/* Conteúdo das páginas */}
         <main className="min-h-dvh px-2 sm:px-0">
-          {/* Botão de menu (mobile) */}
-          <div className="mb-4 xl:hidden">
-            <MobileSidebarTriggerAdmin />
+          {/* Topbar do sistema (nome + e-mail, tema, notificações) */}
+          <div className="mb-4">
+            <div className="flex items-center justify-between">
+              {/* botão de menu (mobile) à esquerda */}
+              <div className="xl:hidden mr-2">
+                <MobileSidebarTriggerAdmin />
+              </div>
+              {/* topbar ocupa o resto */}
+              <div className="flex-1">
+                <SistemaTopbar notificationsHref="/sistema/notificacoes" />
+              </div>
+            </div>
           </div>
+
           {children}
         </main>
       </div>
