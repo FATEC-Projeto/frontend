@@ -10,8 +10,6 @@ type Chamado = {
   titulo: string;
   descricao: string;
   status: string;
-  prioridade: string;
-  nivel: string;
   criadoEm: string;
 };
 
@@ -62,8 +60,6 @@ export default function ChamadoDetalhePage() {
       <div className="space-y-2">
         <p><strong>Descrição:</strong> {chamado.descricao}</p>
         <p><strong>Status:</strong> {chamado.status}</p>
-        <p><strong>Prioridade:</strong> {chamado.prioridade}</p>
-        <p><strong>Nível:</strong> {chamado.nivel}</p>
         <p><strong>Criado em:</strong> {new Date(chamado.criadoEm).toLocaleString("pt-BR")}</p>
       </div>
     </div>

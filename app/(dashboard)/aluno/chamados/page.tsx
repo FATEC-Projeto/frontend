@@ -18,7 +18,6 @@ import MobileSidebarTriggerAluno from "../_components/MobileSidebarTriggerAluno"
 
 // Tipos
 type Status = "ABERTO" | "EM_ATENDIMENTO" | "AGUARDANDO_USUARIO" | "RESOLVIDO" | "ENCERRADO";
-type Prioridade = "BAIXA" | "MEDIA" | "ALTA" | "URGENTE";
 
 type Chamado = {
   id: string;
@@ -26,7 +25,6 @@ type Chamado = {
   titulo: string;
   criadoEm: string;
   status: Status;
-  prioridade: Prioridade;
   setor?: { nome?: string };
   precisaAcaoDoAluno?: boolean;
   mensagensNaoLidas?: number;
@@ -89,7 +87,6 @@ export default function MeusChamadosPage() {
   const [dados, setDados] = useState<Chamado[]>([]);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<Status | "ALL">("ALL");
-  const [prioridade, setPrioridade] = useState<Prioridade | "ALL">("ALL");
   const [loading, setLoading] = useState(true);
 
   // Cabeçalho com nome (mesma lógica da home)
@@ -157,10 +154,9 @@ export default function MeusChamadosPage() {
         c.titulo.toLowerCase().includes(q.toLowerCase()) ||
         c.protocolo?.toLowerCase().includes(q.toLowerCase());
       const sOk = status === "ALL" || c.status === status;
-      const pOk = prioridade === "ALL" || c.prioridade === prioridade;
-      return qOk && sOk && pOk;
+      return qOk && sOk;
     });
-  }, [dados, q, status, prioridade]);
+  }, [dados, q, status]);
 
   const aguardandoCount = filtrados.filter((d) => d.status === "AGUARDANDO_USUARIO").length;
 
@@ -238,17 +234,7 @@ export default function MeusChamadosPage() {
             <option value="ENCERRADO">Encerrado</option>
           </select>
 
-          <select
-            className="h-10 w-full sm:w-[180px] px-3 rounded-lg border border-[var(--border)] bg-background focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-            value={prioridade}
-            onChange={(e) => setPrioridade(e.target.value as any)}
-          >
-            <option value="ALL">Todas prioridades</option>
-            <option value="BAIXA">Baixa</option>
-            <option value="MEDIA">Média</option>
-            <option value="ALTA">Alta</option>
-            <option value="URGENTE">Urgente</option>
-          </select>
+          
         </div>
       </div>
 
