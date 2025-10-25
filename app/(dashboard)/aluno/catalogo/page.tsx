@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Search, Layers, BookOpen, Plus, Loader2 } from "lucide-react";
 import MobileSidebarTriggerAluno from "../_components/MobileSidebarTriggerAluno";
-import { apiFetch } from "../../../../utils/api";
 
 /* ----------------------------- Tipos ----------------------------- */
 type Servico = {
@@ -67,22 +66,12 @@ const MOCK: CatalogResponse = {
 };
 
 /* ----------------------------- Componentes ----------------------------- */
-function CategoriaPill({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active?: boolean;
-  onClick: () => void;
-}) {
+function CategoriaPill({ label, active, onClick }: { label: string; active?: boolean; onClick: () => void }) {
   return (
     <button
       className={cx(
         "h-9 px-3 rounded-lg border text-sm transition",
-        active
-          ? "bg-primary text-primary-foreground border-transparent"
-          : "bg-background hover:bg-[var(--muted)] border-[var(--border)]"
+        active ? "bg-primary text-primary-foreground border-transparent" : "bg-background hover:bg-[var(--muted)] border-[var(--border)]"
       )}
       onClick={onClick}
     >
@@ -100,9 +89,15 @@ function ServicoCard({ s }: { s: Servico }) {
     if (!s.ativo) return;
     try {
       setLoading(true);
+      const token = localStorage.getItem("accessToken");
+      if (!token) throw new Error("Sessão expirada. Faça login novamente.");
 
-      const res = await apiFetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/tickets`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/tickets`, {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
           titulo: s.nome,
           descricao: s.descricao || "Solicitação aberta via catálogo",
@@ -114,7 +109,7 @@ function ServicoCard({ s }: { s: Servico }) {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err?.error || "Erro ao criar chamado");
+        throw new Error(err.message || "Erro ao criar chamado");
       }
 
       const data = await res.json();
@@ -138,7 +133,9 @@ function ServicoCard({ s }: { s: Servico }) {
             </span>
           )}
         </div>
-        {s.descricao && <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{s.descricao}</p>}
+        {s.descricao && (
+          <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{s.descricao}</p>
+        )}
       </div>
 
       <div className="flex items-center justify-between">
@@ -175,20 +172,17 @@ export default function CatalogoAlunoPage() {
   const [q, setQ] = useState("");
   const [catId, setCatId] = useState<string | "ALL">("ALL");
 
+
   /* Buscar catálogo */
   useEffect(() => {
     async function fetchCatalog() {
       try {
-        const res = await apiFetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/catalogo`, {
-          cache: "no-store",
-        });
+        const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/catalogo`;
+        const res = await fetch(url, { cache: "no-store" });
         if (!res.ok) throw new Error("fallback");
         const data = (await res.json()) as CatalogResponse;
         setCatalog({
-          categorias: (data.categorias ?? []).map((c) => ({
-            ...c,
-            servicos: c.servicos ?? [],
-          })),
+          categorias: (data.categorias ?? []).map((c) => ({ ...c, servicos: c.servicos ?? [] })),
         });
       } catch {
         setCatalog(MOCK);
@@ -213,10 +207,7 @@ export default function CatalogoAlunoPage() {
     const texto = q.trim().toLowerCase();
     return flatServicos.filter((s) => {
       const byCat = catId === "ALL" || s.categoriaId === catId;
-      const byText =
-        !texto ||
-        s.nome.toLowerCase().includes(texto) ||
-        (s.descricao ?? "").toLowerCase().includes(texto);
+      const byText = !texto || s.nome.toLowerCase().includes(texto) || (s.descricao ?? "").toLowerCase().includes(texto);
       return byCat && byText;
     });
   }, [flatServicos, q, catId]);
@@ -231,10 +222,9 @@ export default function CatalogoAlunoPage() {
   /* ----------------------------- Render ----------------------------- */
   return (
     <>
-      {/* Topbar mínima (sem saudação; o layout já tem o cabeçalho global) */}
+      {/* Topbar */}
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <p className="text-muted-foreground">Selecione um serviço para abrir um novo chamado.</p>
           <p className="text-xs text-muted-foreground mt-2">
             Catálogo: {kpis.ativos} serviços disponíveis • {kpis.indisponiveis} indisponíveis
           </p>
@@ -295,9 +285,7 @@ export default function CatalogoAlunoPage() {
             Carregando catálogo...
           </div>
         ) : filtrados.length === 0 ? (
-          <div className="py-10 text-center text-muted-foreground">
-            Nenhum serviço encontrado com os filtros atuais.
-          </div>
+          <div className="py-10 text-center text-muted-foreground">Nenhum serviço encontrado com os filtros atuais.</div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {filtrados.map((s) => (
