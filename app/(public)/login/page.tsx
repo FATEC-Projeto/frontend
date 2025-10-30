@@ -90,6 +90,16 @@ export default function LoginPage() {
       if (data?.accessToken) {
         localStorage.setItem("accessToken", data.accessToken);
       }
+      // 🔹 Extrai o userId do token (campo "sub") e salva no localStorage
+try {
+  const payload = JSON.parse(atob(data.accessToken.split(".")[1]));
+  if (payload?.sub) {
+    localStorage.setItem("userId", payload.sub);
+  }
+} catch (err) {
+  console.warn("Falha ao extrair userId do token:", err);
+}
+
       if (data?.refreshToken) {
         localStorage.setItem("refreshToken", data.refreshToken);
       }
