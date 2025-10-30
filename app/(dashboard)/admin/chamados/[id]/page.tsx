@@ -69,8 +69,6 @@ type Chamado = {
   historico?: Historico[];
 };
 
-type TicketResponse = Chamado;
-
 /* ===== Utils ===== */
 function cx(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
@@ -106,20 +104,17 @@ export default function AdminChamadoPage() {
   const { id } = useParams<{ id: string }>();
   const API = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-  // dados
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [ticket, setTicket] = useState<TicketResponse | null>(null);
+  const [ticket, setTicket] = useState<Chamado | null>(null);
 
-  // edição
   const [status, setStatus] = useState<Status>("ABERTO");
   const [prioridade, setPrioridade] = useState<Prioridade>("MEDIA");
   const [nivel, setNivel] = useState<Nivel>("N1");
   const [responsavelId, setResponsavelId] = useState<string>("");
 
-  // chat
   const [msg, setMsg] = useState("");
   const chatRef = useRef<HTMLDivElement | null>(null);
 
@@ -149,7 +144,7 @@ export default function AdminChamadoPage() {
         const e = await res.json().catch(() => ({}));
         throw new Error(e?.error || `Erro HTTP ${res.status}`);
       }
-      const data: TicketResponse = await res.json();
+      const data: Chamado = await res.json();
       setTicket(data);
       setStatus(data.status);
       setPrioridade(data.prioridade);
@@ -164,7 +159,6 @@ export default function AdminChamadoPage() {
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, API]);
 
   useEffect(() => {
@@ -172,16 +166,41 @@ export default function AdminChamadoPage() {
     chatRef.current.scrollTop = chatRef.current.scrollHeight;
   }, [ticket?.mensagens?.length]);
 
+  // === WebSocket ===
+  useEffect(() => {
+    if (!id) return;
+    const wsUrl = API?.replace(/^http/, "ws") + "/ws";
+    const ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => console.log("✅ WebSocket conectado");
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "nova_mensagem" && data.chamadoId === id) {
+          setTicket((prev) =>
+            prev
+              ? { ...prev, mensagens: [...(prev.mensagens ?? []), data.mensagem] }
+              : prev
+          );
+          chatRef.current?.scrollTo({
+            top: chatRef.current.scrollHeight,
+            behavior: "smooth",
+          });
+        }
+      } catch (err) {
+        console.error("Erro WS:", err);
+      }
+    };
+    ws.onclose = () => console.log("🔌 WebSocket desconectado");
+
+    return () => ws.close();
+  }, [id, API]);
+
   async function saveEdits() {
     if (!ticket) return;
     try {
       setSaving(true);
-      const body = {
-        status,
-        prioridade,
-        nivel,
-        responsavelId: responsavelId || null,
-      };
+      const body = { status, prioridade, nivel, responsavelId: responsavelId || null };
       const res = await apiFetch(`${API}/tickets/${ticket.id}`, {
         method: "PATCH",
         body: JSON.stringify(body),
@@ -204,7 +223,6 @@ export default function AdminChamadoPage() {
     if (!trimmed) return;
     try {
       setSending(true);
-      // 🔧 usa a rota oficial de mensagens deste ticket
       const res = await apiFetch(`${API}/tickets/${ticket.id}/mensagens`, {
         method: "POST",
         body: JSON.stringify({ conteudo: trimmed }),
@@ -213,8 +231,18 @@ export default function AdminChamadoPage() {
         const e = await res.json().catch(() => ({}));
         throw new Error(e?.error || `Erro HTTP ${res.status}`);
       }
+
+      // ✅ Atualiza chat imediatamente
+      const nova = await res.json();
+      setTicket((prev) =>
+        prev ? { ...prev, mensagens: [...(prev.mensagens ?? []), nova] } : prev
+      );
+
       setMsg("");
-      await load();
+      chatRef.current?.scrollTo({
+        top: chatRef.current.scrollHeight,
+        behavior: "smooth",
+      });
     } catch (e: any) {
       alert(e?.message || "Falha ao enviar mensagem");
     } finally {
@@ -222,6 +250,7 @@ export default function AdminChamadoPage() {
     }
   }
 
+  // --- renderização ---
   if (loading) {
     return (
       <div className="p-6">
@@ -246,16 +275,11 @@ export default function AdminChamadoPage() {
     );
   }
 
-  const mensagens = (ticket.mensagens ?? []).slice().sort(
-    (a, b) => +new Date(a.criadoEm) - +new Date(b.criadoEm)
-  );
-  const historico = (ticket.historico ?? []).slice().sort(
-    (a, b) => +new Date(b.criadoEm) - +new Date(a.criadoEm)
-  );
+  const mensagens = (ticket.mensagens ?? []).slice().sort((a, b) => +new Date(a.criadoEm) - +new Date(b.criadoEm));
+  const historico = (ticket.historico ?? []).slice().sort((a, b) => +new Date(b.criadoEm) - +new Date(a.criadoEm));
 
   return (
     <div className="px-4 py-2 sm:px-6 lg:px-8">
-      {/* topo */}
       <div className="mb-4 flex items-center justify-between">
         <Link href="/admin/chamados" className="inline-flex items-center gap-2 text-sm hover:underline">
           <ArrowLeft className="size-4" /> Voltar
@@ -265,67 +289,9 @@ export default function AdminChamadoPage() {
         </div>
       </div>
 
-      {/* header do chamado */}
-      <div className="rounded-xl border border-[var(--border)] bg-card p-4 mb-6">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <div className="text-xs text-muted-foreground">{ticket.protocolo ?? `#${ticket.id}`}</div>
-            <h1 className="font-grotesk text-xl sm:text-2xl font-semibold tracking-tight line-clamp-2">
-              {ticket.titulo}
-            </h1>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <BadgeStatus s={ticket.status} />
-            <span className="inline-flex items-center gap-2 text-sm border rounded-md px-2 py-1">
-              <DotPrioridade p={ticket.prioridade} /> {ticket.prioridade}
-            </span>
-            <span className="inline-flex items-center gap-2 text-xs border rounded-md px-2 py-1">
-              Nível {ticket.nivel}
-            </span>
-          </div>
-        </div>
-
-        {/* metadados */}
-        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-sm">
-          <div className="inline-flex items-center gap-2">
-            <User className="size-4" />
-            <span className="text-muted-foreground">Criado por:</span>
-            <span className="font-medium">{ticket.criadoPor?.nome ?? "—"}</span>
-          </div>
-          <div className="inline-flex items-center gap-2">
-            <User className="size-4" />
-            <span className="text-muted-foreground">Responsável:</span>
-            <span className="font-medium">{ticket.responsavel?.nome ?? "—"}</span>
-          </div>
-          <div className="inline-flex items-center gap-2">
-            <Building2 className="size-4" />
-            <span className="text-muted-foreground">Setor:</span>
-            <span className="font-medium">{ticket.setor?.nome ?? "—"}</span>
-          </div>
-          <div className="inline-flex items-center gap-2">
-            <Tag className="size-4" />
-            <span className="text-muted-foreground">Serviço:</span>
-            <span className="font-medium">{ticket.servico?.nome ?? "—"}</span>
-          </div>
-          <div className="inline-flex items-center gap-2">
-            <User className="size-4" />
-            <span className="text-muted-foreground">Cliente:</span>
-            <span className="font-medium">{ticket.cliente?.nome ?? "—"}</span>
-          </div>
-          <div className="inline-flex items-center gap-2">
-            <Clock className="size-4" />
-            <span className="text-muted-foreground">Atualizado:</span>
-            <span className="font-medium">
-              {new Date(ticket.atualizadoEm).toLocaleDateString("pt-BR")}{" "}
-              {new Date(ticket.atualizadoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-            </span>
-          </div>
-        </div>
-      </div>
-
       {/* layout: chat à esquerda, gestão à direita */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-        {/* chat */}
+        {/* === CHAT === */}
         <section className="xl:col-span-8 rounded-xl border border-[var(--border)] bg-card flex flex-col">
           <div className="p-3 border-b border-[var(--border)] flex items-center gap-2">
             <MessageSquareText className="size-4" />
@@ -349,7 +315,6 @@ export default function AdminChamadoPage() {
                     <div className="text-xs text-muted-foreground mb-1">
                       {m.autor?.nome ?? (m.autorId === ticket.criadoPorId ? "Solicitante" : "Equipe")}
                       {" · "}
-                      {new Date(m.criadoEm).toLocaleDateString("pt-BR")}{" "}
                       {new Date(m.criadoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                     </div>
                     <div className="whitespace-pre-wrap">{m.conteudo}</div>

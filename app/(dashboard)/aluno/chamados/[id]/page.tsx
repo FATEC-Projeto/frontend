@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ChevronLeft, Loader2, Send } from "lucide-react";
@@ -22,28 +22,19 @@ type Mensagem = {
   autor?: { id: string; nome: string; emailPessoal?: string | null } | null;
 };
 
-type MensagensPage = {
-  total: number;
-  page: number;
-  pageSize: number;
-  items: Mensagem[];
-};
-
 export default function ChamadoDetalhePage() {
   const { id } = useParams();
   const router = useRouter();
 
   const [chamado, setChamado] = useState<Chamado | null>(null);
   const [loading, setLoading] = useState(true);
-
-  // mensagens
   const [msgs, setMsgs] = useState<Mensagem[]>([]);
-  const [msgLoading, setMsgLoading] = useState(true);
-  const [msgSending, setMsgSending] = useState(false);
   const [msgText, setMsgText] = useState("");
-  const [page, setPage] = useState(1);
-  const pageSize = 50;
+  const [msgSending, setMsgSending] = useState(false);
+  const [msgLoading, setMsgLoading] = useState(true);
+  const [socketConnected, setSocketConnected] = useState(false);
 
+  const endRef = useRef<HTMLDivElement>(null);
   const apiBase = useMemo(() => process.env.NEXT_PUBLIC_API_BASE_URL, []);
 
   async function authedFetch(input: string, init?: RequestInit) {
@@ -64,11 +55,11 @@ export default function ChamadoDetalhePage() {
     return res;
   }
 
-  // Carrega dados do chamado
+  /** 🔹 Carrega o chamado */
   useEffect(() => {
     async function fetchChamado() {
-      setLoading(true);
       try {
+        setLoading(true);
         const res = await authedFetch(`${apiBase}/tickets/${id}`);
         const data = await res.json();
         setChamado(data);
@@ -81,16 +72,14 @@ export default function ChamadoDetalhePage() {
     if (id && apiBase) fetchChamado();
   }, [id, apiBase]);
 
-  // Carrega mensagens
-  async function fetchMensagens(p = page) {
+  /** 🔹 Carrega mensagens */
+  async function fetchMensagens() {
     if (!id) return;
     setMsgLoading(true);
     try {
-      const res = await authedFetch(
-        `${apiBase}/tickets/${id}/mensagens?page=${p}&pageSize=${pageSize}&orderDir=asc`
-      );
-      const data: MensagensPage = await res.json();
-      setMsgs(data.items);
+      const res = await authedFetch(`${apiBase}/tickets/${id}/mensagens?page=1&pageSize=100&orderDir=asc`);
+      const data = await res.json();
+      setMsgs(data.mensagens || data.items || []);
     } catch (err: any) {
       toast.error(err.message || "Erro ao carregar mensagens.");
     } finally {
@@ -99,23 +88,74 @@ export default function ChamadoDetalhePage() {
   }
 
   useEffect(() => {
-    if (id && apiBase) fetchMensagens(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (id && apiBase) fetchMensagens();
   }, [id, apiBase]);
 
-  // Envia mensagem (dispara notificação no backend)
+  /** 🔹 WebSocket (tempo real + reconexão automática) */
+  useEffect(() => {
+    const userId = localStorage.getItem("userId");
+    if (!userId || !apiBase) return;
+
+    const wsUrl = (apiBase ?? "http://localhost:3333")
+      .replace(/^http/, "ws") + `/ws?userId=${userId}`;
+    
+    let ws: WebSocket | null = null;
+    let reconnectTimer: NodeJS.Timeout;
+
+    function connectWS() {
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        console.log("🟢 WS conectado");
+        setSocketConnected(true);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "nova_mensagem" && data.chamadoId === id) {
+            setMsgs((prev) => [...prev, data.mensagem]);
+            setTimeout(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+          }
+        } catch (e) {
+          console.error("Erro ao processar mensagem WS:", e);
+        }
+      };
+
+      ws.onerror = (err) => {
+        console.error("💥 Erro WS:", err);
+        setSocketConnected(false);
+      };
+
+      ws.onclose = () => {
+        console.warn("🔴 WS desconectado, tentando reconectar em 5s...");
+        setSocketConnected(false);
+        reconnectTimer = setTimeout(connectWS, 5000);
+      };
+    }
+
+    connectWS();
+
+    return () => {
+      clearTimeout(reconnectTimer);
+      ws?.close();
+    };
+  }, [apiBase, id]);
+
+  /** 🔹 Envia mensagem */
   async function sendMensagem() {
     if (!msgText.trim()) return;
     setMsgSending(true);
     try {
-      await authedFetch(`${apiBase}/tickets/${id}/mensagens`, {
+      const res = await authedFetch(`${apiBase}/tickets/${id}/mensagens`, {
         method: "POST",
         body: JSON.stringify({ conteudo: msgText.trim() }),
       });
+      const novaMsg = await res.json();
+      setMsgs((prev) => [...prev, novaMsg]);
       setMsgText("");
       toast.success("Mensagem enviada!");
-      await fetchMensagens(1);
-      setPage(1);
+      setTimeout(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
     } catch (err: any) {
       toast.error(err.message || "Erro ao enviar mensagem.");
     } finally {
@@ -132,29 +172,29 @@ export default function ChamadoDetalhePage() {
   }
 
   if (!chamado) {
-    return (
-      <div className="text-center py-16 text-muted-foreground">
-        Chamado não encontrado.
-      </div>
-    );
+    return <div className="text-center py-16 text-muted-foreground">Chamado não encontrado.</div>;
   }
 
   return (
-    <div className="max-w-3xl mx-auto p-6 rounded-xl border border-[var(--border)] bg-card space-y-8">
-      {/* Topbar local com voltar */}
+    <div className="max-w-3xl mx-auto p-6 rounded-xl border bg-card space-y-8">
+      {/* Indicador de status WebSocket */}
+      <div className="text-sm text-muted-foreground">
+        {socketConnected ? "🟢 Conectado em tempo real" : "🔴 Sem conexão em tempo real"}
+      </div>
+
+      {/* Topbar */}
       <div className="flex items-center justify-between">
         <button
           type="button"
           onClick={() => router.back()}
-          className="inline-flex items-center gap-2 h-9 px-3 rounded-md border border-[var(--border)] bg-background hover:bg-[var(--muted)] text-sm"
+          className="inline-flex items-center gap-2 h-9 px-3 rounded-md border bg-background hover:bg-muted text-sm"
         >
-          <ChevronLeft className="size-4" />
-          Voltar
+          <ChevronLeft className="size-4" /> Voltar
         </button>
 
         <Link
           href="/aluno/chamados"
-          className="inline-flex items-center gap-2 h-9 px-3 rounded-md border border-[var(--border)] bg-background hover:bg-[var(--muted)] text-sm"
+          className="inline-flex items-center gap-2 h-9 px-3 rounded-md border bg-background hover:bg-muted text-sm"
         >
           Lista de chamados
         </Link>
@@ -164,32 +204,26 @@ export default function ChamadoDetalhePage() {
       <div>
         <h1 className="text-2xl font-bold mb-2">{chamado.titulo}</h1>
         <p className="text-sm text-muted-foreground mb-4">ID: {chamado.id}</p>
-
         <div className="space-y-2">
           <p><strong>Descrição:</strong> {chamado.descricao}</p>
           <p><strong>Status:</strong> {chamado.status}</p>
-          <p>
-            <strong>Criado em:</strong>{" "}
-            {new Date(chamado.criadoEm).toLocaleString("pt-BR")}
-          </p>
+          <p><strong>Criado em:</strong> {new Date(chamado.criadoEm).toLocaleString("pt-BR")}</p>
         </div>
       </div>
 
       {/* Mensagens */}
       <section>
         <h2 className="text-lg font-semibold mb-3">Mensagens</h2>
-
         {msgLoading ? (
           <div className="flex items-center gap-2 text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" />
-            Carregando mensagens...
+            <Loader2 className="size-4 animate-spin" /> Carregando mensagens...
           </div>
         ) : msgs.length === 0 ? (
           <div className="text-sm text-muted-foreground border rounded-md p-3">
             Nenhuma mensagem por aqui ainda.
           </div>
         ) : (
-          <ul className="space-y-3">
+          <ul className="space-y-3 max-h-[500px] overflow-y-auto">
             {msgs.map((m) => (
               <li key={m.id} className="p-3 border rounded-md bg-background">
                 <div className="text-sm text-muted-foreground flex items-center justify-between">
@@ -199,6 +233,7 @@ export default function ChamadoDetalhePage() {
                 <p className="mt-1 whitespace-pre-wrap">{m.conteudo}</p>
               </li>
             ))}
+            <div ref={endRef} />
           </ul>
         )}
       </section>
@@ -225,6 +260,7 @@ export default function ChamadoDetalhePage() {
           </div>
           <p className="text-xs text-muted-foreground">
             Ao enviar, os responsáveis pelo chamado serão notificados.
+            {socketConnected ? " 🟢 Conectado em tempo real" : " 🔴 Sem conexão em tempo real"}
           </p>
         </div>
       </section>
