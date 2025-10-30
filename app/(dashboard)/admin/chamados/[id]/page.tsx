@@ -5,9 +5,13 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft, Loader2, Send, User, Building2, Tag, Clock,
-  CheckCircle2, RotateCcw, Pencil, Save, MessageSquareText
+  CheckCircle2, RotateCcw, Pencil, Save, MessageSquareText,
+  Paperclip, // Ícone de anexo
+  Download, // Ícone de download
+  Upload // Ícone de upload
 } from "lucide-react";
 import { apiFetch } from "../../../../../utils/api";
+import { toast } from "sonner"; // Importar toast
 
 /* ===== Tipos ===== */
 type Nivel = "N1" | "N2" | "N3";
@@ -38,6 +42,17 @@ type Historico = {
   observacao?: string | null;
 };
 
+// Adicionado tipo para Anexo
+type AnexoInfo = {
+  id: string;
+  nomeArquivo: string;
+  mimeType: string;
+  tamanhoBytes: number;
+  enviadoEm: string;
+  enviadoPor?: { id: string; nome?: string | null } | null;
+};
+
+
 type Chamado = {
   id: string;
   protocolo?: string | null;
@@ -67,6 +82,7 @@ type Chamado = {
   contrato?: ContratoMin | null;
   mensagens?: Mensagem[];
   historico?: Historico[];
+  // Anexos podem vir aqui se o include for usado, mas buscaremos separado
 };
 
 type TicketResponse = Chamado;
@@ -106,10 +122,9 @@ export default function AdminChamadoPage() {
   const { id } = useParams<{ id: string }>();
   const API = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-  // dados
+  // dados gerais
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [sending, setSending] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [ticket, setTicket] = useState<TicketResponse | null>(null);
 
@@ -120,8 +135,17 @@ export default function AdminChamadoPage() {
   const [responsavelId, setResponsavelId] = useState<string>("");
 
   // chat
+  const [sending, setSending] = useState(false);
   const [msg, setMsg] = useState("");
   const chatRef = useRef<HTMLDivElement | null>(null);
+  
+  // anexos
+  const [anexos, setAnexos] = useState<AnexoInfo[]>([]);
+  const [loadingAnexos, setLoadingAnexos] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
 
   const include = useMemo(
     () =>
@@ -133,15 +157,34 @@ export default function AdminChamadoPage() {
         "cliente",
         "contrato",
         "historico",
-        "mensagens",
+        "mensagens", 
       ].join(","),
     []
   );
 
+  async function fetchAnexos(ticketId: string) {
+      if (!API) return;
+      setLoadingAnexos(true);
+      try {
+          const res = await apiFetch(`${API}/tickets/${ticketId}/anexos`);
+          if (!res.ok) throw new Error("Falha ao buscar anexos");
+          const data = await res.json();
+          setAnexos(Array.isArray(data) ? data : []);
+      } catch (err: any) {
+          console.error("Erro ao buscar anexos:", err);
+          toast.error("Falha ao carregar anexos.", { description: err.message });
+      } finally {
+          setLoadingAnexos(false);
+      }
+  }
+
   async function load() {
+    if (!id || !API) return;
     try {
       setLoading(true);
       setErr(null);
+      setLoadingAnexos(true); 
+
       const res = await apiFetch(`${API}/tickets/${id}?include=${encodeURIComponent(include)}`, {
         cache: "no-store",
       });
@@ -155,8 +198,12 @@ export default function AdminChamadoPage() {
       setPrioridade(data.prioridade);
       setNivel(data.nivel);
       setResponsavelId(data.responsavelId ?? "");
+
+      await fetchAnexos(data.id);
+
     } catch (e: any) {
       setErr(e?.message || "Falha ao carregar");
+      setTicket(null); 
     } finally {
       setLoading(false);
     }
@@ -165,12 +212,14 @@ export default function AdminChamadoPage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, API]);
+  }, [id, API]); 
 
+  // Scroll do chat
   useEffect(() => {
-    if (!chatRef.current) return;
-    chatRef.current.scrollTop = chatRef.current.scrollHeight;
-  }, [ticket?.mensagens?.length]);
+    if (chatRef.current) {
+      chatRef.current.scrollTop = chatRef.current.scrollHeight;
+    }
+  }, [ticket?.mensagens?.length]); 
 
   async function saveEdits() {
     if (!ticket) return;
@@ -190,9 +239,10 @@ export default function AdminChamadoPage() {
         const e = await res.json().catch(() => ({}));
         throw new Error(e?.error || `Erro HTTP ${res.status}`);
       }
-      await load();
+      toast.success("Alterações salvas!");
+      await load(); 
     } catch (e: any) {
-      alert(e?.message || "Falha ao salvar alterações");
+      toast.error("Falha ao salvar", { description: e?.message });
     } finally {
       setSaving(false);
     }
@@ -204,7 +254,6 @@ export default function AdminChamadoPage() {
     if (!trimmed) return;
     try {
       setSending(true);
-      // 🔧 usa a rota oficial de mensagens deste ticket
       const res = await apiFetch(`${API}/tickets/${ticket.id}/mensagens`, {
         method: "POST",
         body: JSON.stringify({ conteudo: trimmed }),
@@ -214,15 +263,50 @@ export default function AdminChamadoPage() {
         throw new Error(e?.error || `Erro HTTP ${res.status}`);
       }
       setMsg("");
-      await load();
+      await load(); // Recarrega tudo para ver a nova mensagem
     } catch (e: any) {
-      alert(e?.message || "Falha ao enviar mensagem");
+       toast.error("Falha ao enviar mensagem", { description: e?.message });
     } finally {
       setSending(false);
     }
   }
 
-  if (loading) {
+  const handleUpload = async () => {
+      if (!selectedFile || !ticket?.id || !API) return;
+
+      setUploading(true);
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+
+      try {
+          const token = localStorage.getItem("accessToken") || "";
+          const res = await fetch(`${API}/tickets/${ticket.id}/anexos`, {
+              method: 'POST',
+              headers: {
+                  'Authorization': `Bearer ${token}`,
+              },
+              body: formData,
+          });
+
+          if (!res.ok) {
+              const errorData = await res.json().catch(() => ({ error: `Erro HTTP ${res.status}` }));
+              throw new Error(errorData.error || `Erro HTTP ${res.status}`);
+          }
+
+          toast.success(`Arquivo "${selectedFile.name}" enviado com sucesso!`);
+          setSelectedFile(null);
+          if(fileInputRef.current) fileInputRef.current.value = "";
+          await fetchAnexos(ticket.id); // Recarrega só a lista de anexos
+
+      } catch (err: any) {
+          console.error("Erro no upload:", err);
+          toast.error("Falha ao enviar arquivo.", { description: err.message });
+      } finally {
+          setUploading(false);
+      }
+  };
+
+  if (loading && !ticket) {
     return (
       <div className="p-6">
         <div className="inline-flex items-center gap-2 text-muted-foreground">
@@ -267,14 +351,18 @@ export default function AdminChamadoPage() {
 
       {/* header do chamado */}
       <div className="rounded-xl border border-[var(--border)] bg-card p-4 mb-6">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <div className="text-xs text-muted-foreground">{ticket.protocolo ?? `#${ticket.id}`}</div>
             <h1 className="font-grotesk text-xl sm:text-2xl font-semibold tracking-tight line-clamp-2">
               {ticket.titulo}
             </h1>
+            {/* Descrição adicionada aqui */}
+            <p className="mt-2 text-sm text-muted-foreground whitespace-pre-wrap">
+              {ticket.descricao}
+            </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 flex-shrink-0 pt-1">
             <BadgeStatus s={ticket.status} />
             <span className="inline-flex items-center gap-2 text-sm border rounded-md px-2 py-1">
               <DotPrioridade p={ticket.prioridade} /> {ticket.prioridade}
@@ -286,101 +374,177 @@ export default function AdminChamadoPage() {
         </div>
 
         {/* metadados */}
-        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-sm">
+        <div className="mt-4 border-t pt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-2 text-sm">
           <div className="inline-flex items-center gap-2">
-            <User className="size-4" />
+            <User className="size-4 flex-shrink-0 text-muted-foreground" />
             <span className="text-muted-foreground">Criado por:</span>
-            <span className="font-medium">{ticket.criadoPor?.nome ?? "—"}</span>
+            <span className="font-medium truncate">{ticket.criadoPor?.nome ?? "—"}</span>
           </div>
           <div className="inline-flex items-center gap-2">
-            <User className="size-4" />
+            <User className="size-4 flex-shrink-0 text-muted-foreground" />
             <span className="text-muted-foreground">Responsável:</span>
-            <span className="font-medium">{ticket.responsavel?.nome ?? "—"}</span>
+            <span className="font-medium truncate">{ticket.responsavel?.nome ?? "—"}</span>
           </div>
           <div className="inline-flex items-center gap-2">
-            <Building2 className="size-4" />
+            <Building2 className="size-4 flex-shrink-0 text-muted-foreground" />
             <span className="text-muted-foreground">Setor:</span>
-            <span className="font-medium">{ticket.setor?.nome ?? "—"}</span>
+            <span className="font-medium truncate">{ticket.setor?.nome ?? "—"}</span>
           </div>
           <div className="inline-flex items-center gap-2">
-            <Tag className="size-4" />
+            <Tag className="size-4 flex-shrink-0 text-muted-foreground" />
             <span className="text-muted-foreground">Serviço:</span>
-            <span className="font-medium">{ticket.servico?.nome ?? "—"}</span>
+            <span className="font-medium truncate">{ticket.servico?.nome ?? "—"}</span>
           </div>
           <div className="inline-flex items-center gap-2">
-            <User className="size-4" />
+            <User className="size-4 flex-shrink-0 text-muted-foreground" />
             <span className="text-muted-foreground">Cliente:</span>
-            <span className="font-medium">{ticket.cliente?.nome ?? "—"}</span>
+            <span className="font-medium truncate">{ticket.cliente?.nome ?? "—"}</span>
           </div>
           <div className="inline-flex items-center gap-2">
-            <Clock className="size-4" />
+            <Clock className="size-4 flex-shrink-0 text-muted-foreground" />
             <span className="text-muted-foreground">Atualizado:</span>
-            <span className="font-medium">
-              {new Date(ticket.atualizadoEm).toLocaleDateString("pt-BR")}{" "}
-              {new Date(ticket.atualizadoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+            <span className="font-medium truncate">
+              {new Date(ticket.atualizadoEm).toLocaleString("pt-BR", { day: '2-digit', month: '2-digit', year: 'numeric', hour: "2-digit", minute: "2-digit" })}
             </span>
           </div>
         </div>
       </div>
 
-      {/* layout: chat à esquerda, gestão à direita */}
+      {/* layout: chat/anexos à esquerda, gestão/histórico à direita */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-        {/* chat */}
-        <section className="xl:col-span-8 rounded-xl border border-[var(--border)] bg-card flex flex-col">
-          <div className="p-3 border-b border-[var(--border)] flex items-center gap-2">
-            <MessageSquareText className="size-4" />
-            <div className="font-grotesk font-semibold">Mensagens</div>
-          </div>
 
-          <div ref={chatRef} className="flex-1 overflow-y-auto p-4 space-y-3">
-            {mensagens.length === 0 ? (
-              <div className="text-sm text-muted-foreground">Sem mensagens ainda.</div>
-            ) : (
-              mensagens.map((m) => (
-                <div key={m.id} className={cx("max-w-[86%]", m.autorId === ticket.criadoPorId ? "" : "ml-auto")}>
-                  <div
-                    className={cx(
-                      "rounded-lg px-3 py-2 border",
-                      m.autorId === ticket.criadoPorId
-                        ? "bg-background"
-                        : "bg-[var(--brand-cyan)]/10 border-[var(--brand-cyan)]/30"
-                    )}
-                  >
-                    <div className="text-xs text-muted-foreground mb-1">
-                      {m.autor?.nome ?? (m.autorId === ticket.criadoPorId ? "Solicitante" : "Equipe")}
-                      {" · "}
-                      {new Date(m.criadoEm).toLocaleDateString("pt-BR")}{" "}
-                      {new Date(m.criadoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+        {/* Coluna Esquerda: Chat e Anexos */}
+        <div className="xl:col-span-8 space-y-6">
+            {/* chat */}
+            <section className="rounded-xl border border-[var(--border)] bg-card flex flex-col min-h-[400px]">
+              <div className="p-3 border-b border-[var(--border)] flex items-center gap-2">
+                <MessageSquareText className="size-4" />
+                <div className="font-grotesk font-semibold">Mensagens</div>
+              </div>
+
+              <div ref={chatRef} className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[200px]">
+                {mensagens.length === 0 ? (
+                  <div className="text-sm text-muted-foreground text-center py-4">Sem mensagens ainda.</div>
+                ) : (
+                  mensagens.map((m) => (
+                    <div key={m.id} className={cx("flex", m.autorId === ticket?.criadoPorId ? "justify-start" : "justify-end")}>
+                      <div
+                        className={cx(
+                          "max-w-[85%] rounded-lg px-3 py-2 border text-sm",
+                          m.autorId === ticket?.criadoPorId
+                            ? "bg-background"
+                            : "bg-[var(--brand-cyan)]/10 border-[var(--brand-cyan)]/30"
+                        )}
+                      >
+                        <div className="text-xs text-muted-foreground mb-1">
+                          {m.autor?.nome ?? (m.autorId === ticket?.criadoPorId ? "Solicitante" : "Equipe")}
+                          {" · "}
+                          {new Date(m.criadoEm).toLocaleString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                        </div>
+                        <div className="whitespace-pre-wrap break-words">{m.conteudo}</div>
+                      </div>
                     </div>
-                    <div className="whitespace-pre-wrap">{m.conteudo}</div>
-                  </div>
+                  ))
+                )}
+              </div>
+
+              <div className="p-3 border-t border-[var(--border)]">
+                <div className="flex items-end gap-2">
+                  <textarea
+                    value={msg}
+                    onChange={(e) => setMsg(e.target.value)}
+                    rows={2}
+                    placeholder="Escreva uma mensagem…"
+                    className="flex-1 max-h-32 rounded-lg border border-[var(--border)] bg-input px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--ring)] resize-none"
+                    disabled={sending}
+                  />
+                  <button
+                    onClick={sendMessage}
+                    disabled={sending || !msg.trim()}
+                    className="h-[56px] px-3 rounded-lg bg-primary text-primary-foreground disabled:opacity-60 inline-flex items-center justify-center shrink-0"
+                    title="Enviar"
+                  >
+                    {sending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+                  </button>
                 </div>
-              ))
-            )}
-          </div>
+              </div>
+            </section>
 
-          <div className="p-3 border-t border-[var(--border)]">
-            <div className="flex items-end gap-2">
-              <textarea
-                value={msg}
-                onChange={(e) => setMsg(e.target.value)}
-                rows={2}
-                placeholder="Escreva uma mensagem…"
-                className="flex-1 h-[72px] rounded-lg border border-[var(--border)] bg-input px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-              />
-              <button
-                onClick={sendMessage}
-                disabled={sending || !msg.trim()}
-                className="h-[72px] px-3 rounded-lg bg-primary text-primary-foreground disabled:opacity-60 inline-flex items-center justify-center"
-                title="Enviar"
-              >
-                {sending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-              </button>
-            </div>
-          </div>
-        </section>
+             {/* --- Seção de Anexos --- */}
+            <section className="rounded-xl border border-[var(--border)] bg-card p-4">
+                <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                    <Paperclip className="size-4" /> Anexos ({anexos.length})
+                </h2>
 
-        {/* gestão */}
+                {loadingAnexos ? (
+                    <div className="text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin inline mr-1" /> Carregando anexos...</div>
+                ) : anexos.length === 0 ? (
+                    <div className="text-sm text-muted-foreground border rounded-md p-3 bg-background">Nenhum anexo encontrado.</div>
+                ) : (
+                    <ul className="space-y-2 mb-4">
+                    {anexos.map((a) => (
+                        <li key={a.id} className="p-2 border rounded-md bg-background flex items-center justify-between gap-2 text-sm">
+                        <div className="min-w-0">
+                            <span className="font-medium truncate block">{a.nomeArquivo}</span>
+                            <span className="text-xs text-muted-foreground">
+                            {(a.tamanhoBytes / 1024).toFixed(1)} KB - {new Date(a.enviadoEm).toLocaleDateString('pt-BR')} por {a.enviadoPor?.nome ?? 'Usuário'}
+                            </span>
+                        </div>
+                        <a
+                            href={`${API}/anexos/${a.id}/download`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download
+                            className="inline-flex items-center gap-1 h-8 px-2 rounded-md border hover:bg-[var(--muted)] text-xs shrink-0"
+                            title="Baixar anexo"
+                        >
+                            <Download className="size-3.5" /> Baixar
+                        </a>
+                        </li>
+                    ))}
+                    </ul>
+                )}
+
+                {/* Formulário de Upload */}
+                <div className="mt-4 pt-4 border-t">
+                    <h3 className="text-base font-medium mb-2">Adicionar anexo</h3>
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={(e) => setSelectedFile(e.target.files ? e.target.files[0] : null)}
+                        className="hidden"
+                    />
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="inline-flex items-center gap-2 h-9 px-3 rounded-md border bg-background hover:bg-[var(--muted)] text-sm"
+                            disabled={uploading}
+                        >
+                            <Paperclip className="size-4" /> Escolher arquivo...
+                        </button>
+                        {selectedFile && (
+                            <span className="text-sm text-muted-foreground truncate max-w-xs">{selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)</span>
+                        )}
+                    </div>
+
+                    {selectedFile && (
+                    <button
+                        onClick={handleUpload}
+                        disabled={!selectedFile || uploading}
+                        className="mt-2 inline-flex items-center justify-center gap-2 h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm hover:opacity-90 disabled:opacity-60 min-w-[140px]"
+                    >
+                        {uploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+                        {uploading ? 'Enviando...' : 'Enviar arquivo'}
+                    </button>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-2">Limite por arquivo: 10MB (exemplo).</p>
+                </div>
+            </section>
+             {/* --- Fim Seção de Anexos --- */}
+        </div>
+
+        {/* Coluna Direita: Gestão e Histórico */}
         <aside className="xl:col-span-4 space-y-6">
           <div className="rounded-xl border border-[var(--border)] bg-card">
             <div className="p-3 border-b border-[var(--border)] flex items-center gap-2">
@@ -440,12 +604,11 @@ export default function AdminChamadoPage() {
                 />
               </label>
 
-              {/* 🔧 botões empilhados, largura total */}
               <div className="flex flex-col gap-2 pt-2">
                 <button
                   onClick={() => {
                     setStatus("RESOLVIDO");
-                    saveEdits();
+                    saveEdits(); 
                   }}
                   className="w-full inline-flex items-center justify-center gap-2 h-10 rounded-md border border-[var(--border)] hover:bg-[var(--muted)] text-sm"
                 >
@@ -484,12 +647,11 @@ export default function AdminChamadoPage() {
                   <div key={h.id} className="text-sm">
                     <div className="font-medium">
                       {h.de ? <BadgeStatus s={h.de} /> : <span className="text-xs text-muted-foreground">—</span>}
-                      <span className="mx-2">→</span>
+                      <span className="mx-1.5 text-muted-foreground">→</span>
                       <BadgeStatus s={h.para} />
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
-                      {new Date(h.criadoEm).toLocaleDateString("pt-BR")}{" "}
-                      {new Date(h.criadoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                      {new Date(h.criadoEm).toLocaleString("pt-BR", { day: '2-digit', month: '2-digit', hour: "2-digit", minute: "2-digit" })}
                       {h.porUsuario?.nome ? ` · por ${h.porUsuario.nome}` : ""}
                       {h.observacao ? ` · ${h.observacao}` : ""}
                     </div>
@@ -499,6 +661,7 @@ export default function AdminChamadoPage() {
             </div>
           </div>
         </aside>
+
       </div>
     </div>
   );
