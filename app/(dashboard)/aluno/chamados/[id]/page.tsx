@@ -270,7 +270,7 @@ export default function ChamadoDetalhePage() {
             </button>
           </div>
           <p className="text-xs text-muted-foreground text-right">
-            teste
+          Ao enviar, os responsáveis pelo chamado serão notificados.
           </p>
         </div>
       </section>
