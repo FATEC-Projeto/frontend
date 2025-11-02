@@ -138,18 +138,7 @@ export default function SidebarAdmin({
             </li>
           </ul>
         </div>
-
-        {/* Sair */}
-        <div className="mt-auto pt-3">
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="w-full inline-flex items-center justify-center gap-2 h-10 rounded-lg border border-[var(--border)] hover:bg-[var(--muted)] text-sm"
-          >
-            <LogOut className="size-4" />
-            Sair
-          </button>
-        </div>
+        
       </div>
     </aside>
   );

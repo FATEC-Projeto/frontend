@@ -19,24 +19,19 @@ type Usuario = {
 function getRedirectPath(params: { mode: Mode; user?: Usuario | null }) {
   const { mode, user } = params;
 
-  // 1) Login por RA => dashboard do aluno
-  if (mode === "ra") return "/aluno/home";
-
-  // 2) Backend indicou RA => aluno
-  if (user?.ra) return "/aluno/home";
-
-  // 3) Papel do Prisma
   switch (user?.papel) {
     case "ADMINISTRADOR":
     case "BACKOFFICE":
       return "/admin/home";
     case "TECNICO":
-      // ajuste se tiver um painel de técnico separado
       return "/admin";
     case "USUARIO":
     default:
       return "/aluno/home";
   }
+  if (mode === "ra") return "/aluno/home";
+
+  if (user?.ra) return "/aluno/home";
 }
 
 export default function LoginPage() {
