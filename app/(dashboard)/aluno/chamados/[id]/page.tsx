@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -59,7 +60,7 @@ export default function ChamadoDetalhePage() {
 
   // Estados para mensagens
   const [msgs, setMsgs] = useState<Mensagem[]>([]);
-  const [msgLoading, setMsgLoading] = useState(true);
+  const [msgText, setMsgText] = useState("");
   const [msgSending, setMsgSending] = useState(false);
   const [msgText, setMsgText] = useState("");
 
@@ -71,6 +72,7 @@ export default function ChamadoDetalhePage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   // --- Fim Estados para Anexos ---
 
+  const endRef = useRef<HTMLDivElement>(null);
   const apiBase = useMemo(() => process.env.NEXT_PUBLIC_API_BASE_URL, []);
   const API = apiBase;
 
@@ -152,6 +154,14 @@ export default function ChamadoDetalhePage() {
         method: "POST",
         body: JSON.stringify({ conteudo: msgText.trim() }),
       });
+      const novaMsg = await res.json();
+
+      // evita duplicar localmente
+      if (!knownIds.current.has(novaMsg.id)) {
+        knownIds.current.add(novaMsg.id);
+        setMsgs((prev) => [...prev, novaMsg]);
+      }
+
       setMsgText("");
       toast.success("Mensagem enviada!");
       await fetchMensagens(chamado.id);
@@ -223,15 +233,14 @@ export default function ChamadoDetalhePage() {
         <button
           type="button"
           onClick={() => router.back()}
-          className="inline-flex items-center gap-2 h-9 px-3 rounded-md border border-[var(--border)] bg-background hover:bg-[var(--muted)] text-sm"
+          className="inline-flex items-center gap-2 h-9 px-3 rounded-md border bg-background hover:bg-muted text-sm"
         >
-          <ChevronLeft className="size-4" />
-          Voltar
+          <ChevronLeft className="size-4" /> Voltar
         </button>
 
         <Link
           href="/aluno/chamados"
-          className="inline-flex items-center gap-2 h-9 px-3 rounded-md border border-[var(--border)] bg-background hover:bg-[var(--muted)] text-sm"
+          className="inline-flex items-center gap-2 h-9 px-3 rounded-md border bg-background hover:bg-muted text-sm"
         >
           Lista de chamados
         </Link>
@@ -260,9 +269,7 @@ export default function ChamadoDetalhePage() {
       </div>
 
       {/* Mensagens */}
-      <section>
-        <h2 className="text-lg font-semibold mb-3">Mensagens</h2>
-
+      <section className="border rounded-xl bg-white/90 dark:bg-gray-900/60 p-4 shadow-inner max-h-[500px] overflow-y-auto space-y-3 scrollbar-thin">
         {msgLoading ? (
           <div className="flex items-center gap-2 text-muted-foreground text-sm">
             <Loader2 className="size-4 animate-spin" />
@@ -285,6 +292,7 @@ export default function ChamadoDetalhePage() {
             ))}
           </ul>
         )}
+        <div ref={endRef} />
       </section>
 
       {/* Composer (Enviar Mensagem) */}
@@ -313,8 +321,8 @@ export default function ChamadoDetalhePage() {
               )}
             </button>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Ao enviar, os responsáveis pelo chamado serão notificados.
+          <p className="text-xs text-muted-foreground text-right">
+          Ao enviar, os responsáveis pelo chamado serão notificados.
           </p>
         </div>
       </section>

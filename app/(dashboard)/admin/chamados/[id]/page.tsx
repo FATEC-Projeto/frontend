@@ -61,15 +61,7 @@ type Chamado = {
   nivel: Nivel;
   status: Status;
   prioridade: Prioridade;
-
-  servicoId?: string | null;
-  setorId?: string | null;
-  clienteId?: string | null;
-  contratoId?: string | null;
-
-  responsavelId?: string | null;
   criadoPorId: string;
-
   criadoEm: string;
   atualizadoEm: string;
   encerradoEm?: string | null;
@@ -84,8 +76,6 @@ type Chamado = {
   historico?: Historico[];
   // Anexos podem vir aqui se o include for usado, mas buscaremos separado
 };
-
-type TicketResponse = Chamado;
 
 /* ===== Utils ===== */
 function cx(...xs: Array<string | false | null | undefined>) {
@@ -105,16 +95,6 @@ function BadgeStatus({ s }: { s: Status }) {
       {s.replace("_", " ")}
     </span>
   );
-}
-
-function DotPrioridade({ p }: { p: Prioridade }) {
-  const map: Record<Prioridade, string> = {
-    BAIXA: "bg-[var(--muted-foreground)]",
-    MEDIA: "bg-[var(--brand-cyan)]",
-    ALTA: "bg-[var(--brand-teal)]",
-    URGENTE: "bg-[var(--brand-red)]",
-  };
-  return <span className={cx("inline-block size-2 rounded-full", map[p])} />;
 }
 
 /* ===== Página ===== */
@@ -209,6 +189,10 @@ export default function AdminChamadoPage() {
     }
   }
 
+  useEffect(() => { load(); }, [id]);
+  useEffect(() => { chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight }); }, [ticket?.mensagens?.length]);
+
+  // === WebSocket em tempo real ===
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -226,7 +210,7 @@ export default function AdminChamadoPage() {
     try {
       setSaving(true);
       const body = {
-        status,
+        status: newStatus ?? status,
         prioridade,
         nivel,
         responsavelId: responsavelId || null,
@@ -248,20 +232,22 @@ export default function AdminChamadoPage() {
     }
   }
 
+
+
   async function sendMessage() {
-    if (!ticket) return;
-    const trimmed = msg.trim();
-    if (!trimmed) return;
+    if (!ticket || !msg.trim()) return;
+    setSending(true);
     try {
       setSending(true);
       const res = await apiFetch(`${API}/tickets/${ticket.id}/mensagens`, {
         method: "POST",
-        body: JSON.stringify({ conteudo: trimmed }),
+        body: JSON.stringify({ conteudo: msg.trim() }),
       });
-      if (!res.ok) {
-        const e = await res.json().catch(() => ({}));
-        throw new Error(e?.error || `Erro HTTP ${res.status}`);
-      }
+      const nova = await res.json();
+      knownIds.current.add(nova.id);
+      setTicket((prev) =>
+        prev ? { ...prev, mensagens: [...(prev.mensagens ?? []), nova] } : prev
+      );
       setMsg("");
       await load(); // Recarrega tudo para ver a nova mensagem
     } catch (e: any) {
@@ -308,38 +294,23 @@ export default function AdminChamadoPage() {
 
   if (loading && !ticket) {
     return (
-      <div className="p-6">
-        <div className="inline-flex items-center gap-2 text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" /> Carregando chamado…
-        </div>
+      <div className="p-6 flex items-center gap-2 text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" /> Carregando chamado…
       </div>
     );
-  }
 
-  if (err || !ticket) {
+  if (!ticket)
     return (
-      <div className="p-6 space-y-3">
-        <Link href="/admin/chamados" className="inline-flex items-center gap-2 text-sm hover:underline">
-          <ArrowLeft className="size-4" /> Voltar
-        </Link>
-        <div className="rounded-xl border border-[var(--border)] bg-card p-4">
-          <div className="text-red-500 font-medium">Erro</div>
-          <div className="text-sm text-muted-foreground mt-1">{err ?? "Chamado não encontrado"}</div>
-        </div>
+      <div className="p-6 text-sm text-muted-foreground">
+        Chamado não encontrado.
       </div>
     );
-  }
 
-  const mensagens = (ticket.mensagens ?? []).slice().sort(
-    (a, b) => +new Date(a.criadoEm) - +new Date(b.criadoEm)
-  );
-  const historico = (ticket.historico ?? []).slice().sort(
-    (a, b) => +new Date(b.criadoEm) - +new Date(a.criadoEm)
-  );
+  const mensagens = (ticket.mensagens ?? []).slice().sort((a, b) => +new Date(a.criadoEm) - +new Date(b.criadoEm));
+  const historico = (ticket.historico ?? []).slice().sort((a, b) => +new Date(b.criadoEm) - +new Date(a.criadoEm));
 
   return (
     <div className="px-4 py-2 sm:px-6 lg:px-8">
-      {/* topo */}
       <div className="mb-4 flex items-center justify-between">
         <Link href="/admin/chamados" className="inline-flex items-center gap-2 text-sm hover:underline">
           <ArrowLeft className="size-4" /> Voltar
@@ -549,13 +520,13 @@ export default function AdminChamadoPage() {
           <div className="rounded-xl border border-[var(--border)] bg-card">
             <div className="p-3 border-b border-[var(--border)] flex items-center gap-2">
               <Pencil className="size-4" />
-              <div className="font-grotesk font-semibold">Atribuição & Status</div>
+              <div className="font-semibold">Atribuição & Status</div>
             </div>
             <div className="p-4 space-y-3">
               <label className="text-sm block">
                 <span className="text-muted-foreground">Status</span>
                 <select
-                  className="mt-1 w-full h-10 rounded-lg border border-[var(--border)] bg-background px-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                  className="mt-1 w-full h-10 rounded-lg border border-[var(--border)] bg-background px-3 focus:ring-2 focus:ring-[var(--ring)]"
                   value={status}
                   onChange={(e) => setStatus(e.target.value as Status)}
                 >
@@ -570,7 +541,7 @@ export default function AdminChamadoPage() {
               <label className="text-sm block">
                 <span className="text-muted-foreground">Prioridade</span>
                 <select
-                  className="mt-1 w-full h-10 rounded-lg border border-[var(--border)] bg-background px-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                  className="mt-1 w-full h-10 rounded-lg border border-[var(--border)] bg-background px-3 focus:ring-2 focus:ring-[var(--ring)]"
                   value={prioridade}
                   onChange={(e) => setPrioridade(e.target.value as Prioridade)}
                 >
@@ -584,7 +555,7 @@ export default function AdminChamadoPage() {
               <label className="text-sm block">
                 <span className="text-muted-foreground">Nível</span>
                 <select
-                  className="mt-1 w-full h-10 rounded-lg border border-[var(--border)] bg-background px-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                  className="mt-1 w-full h-10 rounded-lg border border-[var(--border)] bg-background px-3 focus:ring-2 focus:ring-[var(--ring)]"
                   value={nivel}
                   onChange={(e) => setNivel(e.target.value as Nivel)}
                 >
@@ -599,8 +570,8 @@ export default function AdminChamadoPage() {
                 <input
                   value={responsavelId}
                   onChange={(e) => setResponsavelId(e.target.value)}
-                  placeholder="cuid_xxx do responsável"
-                  className="mt-1 w-full h-10 rounded-lg border border-[var(--border)] bg-input px-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                  placeholder="cuid_xxx"
+                  className="mt-1 w-full h-10 rounded-lg border border-[var(--border)] bg-input px-3 focus:ring-2 focus:ring-[var(--ring)]"
                 />
               </label>
 
@@ -615,32 +586,26 @@ export default function AdminChamadoPage() {
                   <CheckCircle2 className="size-4" /> Marcar como resolvido
                 </button>
                 <button
-                  onClick={() => {
-                    setStatus("ABERTO");
-                    setPrioridade("MEDIA");
-                    setNivel("N1");
-                    saveEdits();
-                  }}
-                  className="w-full inline-flex items-center justify-center gap-2 h-10 rounded-md border border-[var(--border)] hover:bg-[var(--muted)] text-sm"
+                  onClick={() => saveEdits("ABERTO")}
+                  className="w-full inline-flex items-center justify-center gap-2 h-10 rounded-md border hover:bg-[var(--muted)] text-sm"
                 >
-                  <RotateCcw className="size-4" /> Reabrir (reset básico)
+                  <RotateCcw className="size-4" /> Reabrir
                 </button>
                 <button
-                  onClick={saveEdits}
+                  onClick={() => saveEdits()}
                   disabled={saving}
-                  className="w-full inline-flex items-center justify-center gap-2 h-10 rounded-md bg-primary text-primary-foreground disabled:opacity-60 text-sm"
+                  className="w-full inline-flex items-center justify-center gap-2 h-10 rounded-md bg-gradient-to-r from-[#F87171] to-[#E74C3C] text-white dark:from-[#B91C1C] dark:to-[#7F1D1D] hover:brightness-95 disabled:opacity-60 text-sm"
                 >
-                  {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-                  Salvar alterações
+                  {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />} Salvar
                 </button>
               </div>
             </div>
           </div>
 
           <div className="rounded-xl border border-[var(--border)] bg-card">
-            <div className="p-3 border-b border-[var(--border)] font-grotesk font-semibold">Histórico de status</div>
+            <div className="p-3 border-b font-semibold">Histórico de status</div>
             <div className="p-3 space-y-3 max-h-[360px] overflow-y-auto">
-              {historico.length === 0 ? (
+              {(ticket.historico ?? []).length === 0 ? (
                 <div className="text-sm text-muted-foreground">Sem histórico.</div>
               ) : (
                 historico.map((h) => (

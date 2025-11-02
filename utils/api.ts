@@ -9,6 +9,7 @@ export async function apiFetch(input: RequestInfo, init: RequestInit = {}) {
   const headers = new Headers(init.headers || {});
   if (token) headers.set("Authorization", `Bearer ${token}`);
   headers.set("Accept", "application/json");
+  headers.set("Content-Type", "application/json");
 
   const res = await fetch(input, { ...init, headers });
 
