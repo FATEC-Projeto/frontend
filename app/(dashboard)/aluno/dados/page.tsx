@@ -121,32 +121,51 @@ export default function MeusDadosPage() {
     }
   }
 
-  const canChangePass =
-    currentPass.length >= 6 && newPass.length >= 6 && newPass === newPass2;
+  const meetsPolicy =
+  newPass.length >= 8 &&
+  /[A-Z]/.test(newPass) &&
+  /[a-z]/.test(newPass) &&
+  /\d/.test(newPass) &&
+  /[^A-Za-z0-9]/.test(newPass);
 
-  async function changePassword(e: React.FormEvent) {
-    e.preventDefault();
-    if (!canChangePass) return;
-    try {
-      setChanging(true);
-      const res = await apiFetch(`${apiBase}/auth/change-password`, {
-        method: "POST",
-        body: JSON.stringify({
-          currentPassword: currentPass,
-          newPassword: newPass,
-        }),
+const canChangePass =
+  currentPass.length > 0 &&
+  meetsPolicy &&
+  newPass === newPass2;
+
+async function changePassword(e: React.FormEvent) {
+  e.preventDefault();
+  if (!canChangePass || !user) return; 
+  if (!meetsPolicy) {
+      toast.error("Falha ao alterar senha", { 
+        description: "A nova senha não cumpre todos os critérios de segurança (8+ caracteres, maiúscula, minúscula, número e símbolo)." 
       });
-      if (!res.ok) throw new Error("Erro ao alterar senha");
-      toast.success("Senha alterada com sucesso!");
-      setCurrentPass("");
-      setNewPass("");
-      setNewPass2("");
-    } catch (e: any) {
-      toast.error("Falha ao alterar senha", { description: e?.message });
-    } finally {
-      setChanging(false);
-    }
+      return;
   }
+  try {
+    setChanging(true);
+
+    const res = await apiFetch(`${apiBase}/usuarios/${user.id}`, { 
+      method: "PATCH", 
+      body: JSON.stringify({
+        senha: newPass,
+      }),
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData?.error || errData?.message || "Erro ao alterar senha");
+    }
+  
+    toast.success("Senha alterada com sucesso!");
+    setCurrentPass("");
+    setNewPass("");
+    setNewPass2("");
+  } catch (e: any) {
+    toast.error("Falha ao alterar senha", { description: e?.message });
+  } finally {
+    setChanging(false);
+  }
+}
 
   /* ---------- RENDER ---------- */
   return (
