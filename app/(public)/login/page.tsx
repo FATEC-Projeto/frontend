@@ -81,26 +81,35 @@ export default function LoginPage() {
       toast.success("Login realizado com sucesso!", {
         description: `Bem-vindo(a), ${data?.user?.nome ?? "usuário"} 👋`,
       });
-      
+
       if (data?.accessToken) {
         localStorage.setItem("accessToken", data.accessToken);
       }
       // 🔹 Extrai o userId do token (campo "sub") e salva no localStorage
-try {
-  const payload = JSON.parse(atob(data.accessToken.split(".")[1]));
-  if (payload?.sub) {
-    localStorage.setItem("userId", payload.sub);
-  }
-} catch (err) {
-  console.warn("Falha ao extrair userId do token:", err);
-}
+      try {
+        const payload = JSON.parse(atob(data.accessToken.split(".")[1]));
+        if (payload?.sub) {
+          localStorage.setItem("userId", payload.sub);
+        }
+      } catch (err) {
+        console.warn("Falha ao extrair userId do token:", err);
+      }
 
       if (data?.refreshToken) {
         localStorage.setItem("refreshToken", data.refreshToken);
       }
-      
+
+      // 🔹 Verifica se o usuário precisa redefinir a senha
+      if (data?.mustResetPassword || data?.user?.mustResetPassword) {
+        if (data?.user?.ra) {
+          localStorage.setItem("pendingRA", data.user.ra);
+        }
+        window.location.href = "/primeiro-acesso";
+        return;
+      }
+
       const to = getRedirectPath({ mode, user: data?.user });
-      window.location.href = to;      
+      window.location.href = to;
     } catch (e: any) {
       const msg = e?.message ?? "Erro ao autenticar";
       setErr(msg);
@@ -133,18 +142,16 @@ try {
             <button
               type="button"
               onClick={() => setMode("email")}
-              className={`h-9 rounded-md text-sm font-medium transition ${
-                mode === "email" ? "bg-background ring-1 ring-border" : "opacity-70 hover:opacity-100"
-              }`}
+              className={`h-9 rounded-md text-sm font-medium transition ${mode === "email" ? "bg-background ring-1 ring-border" : "opacity-70 hover:opacity-100"
+                }`}
             >
               Funcionário (Email)
             </button>
             <button
               type="button"
               onClick={() => setMode("ra")}
-              className={`h-9 rounded-md text-sm font-medium transition ${
-                mode === "ra" ? "bg-background ring-1 ring-border" : "opacity-70 hover:opacity-100"
-              }`}
+              className={`h-9 rounded-md text-sm font-medium transition ${mode === "ra" ? "bg-background ring-1 ring-border" : "opacity-70 hover:opacity-100"
+                }`}
             >
               Aluno (RA)
             </button>
