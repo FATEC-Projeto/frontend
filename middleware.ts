@@ -8,21 +8,26 @@ const ALUNO_ROLE: Papel = 'USUARIO'
 const ADMIN_HOME = '/admin/home'
 const ALUNO_HOME = '/aluno/home'
 const LOGIN_PATH = '/login'
-const PUBLIC_PATHS = ['/', '/login', '/sobre', '/como-funciona', '/recursos', '/impacto']
-const PUBLIC_PREFIXES = ['/_next', '/favicon.ico', '/images', '/assets']
 
-function isPublicPath(pathname: string) {
-  if (PUBLIC_PATHS.includes(pathname)) return true
+// Páginas realmente públicas (deixe /login de fora para podermos tratá-la antes)
+const PUBLIC_PATHS = ['/', '/sobre', '/como-funciona', '/recursos', '/impacto']
+const PUBLIC_PREFIXES = ['/_next', '/favicon.svg', '/images', '/assets']
+
+function isAssetPath(pathname: string) {
   return PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))
+}
+function isPublicPath(pathname: string) {
+  return PUBLIC_PATHS.includes(pathname)
 }
 
 async function getJwtPayload(token: string) {
   try {
-    const secret = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET)
-    if (!secret || process.env.JWT_ACCESS_SECRET?.length === 0) {
+    const secretStr = process.env.JWT_ACCESS_SECRET
+    if (!secretStr || secretStr.length === 0) {
       console.error('Middleware Error: JWT_ACCESS_SECRET não definida no .env.local.')
       return null
     }
+    const secret = new TextEncoder().encode(secretStr)
     const { payload } = await jwtVerify(token, secret, {
       issuer: process.env.JWT_ISSUER || 'helpdesk',
       audience: process.env.JWT_AUDIENCE || 'helpdesk-app',
@@ -34,34 +39,55 @@ async function getJwtPayload(token: string) {
   }
 }
 
-// --- O MIDDLEWARE ---
 export async function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl
+  const { pathname, search } = req.nextUrl
+  console.log(`\n--- [MIDDLEWARE] Rota: ${pathname}`)
 
-  console.log(`\n--- [V4 - MIDDLEWARE A CORRER] ---`)
-  console.log(`[Middleware DEBUG] Rota: ${pathname}`)
-
-  if (isPublicPath(pathname)) {
-    console.log('[Middleware DEBUG] Rota pública. Acesso permitido.')
+  // 0) Deixa assets passarem sempre
+  if (isAssetPath(pathname)) {
     return NextResponse.next()
   }
 
   const sessionToken = req.cookies.get('access_token')?.value
+  const redirectParam = `?redirect=${encodeURIComponent(pathname + search)}`
+
+  // 1) Tratar /login ANTES de checar público
+  if (pathname === LOGIN_PATH) {
+    // Se já está logado, manda para home adequada
+    if (sessionToken) {
+      const payload = await getJwtPayload(sessionToken)
+      if (payload) {
+        const home = ADMIN_ROLES.includes(payload.role) ? ADMIN_HOME : ALUNO_HOME
+        return NextResponse.redirect(new URL(home, req.url))
+      } else {
+        // token inválido → limpa cookie e deixa entrar no login
+        const res = NextResponse.next()
+        res.cookies.delete('access_token')
+        return res
+      }
+    }
+    // não logado → pode ver /login
+    return NextResponse.next()
+  }
+
+  // 2) Páginas públicas (excluindo /login, já tratado)
+  if (isPublicPath(pathname)) {
+    return NextResponse.next()
+  }
+
+  // 3) Rota privada → exige token
   if (!sessionToken) {
-    console.log('[Middleware DEBUG] Token não encontrado. Redirecionando para login.')
     const url = req.nextUrl.clone()
     url.pathname = LOGIN_PATH
-    url.search = `?redirect=${encodeURIComponent(pathname + req.nextUrl.search)}`
+    url.search = redirectParam
     return NextResponse.redirect(url)
   }
 
   const payload = await getJwtPayload(sessionToken)
-
   if (!payload) {
-    console.log('[Middleware DEBUG] Token inválido. Redirecionando para login.')
     const url = req.nextUrl.clone()
     url.pathname = LOGIN_PATH
-    url.search = `?redirect=${encodeURIComponent(pathname + req.nextUrl.search)}`
+    url.search = redirectParam
     const res = NextResponse.redirect(url)
     res.cookies.delete('access_token')
     return res
@@ -70,37 +96,19 @@ export async function middleware(req: NextRequest) {
   const userRole = payload.role
   const isAdminRoute = pathname.startsWith('/admin')
   const isAlunoRoute = pathname.startsWith('/aluno')
-  console.log(`[Middleware DEBUG] Papel do Utilizador: ${userRole}`)
-
-  if (pathname === LOGIN_PATH) {
-    const home = ADMIN_ROLES.includes(userRole) ? ADMIN_HOME : ALUNO_HOME
-    console.log(`[Middleware DEBUG] Utilizador logado a tentar aceder ao /login. Redirecionando para ${home}`)
-    return NextResponse.redirect(new URL(home, req.url))
-  }
 
   if (isAdminRoute && !ADMIN_ROLES.includes(userRole)) {
-    console.log(`[Middleware DEBUG] 🚨 ACESSO NEGADO: Papel '${userRole}' não pode aceder a '${pathname}'. Redirecionando para ${ALUNO_HOME}`)
     return NextResponse.redirect(new URL(ALUNO_HOME, req.url))
   }
-
   if (isAlunoRoute && userRole !== ALUNO_ROLE) {
-    console.log(`[Middleware DEBUG] 🚨 ACESSO NEGADO: Papel '${userRole}' não pode aceder a '${pathname}'. Redirecionando para ${ADMIN_HOME}`)
     return NextResponse.redirect(new URL(ADMIN_HOME, req.url))
   }
 
-  console.log(`[Middleware DEBUG] Acesso PERMITIDO para papel '${userRole}' em '${pathname}'.`)
   return NextResponse.next()
 }
 
 export const config = {
   matcher: [
-    '/',
-    '/login',
-    '/admin/:path*',
-    '/aluno/:path*',
-    '/sobre',
-    '/como-funciona',
-    '/recursos',
-    '/impacto',
+    '/((?!api).*)', // roda em tudo exceto /api (ajuste se quiser proteger /api também)
   ],
 }

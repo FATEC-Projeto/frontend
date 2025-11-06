@@ -1,4 +1,3 @@
-// app/layout.tsx
 import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "sonner";
@@ -21,6 +20,10 @@ const grotesk = Space_Grotesk({
 export const metadata: Metadata = {
   title: "Workflow Fatec",
   description: "Portal acadêmico",
+  icons: {
+    icon: "images/favicon.svg", 
+    shortcut: "/favicon.svg", 
+  },
 };
 
 // === Layout Root ===
