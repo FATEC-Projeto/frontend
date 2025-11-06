@@ -2,7 +2,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Mail, Lock, ArrowRight, Eye, EyeOff, Info } from "lucide-react";
+import { Mail, Hash, Lock, ArrowRight, Eye, EyeOff, Info } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -15,10 +15,9 @@ type Usuario = {
   papel?: "USUARIO" | "BACKOFFICE" | "TECNICO" | "ADMINISTRADOR";
 };
 
-// Decide a rota pós-login
-function getRedirectPath(params: { mode: Mode; user?: Usuario | null }) {
-  const { mode, user } = params;
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3333";
 
+function getRedirectPath(user?: Usuario | null) {
   switch (user?.papel) {
     case "ADMINISTRADOR":
     case "BACKOFFICE":
@@ -29,9 +28,6 @@ function getRedirectPath(params: { mode: Mode; user?: Usuario | null }) {
     default:
       return "/aluno/home";
   }
-  if (mode === "ra") return "/aluno/home";
-
-  if (user?.ra) return "/aluno/home";
 }
 
 export default function LoginPage() {
@@ -42,38 +38,68 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  // Regex de RA atual (sem '/'). Se seu RA tiver '/', troque para a linha comentada abaixo.
+  const raRegex = /^[A-Za-z0-9._-]{3,32}$/;
+  // const raRegex = /^[A-Za-z0-9._\/-]{3,32}$/; // permite '/'
+
+  // validação com trim (evita travar por espaço invisível)
   const isValid = useMemo(() => {
-    const idOk =
-      mode === "email"
-        ? /@/.test(identifier)
-        : /^[A-Za-z0-9._-]{3,32}$/.test(identifier);
-    return idOk && password.length >= 6;
+    const id = identifier.trim();
+    const passOk = password.trim().length >= 8;
+    const idOk = mode === "email" ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(id) : raRegex.test(id);
+    return idOk && passOk;
   }, [identifier, password, mode]);
+
+  // auto-switch opcional: se não tem '@' e só contém chars válidos, muda pra RA
+  function handleIdentifierChange(v: string) {
+    setIdentifier(v);
+    const t = v.trim();
+    if (!t.includes("@") && /^[A-Za-z0-9._/-]+$/.test(t)) {
+      setMode("ra");
+    }
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
-    if (!isValid) return;
+    if (!isValid || loading) return;
 
     setLoading(true);
     try {
-      const body =
-        mode === "email"
-          ? { email: identifier.trim(), password }
-          : { ra: identifier.trim(), password };
+      const id = identifier.trim();
+      const body = mode === "email" ? { email: id, password } : { ra: id, password };
 
-      const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/login`;
-
-      const res = await fetch(url, {
+      const res = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include", // se seu backend usa cookies httpOnly
+        credentials: "include",
         body: JSON.stringify(body),
       });
 
+      // 428 = precisa trocar senha (primeiro acesso)
+      if (res.status === 428) {
+        const data = await res.json().catch(() => ({}));
+        const uid = data?.user?.id;
+        if (uid) localStorage.setItem("firstAccessUserId", uid);
+        toast.message("Primeiro acesso", {
+          description: "Você precisa criar uma nova senha antes de continuar.",
+        });
+        window.location.href = `/primeiro-acesso${uid ? `?uid=${uid}` : ""}`;
+        return;
+      }
+
+      // erros comuns
+      if (res.status === 401) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j?.error || "Credenciais inválidas");
+      }
+      if (res.status === 423) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j?.message || "Conta temporariamente bloqueada");
+      }
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || "Credenciais inválidas ou erro no servidor");
+        const text = await res.text().catch(() => "");
+        throw new Error(text || "Erro no servidor");
       }
 
       const data = await res.json();
@@ -81,26 +107,20 @@ export default function LoginPage() {
       toast.success("Login realizado com sucesso!", {
         description: `Bem-vindo(a), ${data?.user?.nome ?? "usuário"} 👋`,
       });
-      
+
       if (data?.accessToken) {
         localStorage.setItem("accessToken", data.accessToken);
+        try {
+          const payload = JSON.parse(atob(String(data.accessToken).split(".")[1] || ""));
+          if (payload?.sub) localStorage.setItem("userId", payload.sub);
+        } catch {}
       }
-      // 🔹 Extrai o userId do token (campo "sub") e salva no localStorage
-try {
-  const payload = JSON.parse(atob(data.accessToken.split(".")[1]));
-  if (payload?.sub) {
-    localStorage.setItem("userId", payload.sub);
-  }
-} catch (err) {
-  console.warn("Falha ao extrair userId do token:", err);
-}
-
       if (data?.refreshToken) {
         localStorage.setItem("refreshToken", data.refreshToken);
       }
-      
-      const to = getRedirectPath({ mode, user: data?.user });
-      window.location.href = to;      
+
+      const to = getRedirectPath(data?.user);
+      window.location.href = to;
     } catch (e: any) {
       const msg = e?.message ?? "Erro ao autenticar";
       setErr(msg);
@@ -155,39 +175,36 @@ try {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium" htmlFor="identifier">
-                  {mode === "email" ? "Email" : "RA do Aluno"}
+                  {mode === "email" ? "Email institucional" : "RA do Aluno"}
                 </label>
 
-                {/* Tooltip simples */}
                 <div className="relative group inline-flex items-center">
                   <Info className="size-4 text-muted-foreground" aria-hidden />
                   <div className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md bg-popover px-2 py-1 text-xs text-popover-foreground shadow ring-1 ring-border opacity-0 group-hover:opacity-100 transition">
-                    {mode === "email"
-                      ? "Use seu email cadastrado"
-                      : "Seu RA sem espaços (3–32 caracteres)."}
+                    {mode === "email" ? "Use seu e-mail cadastrado" : "Seu RA sem espaços (3–32 caracteres)."}
                   </div>
                 </div>
               </div>
 
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                  <Mail className={`size-4 ${mode === "ra" ? "opacity-0" : ""}`} aria-hidden />
+                  {mode === "email" ? <Mail className="size-4" /> : <Hash className="size-4" />}
                 </span>
                 <input
                   id="identifier"
                   type={mode === "email" ? "email" : "text"}
                   inputMode={mode === "email" ? "email" : "text"}
                   autoComplete={mode === "email" ? "email" : "username"}
-                  placeholder={mode === "email" ? "seu@email.com" : "Ex.: 123456"}
-                  className={`w-full ${mode === "email" ? "pl-9" : "pl-3"} pr-3 h-11 rounded-lg bg-input ring-1 ring-border focus:outline-none focus:ring-2 focus:ring-ring text-base`}
+                  placeholder={mode === "email" ? "nome.sobrenome@fatec.sp.gov.br" : "Ex.: 123456"}
+                  className={`w-full pl-9 pr-3 h-11 rounded-lg bg-input ring-1 ring-border focus:outline-none focus:ring-2 focus:ring-ring text-base`}
                   value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
+                  onChange={(e) => handleIdentifierChange(e.target.value)}
                   required
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
                   {mode === "email"
-                    ? "Informe o email cadastrado no sistema."
-                    : "Somente letras, números e . _ -"}
+                    ? "Informe o e-mail institucional cadastrado."
+                    : "Apenas letras, números, ponto (.), underscore (_) e hífen (-)."}
                 </p>
               </div>
             </div>
@@ -222,14 +239,14 @@ try {
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Mínimo de 6 caracteres.</span>
+                <span className="text-xs text-muted-foreground">Mínimo de 8 caracteres.</span>
                 <Link href="/recuperar-senha" className="text-xs underline underline-offset-4 hover:opacity-80">
                   Esqueci a senha
                 </Link>
               </div>
             </div>
 
-            {/* ERRO (fallback visual além do toast) */}
+            {/* ERRO */}
             {err && (
               <div className="text-sm text-destructive-foreground bg-destructive/15 border border-destructive rounded-md px-3 py-2">
                 {err}
