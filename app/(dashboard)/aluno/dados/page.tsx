@@ -1,7 +1,7 @@
 "use client";
 import { apiFetch } from "../../../../utils/api";
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Save, Shield, User, Mail, IdCard } from "lucide-react";
+import { Loader2, Save, Shield, User, Mail, IdCard, Eye, EyeOff} from "lucide-react";
 import { toast } from "sonner";
 import MobileSidebarTriggerAluno from "../_components/MobileSidebarTriggerAluno";
 
@@ -52,6 +52,7 @@ export default function MeusDadosPage() {
   const [currentPass, setCurrentPass] = useState("");
   const [newPass, setNewPass] = useState("");
   const [newPass2, setNewPass2] = useState("");
+  const [showPass, setShowPass] = useState(false);
 
   const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -240,36 +241,63 @@ export default function MeusDadosPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Field label="Senha atual">
-                <input
-                  type="password"
-                  className="h-10 w-full rounded-lg border border-[var(--border)] bg-input px-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-                  value={currentPass}
-                  onChange={(e) => setCurrentPass(e.target.value)}
-                  minLength={6}
-                  placeholder="••••••••"
-                />
+                <div className="relative">
+                  <input
+                    type={showPass ? "text" : "password"}
+                    className="h-10 w-full rounded-lg border border-[var(--border)] bg-input px-3 pr-10 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                    value={currentPass}
+                    onChange={(e) => setCurrentPass(e.target.value)}
+                    minLength={6}
+                    placeholder="••••••••"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPass(v => !v)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-[var(--muted)]/60"
+                  >
+                    {showPass ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
               </Field>
 
               <Field label="Nova senha">
-                <input
-                  type="password"
-                  className="h-10 w-full rounded-lg border border-[var(--border)] bg-input px-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-                  value={newPass}
-                  onChange={(e) => setNewPass(e.target.value)}
-                  minLength={6}
-                  placeholder="••••••••"
-                />
+                <div className="relative">
+                  <input
+                    type={showPass ? "text" : "password"}
+                    className="h-10 w-full rounded-lg border border-[var(--border)] bg-input px-3 pr-10 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                    value={newPass}
+                    onChange={(e) => setNewPass(e.target.value)}
+                    minLength={6}
+                    placeholder="••••••••"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPass(v => !v)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-[var(--muted)]/60"
+                  >
+                    {showPass ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
               </Field>
 
               <Field label="Confirmar nova senha">
-                <input
-                  type="password"
-                  className="h-10 w-full rounded-lg border border-[var(--border)] bg-input px-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-                  value={newPass2}
-                  onChange={(e) => setNewPass2(e.target.value)}
-                  minLength={6}
-                  placeholder="••••••••"
-                />
+                <div className="relative">
+                  <input
+                    type={showPass ? "text" : "password"}
+                    className="h-10 w-full rounded-lg border border-[var(--border)] bg-input px-3 pr-10 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                    value={newPass2}
+                    onChange={(e) => setNewPass2(e.target.value)}
+                    minLength={6}
+                    placeholder="••••••••"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPass(v => !v)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-[var(--muted)]/60"
+                  >
+                    {showPass ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
               </Field>
             </div>
 
