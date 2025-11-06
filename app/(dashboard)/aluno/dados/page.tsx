@@ -83,7 +83,7 @@ export default function MeusDadosPage() {
     if (!user) return false;
     const changed =
       nome !== (user.nome ?? "") ||
-      emailPessoal !== (user.emailPessoal ?? "") ||
+      emailPessoal !== (user.emailPessoal ?? "") || 
       emailEducacional !== (user.emailEducacional ?? "");
     const emailOk = /\S+@\S+\.\S+/.test(emailPessoal);
     const eduOk = /\S+@\S+\.\S+/.test(emailEducacional);
@@ -204,17 +204,11 @@ export default function MeusDadosPage() {
                 </div>
               </Field>
 
-              <Field label="E-mail educacional" required desc="Obrigatório para alunos">
+              <Field label="E-mail educacional (somente leitura)">
                 <div className="relative">
-                  <Mail className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="email"
-                    required
-                    className="h-10 w-full rounded-lg border border-[var(--border)] bg-input pl-9 pr-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-                    value={emailEducacional}
-                    onChange={(e) => setEmailEducacional(e.target.value)}
-                    placeholder="nome.sobrenome@fatec.sp.gov.br"
-                  />
+                  <div className="h-10 w-full rounded-lg border border-[var(--border)] bg-muted px-3 grid items-center text-sm">
+                  {user.emailEducacional ?? "—"}
+                </div>
                 </div>
               </Field>
             </div>
