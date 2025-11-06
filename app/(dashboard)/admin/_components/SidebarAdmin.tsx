@@ -13,7 +13,7 @@ import {
   Building2,
   Bell,
   LogOut,
-  MessageCircleMore, // 💬 ícone de mensagens
+  //MessageCircleMore, // 💬 ícone de mensagens(Removido da sidebar)
 } from "lucide-react";
 import { useMemo } from "react";
 
@@ -50,13 +50,13 @@ export default function SidebarAdmin({
       { href: "/admin/chamados", label: "Todos os Chamados", icon: <Ticket className="size-4" />, badge: chamadosAbertosCount },
       { href: "/admin/alunos", label: "Gerenciar Alunos", icon: <Users className="size-4" />, badge: pendenciasCount || undefined },
       { href: "/admin/funcionarios", label: "Gerenciar Funcionários", icon: <UserPlus className="size-4" /> },
-      { href: "/admin/mensagens", label: "Mensagens", icon: <MessageCircleMore className="size-4" />, badge: mensagensCount || undefined }, // 💬 nova rota
+      //{ href: "/admin/mensagens", label: "Mensagens", icon: <MessageCircleMore className="size-4" />, badge: mensagensCount || undefined }, // 💬 nova rota
       { href: "/admin/comunicacoes", label: "Comunicações", icon: <MessageSquareText className="size-4" />, badge: notificacoesCount },
       { href: "/admin/relatorios", label: "Relatórios", icon: <FileChartColumn className="size-4" /> },
       { href: "/admin/setores", label: "Setores", icon: <Building2 className="size-4" /> },
       { href: "/admin/configuracoes", label: "Configurações", icon: <Settings className="size-4" /> },
     ],
-    [chamadosAbertosCount, notificacoesCount, pendenciasCount, mensagensCount]
+    [chamadosAbertosCount, notificacoesCount, pendenciasCount]
   );
 
   function isActive(href: string) {
@@ -138,7 +138,18 @@ export default function SidebarAdmin({
             </li>
           </ul>
         </div>
-        
+      
+        {/* Sair (fixo no rodapé do sidebar) */}
+        <div className="mt-auto pt-3">
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="w-full inline-flex items-center justify-center gap-2 h-10 rounded-lg border border-[var(--border)] hover:bg-[var(--muted)] text-sm"
+          >
+            <LogOut className="size-4" />
+            Sair
+          </button>
+        </div>
       </div>
     </aside>
   );
