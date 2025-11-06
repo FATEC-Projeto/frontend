@@ -1,79 +1,115 @@
 "use client";
-import { apiFetch } from "../../../../utils/api"
-
-import { useState } from "react";
-import { BadgeCheck, Loader2, KeyRound, Sparkles } from "lucide-react";
+import { apiFetch } from "../../../../utils/api";
+import { useMemo, useState } from "react";
+import { Loader2, KeyRound, Info } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
+const DEFAULT_PASSWORD = "Mudar123#";
+
+/** Catálogo prático — Fatec Cotia */
+const COURSES = [
+  { key: "DSM",  sigla: "DSM",  nome: "Desenvolvimento de Software Multiplataforma" },
+  { key: "CD",   sigla: "CD",   nome: "Ciência de Dados" },
+  { key: "GPI",  sigla: "GPI",  nome: "Gestão da Produção Industrial" },
+  { key: "GE",   sigla: "GE",   nome: "Gestão Empresarial" },
+  { key: "DP",   sigla: "DP",   nome: "Design de Produto (ênfase em processos de produção)" },
+  { key: "COMEX",sigla: "COMEX",nome: "Comércio Exterior" },
+] as const;
 
 type Props = {
   onSuccess?: (createdUser: any) => void;
   onCancel?: () => void;
 };
 
-function randPassword(len = 12) {
-  const chars =
-    "ABCDEFGHJKLMNPQRSTUWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%&*";
-  let s = "";
-  for (let i = 0; i < len; i++) s += chars[Math.floor(Math.random() * chars.length)];
-  return s;
-}
-
 export default function FormAlunoCreate({ onSuccess, onCancel }: Props) {
   const [nome, setNome] = useState("");
   const [emailEducacional, setEmailEducacional] = useState("");
   const [ra, setRa] = useState("");
-  const [senha, setSenha] = useState("");
-  const [gerada, setGerada] = useState(false);
+
+  // seleção guiada de curso
+  const [courseKey, setCourseKey] = useState<string>(""); // "", "DSM", "CD", ... ou "OUTRO"
+  const [cursoNome, setCursoNome] = useState("");
+  const [cursoSigla, setCursoSigla] = useState("");
+
   const [submitting, setSubmitting] = useState(false);
 
-  function gerarSenha() {
-    setSenha(randPassword());
-    setGerada(true);
+  // quando troca o select, preenche automatico; "OUTRO" libera campos manuais
+  function handleCourseChange(val: string) {
+    setCourseKey(val);
+    if (!val) {
+      setCursoNome("");
+      setCursoSigla("");
+      return;
+    }
+    if (val === "OUTRO") {
+      // libera os campos sem preencher
+      return;
+    }
+    const c = COURSES.find(c => c.key === val);
+    if (c) {
+      setCursoNome(c.nome);
+      setCursoSigla(c.sigla);
+    }
   }
+
+  const canSubmit = useMemo(() => {
+    const idOk = ra.trim().length > 0;
+    const mailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailEducacional);
+    // se escolheu OUTRO, não obriga preencher agora (opcional)
+    return idOk && mailOk && !submitting;
+  }, [ra, emailEducacional, submitting]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!emailEducacional || !ra) {
-      alert("E-mail educacional e RA são obrigatórios.");
-      return;
-    }
+    if (!canSubmit) return;
 
     try {
       setSubmitting(true);
 
-      const token =
-        (typeof window !== "undefined" && localStorage.getItem("accessToken")) ||
-        process.env.NEXT_PUBLIC_ACCESS_TOKEN ||
-        "";
+      const payload: any = {
+        nome: nome || undefined,
+        emailEducacional,
+        emailPessoal: emailEducacional, // fallback
+        ra,
+        papel: "USUARIO",
+        ativo: true,
+        senha: DEFAULT_PASSWORD, // Zod atual exige senha
+      };
 
-        const res = await apiFetch(`${API_URL}/usuarios`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            nome: nome || null,
-            emailEducacional,
-            emailPessoal: emailEducacional,
-            ra,
-            papel: "USUARIO", // aluno sempre é USUARIO
-            senha: senha || undefined, // opcional — backend pode gerar
-          }),
-        });
+      // só envia curso se tiver algo preenchido (seletor ou manual)
+      if (cursoNome?.trim()) payload.cursoNome = cursoNome.trim();
+      if (cursoSigla?.trim()) payload.cursoSigla = cursoSigla.trim();
+
+      const res = await apiFetch(`${API_URL}/usuarios`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
       if (!res.ok) {
         const text = await res.text().catch(() => "");
-        throw new Error(text || `Falha ao criar aluno (${res.status})`);
+        try {
+          const json = JSON.parse(text);
+          if (json?.issues?.length) {
+            const msg = json.issues.map((i: any) => `${i.path}: ${i.message}`).join(" | ");
+            throw new Error(`Validação falhou: ${msg}`);
+          }
+          throw new Error(json?.message || `Falha ao criar aluno (${res.status})`);
+        } catch {
+          throw new Error(text || `Falha ao criar aluno (${res.status})`);
+        }
       }
 
       const created = await res.json();
       onSuccess?.(created);
+
+      // reset
       setNome("");
       setEmailEducacional("");
       setRa("");
-      setSenha("");
-      setGerada(false);
+      setCourseKey("");
+      setCursoNome("");
+      setCursoSigla("");
     } catch (err: any) {
       console.error(err);
       alert(err?.message ?? "Erro ao criar aluno");
@@ -123,30 +159,64 @@ export default function FormAlunoCreate({ onSuccess, onCancel }: Props) {
         </div>
 
         <div>
-          <label className="text-sm text-muted-foreground">Senha (opcional)</label>
-          <div className="mt-1 flex gap-2">
+          <label className="text-sm text-muted-foreground">Senha inicial (padrão)</label>
+          <div className="relative">
             <input
-              className="flex-1 h-10 rounded-lg border border-[var(--border)] bg-background px-3 font-mono"
-              placeholder="(deixe vazio para o sistema gerar)"
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
+              className="mt-1 w-full h-10 rounded-lg border border-[var(--border)] bg-muted px-3 font-mono text-sm"
+              value={DEFAULT_PASSWORD}
+              readOnly
+              disabled
             />
-            <button
-              type="button"
-              onClick={gerarSenha}
-              className="inline-flex items-center gap-2 h-10 px-3 rounded-lg border border-[var(--border)] hover:bg-[var(--muted)] text-sm"
-              title="Gerar senha aleatória"
-            >
-              <Sparkles className="size-4" />
-              Gerar
-            </button>
-          </div>
-          {gerada && senha && (
-            <div className="mt-1 text-xs inline-flex items-center gap-1 text-[var(--success)]">
-              <BadgeCheck className="size-3" />
-              Senha gerada — copie e entregue ao aluno com segurança
+            <div className="mt-1 text-xs text-muted-foreground inline-flex items-center gap-1">
+              <Info className="size-3" />
+              A senha inicial é <b className="mx-1">{DEFAULT_PASSWORD}</b>. No primeiro acesso, o aluno deverá alterá-la.
             </div>
-          )}
+          </div>
+        </div>
+      </div>
+
+      {/* Linha 3 — Curso (UX prática) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="text-sm text-muted-foreground">Curso</label>
+          <select
+            className="mt-1 w-full h-10 rounded-lg border border-[var(--border)] bg-background px-3"
+            value={courseKey}
+            onChange={(e) => handleCourseChange(e.target.value)}
+          >
+            <option value="">Selecione um curso…</option>
+            {COURSES.map(c => (
+              <option key={c.key} value={c.key}>{c.nome} — {c.sigla}</option>
+            ))}
+            <option value="OUTRO">Outro curso…</option>
+          </select>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Ao selecionar, os campos abaixo são preenchidos automaticamente.
+          </p>
+        </div>
+
+        {/* quando OUTRO, mostra os campos pra digitar; caso contrário, exibe preenchidos e editáveis */}
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-sm text-muted-foreground">Sigla</label>
+            <input
+              className="mt-1 w-full h-10 rounded-lg border border-[var(--border)] bg-background px-3"
+              placeholder="Ex.: DSM"
+              value={cursoSigla}
+              onChange={(e) => setCursoSigla(e.target.value)}
+              disabled={!courseKey} // só habilita após selecionar algo (inclui OUTRO)
+            />
+          </div>
+          <div>
+            <label className="text-sm text-muted-foreground">Nome do curso</label>
+            <input
+              className="mt-1 w-full h-10 rounded-lg border border-[var(--border)] bg-background px-3"
+              placeholder="Ex.: Desenvolvimento de Software Multiplataforma"
+              value={cursoNome}
+              onChange={(e) => setCursoNome(e.target.value)}
+              disabled={!courseKey}
+            />
+          </div>
         </div>
       </div>
 
@@ -164,7 +234,7 @@ export default function FormAlunoCreate({ onSuccess, onCancel }: Props) {
 
         <button
           type="submit"
-          disabled={submitting}
+          disabled={!canSubmit}
           className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm hover:brightness-95 disabled:opacity-60"
         >
           {submitting ? (
