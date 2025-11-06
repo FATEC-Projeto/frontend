@@ -151,20 +151,65 @@ export default function AdminAlunosPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, status, page]);
 
-  function baixarModeloCSV() {
-    // Modelo “completo”, mas só RA + emailEducacional são obrigatórios
-    const headers = ["ra", "emailEducacional", "emailPessoal", "nome", "senha"];
-    const exemplo1 = ["123456", "joao.silva@fatec.sp.gov.br", "", "João da Silva", ""];
-    const exemplo2 = ["654321", "maria.souza@fatec.sp.gov.br", "maria.souza@gmail.com", "Maria Souza", "SenhaForte!123"];
-    const csv = [headers, exemplo1, exemplo2].map(r => r.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "modelo_alunos.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-  }
+function baixarModeloCSV() {
+  
+  // - OBRIGATÓRIOS: ra, emailEducacional
+  // - OPCIONAIS: nome, emailPessoal, cursoNome, cursoSigla, ativo
+  // Observações:
+  // - "ativo" aceita TRUE/FALSE; default no backend é TRUE se omitido
+  // - senha NÃO vai no CSV: o backend gera a senha padrão e força 1º acesso
+  const headers = [
+    "ra",
+    "emailEducacional",
+    "nome",
+    "emailPessoal",
+    "cursoNome",
+    "cursoSigla",
+    "ativo",
+  ];
+
+  const exemploMinimo = [
+    "123456",
+    "joao.silva@fatec.sp.gov.br",
+    "",        
+    "",        
+    "",        
+    "",        
+    "",       
+  ];
+
+  const exemploCompleto = [
+    "654321",
+    "maria.souza@fatec.sp.gov.br",
+    "Maria Souza",
+    "maria.souza@gmail.com",
+    "Desenvolvimento de Software Multiplataforma",
+    "DSM",
+    "TRUE", 
+  ];
+
+
+  const rows = [headers, exemploMinimo, exemploCompleto]
+    .map(r =>
+      r
+        .map((cell) => {
+        
+          const v = String(cell ?? "");
+          return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+        })
+        .join(",")
+    )
+    .join("\n");
+
+  const blob = new Blob([`\uFEFF${rows}`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "modelo_alunos_primeiro_acesso.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 
   const prevEnabled = page > 1;
   const nextEnabled = total ? page * perPage < total : rows.length === perPage;
