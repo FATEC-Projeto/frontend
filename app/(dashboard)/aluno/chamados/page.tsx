@@ -80,14 +80,19 @@ function StatusBadge({ status }: { status: Status }) {
 
 function AcoesChamado({ c }: { c: Chamado }) {
   const base =
-    "inline-flex items-center h-9 px-3 rounded-md border border-[var(--border)] bg-background hover:bg-[var(--muted)] text-sm";
+    "inline-flex items-center h-9 px-3 rounded-md border border-[var(--border)] bg-background hover:bg-[var(--muted)] text-sm transition";
 
   return (
     <div className="flex gap-2 justify-end">
-      {/* <Link href={`/aluno/chamados/${c.id}`} className={base}>
-        Detalhes <ChevronRight className="size-4 ml-1" />
-      </Link> */}
+      {/* Link sempre visível: permite consultar o chamado mesmo encerrado */}
+      <Link
+        href={`/aluno/chamados/${c.id}`}
+        className={cx(base, "text-[var(--brand-teal)] border-[var(--brand-teal)]/40")}
+      >
+        Ver detalhes
+      </Link>
 
+      {/* Se ainda pode responder */}
       {["ABERTO", "EM_ATENDIMENTO", "AGUARDANDO_USUARIO"].includes(c.status) && (
         <Link
           href={`/aluno/chamados/${c.id}#responder`}
@@ -97,6 +102,7 @@ function AcoesChamado({ c }: { c: Chamado }) {
         </Link>
       )}
 
+      {/* Se precisa enviar arquivo */}
       {c.precisaAcaoDoAluno && (
         <Link
           href={`/aluno/chamados/${c.id}#anexos`}
@@ -111,6 +117,7 @@ function AcoesChamado({ c }: { c: Chamado }) {
     </div>
   );
 }
+
 
 /* ---------- Página ---------- */
 export default function MeusChamadosPage() {

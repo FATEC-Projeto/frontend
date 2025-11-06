@@ -23,7 +23,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               </div>
               {/* topbar ocupa o resto */}
               <div className="flex-1">
-                <SistemaTopbar notificationsHref="/sistema/notificacoes" />
+                <SistemaTopbar notificationsHref="/admin/notificacoes" />
               </div>
             </div>
           </div>
