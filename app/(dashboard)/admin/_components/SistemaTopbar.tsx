@@ -11,7 +11,7 @@ type Props = {
 };
 
 export default function SistemaTopbar({
-  notificationsHref = "/sistema/notificacoes",
+  notificationsHref = "/admin/notificacoes",
   pollMs = 60_000,
 }: Props) {
   const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL;
