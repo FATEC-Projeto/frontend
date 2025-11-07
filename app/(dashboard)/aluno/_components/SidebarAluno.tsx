@@ -12,6 +12,7 @@ import {
   Bell,
   LogOut,
 } from "lucide-react";
+import Cookies from 'js-cookie';
 
 type NavItemProps = {
   href: string;
@@ -54,9 +55,18 @@ export default function SidebarAluno({
 
   function handleLogout() {
     try {
+      // Limpa os cookies que o middleware lê
+      Cookies.remove("accessToken");
+      Cookies.remove("refreshToken");
+
+      // Limpa o localStorage
       localStorage.removeItem("accessToken");
       localStorage.removeItem("refreshToken");
-    } catch {}
+      localStorage.removeItem("userId");
+    } catch (e) {
+      console.error("Erro ao fazer logout:", e);
+    }
+    // Redireciona para o login DEPOIS de limpar
     router.push("/login");
     onClose?.();
   }
