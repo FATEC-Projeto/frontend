@@ -1,4 +1,5 @@
-// app/middleware.ts
+// Ficheiro: middleware.ts (Corrigido para permitir acesso à rota '/')
+
 import { NextResponse, NextRequest } from 'next/server'
 import { jwtVerify } from 'jose'
 
@@ -11,10 +12,18 @@ const LOGIN_PATH = '/login'
 const PUBLIC_PATHS = ['/', '/login', '/sobre', '/como-funciona', '/recursos', '/impacto']
 const PUBLIC_PREFIXES = ['/_next', '/favicon.ico', '/images', '/assets']
 
-function isPublicPath(pathname: string) {
-  if (PUBLIC_PATHS.includes(pathname)) return true
-  return PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))
-}
+// Esta lista agora define apenas as rotas de AUTENTICAÇÃO
+const AUTH_PAGES = [
+  '/login',
+  '/primeiro-acesso', 
+  '/recuperar-senha'
+]
+
+// Prefixo para rotas protegidas 
+const protectedPrefixes = [
+  '/admin',
+  '/aluno'
+]
 
 async function getJwtPayload(token: string) {
   try {
@@ -37,70 +46,58 @@ async function getJwtPayload(token: string) {
 // --- O MIDDLEWARE ---
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
+  
+  const sessionToken = req.cookies.get('accessToken')?.value
 
-  console.log(`\n--- [V4 - MIDDLEWARE A CORRER] ---`)
-  console.log(`[Middleware DEBUG] Rota: ${pathname}`)
+  const isAuthRoute = AUTH_PAGES.includes(pathname)
+  const isProtectedRoute = protectedPrefixes.some(prefix => pathname.startsWith(prefix))
 
-  if (isPublicPath(pathname)) {
-    console.log('[Middleware DEBUG] Rota pública. Acesso permitido.')
-    return NextResponse.next()
-  }
-
-  const sessionToken = req.cookies.get('access_token')?.value
-  if (!sessionToken) {
-    console.log('[Middleware DEBUG] Token não encontrado. Redirecionando para login.')
+  if (!sessionToken && isProtectedRoute) {
     const url = req.nextUrl.clone()
     url.pathname = LOGIN_PATH
-    url.search = `?redirect=${encodeURIComponent(pathname + req.nextUrl.search)}`
+    url.search = `?redirect=${encodeURIComponent(pathname)}`
     return NextResponse.redirect(url)
   }
 
-  const payload = await getJwtPayload(sessionToken)
+  if (sessionToken) {
+    const payload = await getJwtPayload(sessionToken)
 
-  if (!payload) {
-    console.log('[Middleware DEBUG] Token inválido. Redirecionando para login.')
-    const url = req.nextUrl.clone()
-    url.pathname = LOGIN_PATH
-    url.search = `?redirect=${encodeURIComponent(pathname + req.nextUrl.search)}`
-    const res = NextResponse.redirect(url)
-    res.cookies.delete('access_token')
-    return res
+    if (!payload) {
+      const url = req.nextUrl.clone()
+      url.pathname = LOGIN_PATH
+      // Se estava numa rota protegida, adiciona redirect
+      if (isProtectedRoute) {
+        url.search = `?redirect=${encodeURIComponent(pathname)}`
+      }
+      // Limpa o cookie inválido e redireciona para o login
+      const res = NextResponse.redirect(url)
+      res.cookies.delete('accessToken') 
+      res.cookies.delete('refreshToken')
+      return res
+    }
+    
+    const role = payload.role
+
+    if (isAuthRoute) {
+      const home = ADMIN_ROLES.includes(role) ? ADMIN_HOME : ALUNO_HOME
+      return NextResponse.redirect(new URL(home, req.nextUrl.origin))
+    }
+
+    if (pathname.startsWith('/admin') && !ADMIN_ROLES.includes(role)) {
+      return NextResponse.redirect(new URL(ALUNO_HOME, req.nextUrl.origin))
+    }
+
+    if (pathname.startsWith('/aluno') && role !== ALUNO_ROLE) {
+      return NextResponse.redirect(new URL(ADMIN_HOME, req.nextUrl.origin))
+    }
+    
+    return NextResponse.next()
   }
-
-  const userRole = payload.role
-  const isAdminRoute = pathname.startsWith('/admin')
-  const isAlunoRoute = pathname.startsWith('/aluno')
-  console.log(`[Middleware DEBUG] Papel do Utilizador: ${userRole}`)
-
-  if (pathname === LOGIN_PATH) {
-    const home = ADMIN_ROLES.includes(userRole) ? ADMIN_HOME : ALUNO_HOME
-    console.log(`[Middleware DEBUG] Utilizador logado a tentar aceder ao /login. Redirecionando para ${home}`)
-    return NextResponse.redirect(new URL(home, req.url))
-  }
-
-  if (isAdminRoute && !ADMIN_ROLES.includes(userRole)) {
-    console.log(`[Middleware DEBUG] 🚨 ACESSO NEGADO: Papel '${userRole}' não pode aceder a '${pathname}'. Redirecionando para ${ALUNO_HOME}`)
-    return NextResponse.redirect(new URL(ALUNO_HOME, req.url))
-  }
-
-  if (isAlunoRoute && userRole !== ALUNO_ROLE) {
-    console.log(`[Middleware DEBUG] 🚨 ACESSO NEGADO: Papel '${userRole}' não pode aceder a '${pathname}'. Redirecionando para ${ADMIN_HOME}`)
-    return NextResponse.redirect(new URL(ADMIN_HOME, req.url))
-  }
-
-  console.log(`[Middleware DEBUG] Acesso PERMITIDO para papel '${userRole}' em '${pathname}'.`)
   return NextResponse.next()
 }
 
 export const config = {
   matcher: [
-    '/',
-    '/login',
-    '/admin/:path*',
-    '/aluno/:path*',
-    '/sobre',
-    '/como-funciona',
-    '/recursos',
-    '/impacto',
+    '/((?!api|_next/static|_next/image|images|assets|favicon.svg).*)',
   ],
 }

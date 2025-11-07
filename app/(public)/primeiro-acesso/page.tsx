@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Info, LockKeyhole, MailCheck, Loader2, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import Cookies from 'js-cookie';
 
 type Usuario = {
   id: string;
@@ -117,12 +118,22 @@ export default function FirstAccessPage() {
       const data = await res.json();
       const user: Usuario | undefined = data?.user;
 
-      // guarda tokens (se vierem) para navegação autenticada
-      if (data?.accessToken) localStorage.setItem("accessToken", data.accessToken);
-      if (data?.refreshToken) localStorage.setItem("refreshToken", data.refreshToken);
-
-      // limpeza do marcador de primeiro acesso
-      localStorage.removeItem("firstAccessUserId");
+      if (data?.accessToken) {
+        Cookies.set("accessToken", data.accessToken, { 
+          expires: 7, 
+          secure: process.env.NODE_ENV === 'production', 
+          path: '/' 
+        });
+        localStorage.setItem("accessToken", data.accessToken);
+      }
+      if (data?.refreshToken) {
+        Cookies.set("refreshToken", data.refreshToken, { 
+          expires: 30, 
+          secure: process.env.NODE_ENV === 'production', 
+          path: '/' 
+        });
+        localStorage.setItem("refreshToken", data.refreshToken);
+      }
 
       toast.success("Senha atualizada com sucesso!", {
         description:
