@@ -9,6 +9,8 @@ const ALUNO_ROLE: Papel = 'USUARIO'
 const ADMIN_HOME = '/admin/home'
 const ALUNO_HOME = '/aluno/home'
 const LOGIN_PATH = '/login'
+const PUBLIC_PATHS = ['/', '/login', '/sobre', '/como-funciona', '/recursos', '/impacto']
+const PUBLIC_PREFIXES = ['/_next', '/favicon.ico', '/images', '/assets']
 
 // Esta lista agora define apenas as rotas de AUTENTICAÇÃO
 const AUTH_PAGES = [
@@ -25,12 +27,11 @@ const protectedPrefixes = [
 
 async function getJwtPayload(token: string) {
   try {
-    const secretStr = process.env.JWT_ACCESS_SECRET
-    if (!secretStr || secretStr.length === 0) {
+    const secret = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET)
+    if (!secret || process.env.JWT_ACCESS_SECRET?.length === 0) {
       console.error('Middleware Error: JWT_ACCESS_SECRET não definida no .env.local.')
       return null
     }
-    const secret = new TextEncoder().encode(secretStr)
     const { payload } = await jwtVerify(token, secret, {
       issuer: process.env.JWT_ISSUER || 'helpdesk',
       audience: process.env.JWT_AUDIENCE || 'helpdesk-app',
@@ -42,6 +43,7 @@ async function getJwtPayload(token: string) {
   }
 }
 
+// --- O MIDDLEWARE ---
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
   
