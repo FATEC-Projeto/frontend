@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { Mail, Hash, Lock, ArrowRight, Eye, EyeOff, Info } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import Cookies from 'js-cookie';
 
 type Mode = "email" | "ra";
 
@@ -109,6 +110,12 @@ export default function LoginPage() {
       });
 
       if (data?.accessToken) {
+        Cookies.set("accessToken", data.accessToken, { 
+          expires: 7, 
+          secure: process.env.NODE_ENV === 'production',
+          path: '/' 
+        });
+
         localStorage.setItem("accessToken", data.accessToken);
         try {
           const payload = JSON.parse(atob(String(data.accessToken).split(".")[1] || ""));
@@ -116,6 +123,11 @@ export default function LoginPage() {
         } catch {}
       }
       if (data?.refreshToken) {
+        Cookies.set("refreshToken", data.refreshToken, { 
+          expires: 30, 
+          secure: process.env.NODE_ENV === 'production', 
+          path: '/' 
+        });
         localStorage.setItem("refreshToken", data.refreshToken);
       }
 

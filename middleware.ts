@@ -1,4 +1,5 @@
-// app/middleware.ts
+// Ficheiro: middleware.ts (Corrigido para permitir acesso à rota '/')
+
 import { NextResponse, NextRequest } from 'next/server'
 import { jwtVerify } from 'jose'
 
@@ -8,26 +9,29 @@ const ALUNO_ROLE: Papel = 'USUARIO'
 const ADMIN_HOME = '/admin/home'
 const ALUNO_HOME = '/aluno/home'
 const LOGIN_PATH = '/login'
+const PUBLIC_PATHS = ['/', '/login', '/sobre', '/como-funciona', '/recursos', '/impacto']
+const PUBLIC_PREFIXES = ['/_next', '/favicon.ico', '/images', '/assets']
 
-// Páginas realmente públicas (deixe /login de fora para podermos tratá-la antes)
-const PUBLIC_PATHS = ['/', '/sobre', '/como-funciona', '/recursos', '/impacto']
-const PUBLIC_PREFIXES = ['/_next', '/favicon.svg', '/images', '/assets']
+// Esta lista agora define apenas as rotas de AUTENTICAÇÃO
+const AUTH_PAGES = [
+  '/login',
+  '/primeiro-acesso', 
+  '/recuperar-senha'
+]
 
-function isAssetPath(pathname: string) {
-  return PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))
-}
-function isPublicPath(pathname: string) {
-  return PUBLIC_PATHS.includes(pathname)
-}
+// Prefixo para rotas protegidas 
+const protectedPrefixes = [
+  '/admin',
+  '/aluno'
+]
 
 async function getJwtPayload(token: string) {
   try {
-    const secretStr = process.env.JWT_ACCESS_SECRET
-    if (!secretStr || secretStr.length === 0) {
+    const secret = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET)
+    if (!secret || process.env.JWT_ACCESS_SECRET?.length === 0) {
       console.error('Middleware Error: JWT_ACCESS_SECRET não definida no .env.local.')
       return null
     }
-    const secret = new TextEncoder().encode(secretStr)
     const { payload } = await jwtVerify(token, secret, {
       issuer: process.env.JWT_ISSUER || 'helpdesk',
       audience: process.env.JWT_AUDIENCE || 'helpdesk-app',
@@ -39,76 +43,61 @@ async function getJwtPayload(token: string) {
   }
 }
 
+// --- O MIDDLEWARE ---
 export async function middleware(req: NextRequest) {
-  const { pathname, search } = req.nextUrl
-  console.log(`\n--- [MIDDLEWARE] Rota: ${pathname}`)
+  const { pathname } = req.nextUrl
+  
+  const sessionToken = req.cookies.get('accessToken')?.value
 
-  // 0) Deixa assets passarem sempre
-  if (isAssetPath(pathname)) {
-    return NextResponse.next()
-  }
+  const isAuthRoute = AUTH_PAGES.includes(pathname)
+  const isProtectedRoute = protectedPrefixes.some(prefix => pathname.startsWith(prefix))
 
-  const sessionToken = req.cookies.get('access_token')?.value
-  const redirectParam = `?redirect=${encodeURIComponent(pathname + search)}`
-
-  // 1) Tratar /login ANTES de checar público
-  if (pathname === LOGIN_PATH) {
-    // Se já está logado, manda para home adequada
-    if (sessionToken) {
-      const payload = await getJwtPayload(sessionToken)
-      if (payload) {
-        const home = ADMIN_ROLES.includes(payload.role) ? ADMIN_HOME : ALUNO_HOME
-        return NextResponse.redirect(new URL(home, req.url))
-      } else {
-        // token inválido → limpa cookie e deixa entrar no login
-        const res = NextResponse.next()
-        res.cookies.delete('access_token')
-        return res
-      }
-    }
-    // não logado → pode ver /login
-    return NextResponse.next()
-  }
-
-  // 2) Páginas públicas (excluindo /login, já tratado)
-  if (isPublicPath(pathname)) {
-    return NextResponse.next()
-  }
-
-  // 3) Rota privada → exige token
-  if (!sessionToken) {
+  if (!sessionToken && isProtectedRoute) {
     const url = req.nextUrl.clone()
     url.pathname = LOGIN_PATH
-    url.search = redirectParam
+    url.search = `?redirect=${encodeURIComponent(pathname)}`
     return NextResponse.redirect(url)
   }
 
-  const payload = await getJwtPayload(sessionToken)
-  if (!payload) {
-    const url = req.nextUrl.clone()
-    url.pathname = LOGIN_PATH
-    url.search = redirectParam
-    const res = NextResponse.redirect(url)
-    res.cookies.delete('access_token')
-    return res
-  }
+  if (sessionToken) {
+    const payload = await getJwtPayload(sessionToken)
 
-  const userRole = payload.role
-  const isAdminRoute = pathname.startsWith('/admin')
-  const isAlunoRoute = pathname.startsWith('/aluno')
+    if (!payload) {
+      const url = req.nextUrl.clone()
+      url.pathname = LOGIN_PATH
+      // Se estava numa rota protegida, adiciona redirect
+      if (isProtectedRoute) {
+        url.search = `?redirect=${encodeURIComponent(pathname)}`
+      }
+      // Limpa o cookie inválido e redireciona para o login
+      const res = NextResponse.redirect(url)
+      res.cookies.delete('accessToken') 
+      res.cookies.delete('refreshToken')
+      return res
+    }
+    
+    const role = payload.role
 
-  if (isAdminRoute && !ADMIN_ROLES.includes(userRole)) {
-    return NextResponse.redirect(new URL(ALUNO_HOME, req.url))
-  }
-  if (isAlunoRoute && userRole !== ALUNO_ROLE) {
-    return NextResponse.redirect(new URL(ADMIN_HOME, req.url))
-  }
+    if (isAuthRoute) {
+      const home = ADMIN_ROLES.includes(role) ? ADMIN_HOME : ALUNO_HOME
+      return NextResponse.redirect(new URL(home, req.nextUrl.origin))
+    }
 
+    if (pathname.startsWith('/admin') && !ADMIN_ROLES.includes(role)) {
+      return NextResponse.redirect(new URL(ALUNO_HOME, req.nextUrl.origin))
+    }
+
+    if (pathname.startsWith('/aluno') && role !== ALUNO_ROLE) {
+      return NextResponse.redirect(new URL(ADMIN_HOME, req.nextUrl.origin))
+    }
+    
+    return NextResponse.next()
+  }
   return NextResponse.next()
 }
 
 export const config = {
   matcher: [
-    '/((?!api).*)', // roda em tudo exceto /api (ajuste se quiser proteger /api também)
+    '/((?!api|_next/static|_next/image|images|assets|favicon.svg).*)',
   ],
 }
