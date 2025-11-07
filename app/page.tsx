@@ -4,293 +4,379 @@ import Link from "next/link";
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-[#F6F8F9] text-foreground">
-      {/* NAVBAR */}
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur border-b">
+    <main className="min-h-screen">
+
+      {/* Header / Navbar */}
+      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur border-b">
         <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
+          {/* Logo leva para a home */}
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="size-8 grid place-items-center rounded-md bg-red-600 text-white font-bold">WF</div>
-            <span className="text-sm md:text-base tracking-tight group-hover:opacity-80 transition">
+            <div className="size-9 grid place-items-center rounded-lg bg-primary text-primary-foreground font-bold">WF</div>
+            <span className="font-grotesk text-lg tracking-tight group-hover:opacity-80 transition">
               Workflow Fatec
             </span>
           </Link>
 
           <nav className="hidden md:flex items-center gap-6 text-sm">
-            <a href="#sobre" className="hover:opacity-80">Sobre</a>
             <a href="#como-funciona" className="hover:opacity-80">Como Funciona</a>
             <a href="#recursos" className="hover:opacity-80">Recursos</a>
-            <Link
-              href="/login"
-              className="inline-flex items-center rounded-md px-3 py-2 border shadow-sm hover:bg-gray-50"
-            >
+            <a href="#impacto" className="hover:opacity-80">Impacto</a>
+            {/* >>> Rota corrigida para /login */}
+            <Link href="/login" className="inline-flex items-center rounded-md px-3 py-2 border hover:bg-secondary">
               Entrar
             </Link>
           </nav>
         </div>
       </header>
 
-      {/* HERO */}
-      <section className="border-b bg-white">
-        <div className="mx-auto max-w-5xl px-4 py-16 md:py-20">
-          <div className="text-center space-y-6">
-            <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight">
-              Workflow <span className="text-red-600">Fatec</span>
-            </h1>
-
-            <div className="w-14 h-1 rounded-full mx-auto bg-gray-200" />
-
-            <p className="text-base md:text-lg text-muted-foreground">
-              Gestão acadêmica <strong className="text-foreground">integrada</strong> entre alunos,
-              professores e secretaria.
+      {/* Hero */}
+      <section className="relative overflow-hidden border-b">
+        <div className="mx-auto max-w-6xl px-4 py-16 md:py-24 grid gap-8 md:grid-cols-2 items-center">
+          <div className="space-y-6">
+            <p className="font-grotesk text-sm uppercase tracking-widest text-muted-foreground">WF · Workflow Fatec</p>
+            <h1>Workflow Fatec</h1>
+            <p className="text-lg md:text-xl text-muted-foreground max-w-prose">
+              Gestão acadêmica integrada entre alunos, professores e secretaria.
             </p>
-            <p className="text-sm md:text-base text-muted-foreground max-w-2xl mx-auto">
-              Plataforma desenvolvida por alunos da FATEC Cotia para otimizar
-              processos internos e a comunicação institucional.
+            <p className="text-muted-foreground max-w-prose">
+              Plataforma desenvolvida por alunos da FATEC Cotia para otimizar processos internos e a comunicação institucional.
             </p>
 
-            <div className="flex items-center justify-center gap-3 pt-2">
+            <div className="flex flex-wrap gap-3">
               <a
                 href="#como-funciona"
-                className="inline-flex items-center rounded-md px-4 py-2 bg-red-600 text-white shadow hover:opacity-95"
+                className="inline-flex items-center rounded-md px-4 py-2 bg-primary text-primary-foreground hover:opacity-90"
               >
-                Saiba como funciona →
+                Saiba como funciona
               </a>
+              {/* >>> Rota corrigida para /login */}
               <Link
                 href="/login"
-                className="inline-flex items-center rounded-md px-4 py-2 border bg-white hover:bg-gray-50"
+                className="inline-flex items-center rounded-md px-4 py-2 border hover:bg-secondary"
               >
-                Acessar Dashboard
+                Acessar Portal do Aluno
               </Link>
             </div>
-          </div>
 
-        {/* Mock de mídia substituído por imagem real */}
-        <div className="mt-10 md:mt-12">
-          <div className="mx-auto max-w-3xl rounded-2xl border bg-gray-50 p-4 md:p-6 shadow-[0_1px_0_rgba(0,0,0,0.04)]">
-            <div className="aspect-[16/9] w-full rounded-xl overflow-hidden border bg-white">
-              <img
-                src="/images/aluno-dashboard.png"
-                alt="Dashboard do aluno no Workflow Fatec"
-                className="w-full h-full object-cover"
-              />
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span className="i-hero" aria-hidden />
+              <a href="#sobre" className="underline underline-offset-4">Rolar para conhecer</a>
             </div>
+
+           
           </div>
-        </div>
 
-
-          {/* Indicador de scroll */}
-          <div className="pt-10 md:pt-12 flex justify-center">
-            <a href="#sobre" className="group flex flex-col items-center gap-3 text-muted-foreground">
-              <span className="inline-block w-6 h-9 rounded-full border relative">
-                <span className="absolute left-1/2 top-2 -translate-x-1/2 w-1.5 h-2.5 rounded-full bg-gray-400 group-hover:translate-y-2 transition" />
-              </span>
-              <span className="text-xs">VOLTAR NA EXPLORAÇÃO</span>
-            </a>
+          <div className="relative">
+            <div className="aspect-[4/3] w-full rounded-2xl border grid place-items-center text-center p-8">
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Interface moderna e intuitiva</p>
+                <h3 className="text-3xl font-grotesk">Workflow Fatec</h3>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* SOBRE O PROJETO */}
-      <section id="sobre" className="mx-auto max-w-6xl px-4 py-16 md:py-20">
+      {/* Sobre o Projeto */}
+      <section id="sobre" className="mx-auto max-w-6xl px-4 py-16 md:py-24">
         <div className="grid gap-10 md:grid-cols-2 items-start">
           <div className="space-y-4">
-            <span className="inline-flex items-center gap-2 text-xs bg-red-50 text-red-700 border border-red-100 rounded-full px-3 py-1">
-              Projeto acadêmico
-            </span>
-            <h2 className="text-2xl md:text-3xl font-bold">Sobre o Projeto</h2>
-            <p className="text-sm md:text-base text-muted-foreground">
-              O Workflow Fatec é um projeto desenvolvido por alunos do curso DSM da FATEC Cotia,
-              com foco em melhorar a comunicação e a eficiência entre alunos, professores e secretaria.
+            <p className="font-grotesk text-sm uppercase tracking-widest text-muted-foreground">Sobre o Projeto</p>
+            <h2>Conheça a história e a missão do Workflow Fatec</h2>
+            <p className="text-muted-foreground">Projeto Acadêmico</p>
+            <p className="text-muted-foreground">
+              O Workflow Fatec é um projeto desenvolvido por alunos do curso de Desenvolvimento de Software Multiplataforma (DSM)
+              da FATEC Cotia, com o objetivo de otimizar os processos internos de gestão acadêmica e melhorar a comunicação entre
+              alunos, professores e secretaria.
             </p>
-            <p className="text-sm md:text-base text-muted-foreground">
-              A iniciativa nasceu da necessidade de modernizar fluxos administrativos, centralizando
-              chamados, documentos e notificações em uma interface única.
+            <p className="text-muted-foreground">
+              Nascido da necessidade real de modernizar os fluxos de trabalho administrativos, a plataforma integra funcionalidades
+              de sistema de chamados, gerenciamento de documentos e notificações centralizadas em uma única interface intuitiva.
             </p>
           </div>
 
           <div className="space-y-6">
-            <div className="rounded-2xl border bg-white p-6">
-              <h3 className="mb-2 font-semibold">Evolução do Projeto</h3>
-              <ol className="space-y-3">
+            <div className="rounded-2xl border p-6">
+              <h3 className="mb-2">Evolução do Projeto</h3>
+              <ol className="grid gap-4">
                 <li className="rounded-lg border p-4">
-                  <p className="font-medium">Visão</p>
-                  <p className="text-sm text-muted-foreground">
-                    Definição de escopo e mapeamento com stakeholders
-                  </p>
+                  <p className="font-medium">Início</p>
+                  <p className="text-sm text-muted-foreground">Definição de escopo e requisitos com stakeholders</p>
                 </li>
                 <li className="rounded-lg border p-4">
                   <p className="font-medium">Desenvolvimento</p>
-                  <p className="text-sm text-muted-foreground">
-                    Codificação, testes e refinamento das funcionalidades
-                  </p>
+                  <p className="text-sm text-muted-foreground">Codificação, testes e refinamento das funcionalidades</p>
                 </li>
                 <li className="rounded-lg border p-4">
                   <p className="font-medium">Integração</p>
-                  <p className="text-sm text-muted-foreground">
-                    Deploy e integração com sistemas da secretaria
-                  </p>
+                  <p className="text-sm text-muted-foreground">Deploy e integração com sistemas da secretaria</p>
                 </li>
               </ol>
             </div>
 
-            <div className="rounded-2xl border bg-white p-6">
-              <h3 className="mb-2 font-semibold">Curso DSM</h3>
-              <p className="text-sm text-muted-foreground">
-                Desenvolvimento de Software Multiplataforma na FATEC Cotia, com foco em metodologias ágeis,
-                engenharia de software e tecnologias do mercado.
+            <div className="rounded-2xl border p-6">
+              <h3 className="mb-2">Curso DSM</h3>
+              <p className="text-muted-foreground">
+                Desenvolvimento de Software Multiplataforma é um curso técnico de nível superior da FATEC Cotia que prepara
+                profissionais para atuar no desenvolvimento de soluções tecnológicas modernas, com foco em metodologias ágeis e
+                tecnologias de mercado.
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* COMO FUNCIONA */}
-      <section id="como-funciona" className="border-t border-b bg-[#F3F4F6]">
-        <div className="mx-auto max-w-6xl px-4 py-16 md:py-20">
-          <div className="text-center space-y-2 mb-10">
-            <h2 className="text-2xl md:text-3xl font-bold">Como funciona</h2>
-            <p className="text-sm text-muted-foreground">
-              Fluxo integrado entre os três pilares da plataforma
-            </p>
+      {/* Como Funciona */}
+      <section id="como-funciona" className="border-t border-b bg-secondary/40">
+        <div className="mx-auto max-w-6xl px-4 py-16 md:py-24">
+          <div className="space-y-3 mb-10">
+            <p className="font-grotesk text-sm uppercase tracking-widest text-muted-foreground">Como Funciona</p>
+            <h2>Fluxo integrado entre os três pilares da plataforma</h2>
           </div>
 
           <div className="grid gap-6 md:grid-cols-3">
-            {[
-              {
-                t: "Secretaria",
-                d: "Gerencia chamados (N1, N2 e N3), centraliza documentos e evidências.",
-                items: ["Criar e atribuir chamados", "Gerenciar solicitações", "Histórico completo"],
-              },
-              {
-                t: "Professores",
-                d: "Visualizam solicitações, atualizam status e fornecem feedback.",
-                items: ["Ver chamados designados", "Registrar progresso", "Comunicação integrada"],
-              },
-              {
-                t: "Alunos",
-                d: "Acompanham seus chamados e recebem notificações.",
-                items: ["Consultar status", "Receber notificações", "Upload de evidências"],
-              },
-            ].map((c) => (
-              <div key={c.t} className="rounded-2xl border bg-white p-6">
-                <h3 className="mb-2 font-semibold">{c.t}</h3>
-                <p className="text-sm text-muted-foreground mb-4">{c.d}</p>
-                <ul className="space-y-2 text-sm">
-                  {c.items.map((i) => (
-                    <li key={i}>• {i}</li>
-                  ))}
-                </ul>
+            <div className="rounded-2xl border p-6 bg-card">
+              <h3 className="mb-2">Secretaria</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Gerencia chamados N1, N2, N3 e centraliza documentos e evidências do projeto.
+              </p>
+              <ul className="space-y-2 text-sm">
+                <li>• Criar e atribuir chamados</li>
+                <li>• Gerenciar solicitações</li>
+                <li>• Acessar histórico completo</li>
+              </ul>
+            </div>
+
+            <div className="rounded-2xl border p-6 bg-card">
+              <h3 className="mb-2">Professores</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Visualizam solicitações atribuídas, atualizam status e fornecem feedback.
+              </p>
+              <ul className="space-y-2 text-sm">
+                <li>• Ver chamados designados</li>
+                <li>• Registrar progresso</li>
+                <li>• Comunicação integrada</li>
+              </ul>
+            </div>
+
+            <div className="rounded-2xl border p-6 bg-card">
+              <h3 className="mb-2">Alunos</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Acompanham status de suas solicitações e recebem notificações em tempo real.
+              </p>
+              <ul className="space-y-2 text-sm">
+                <li>• Consultar status</li>
+                <li>• Receber notificações</li>
+                <li>• Upload de evidências</li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Fluxo de Integração */}
+          <div className="mt-10 rounded-2xl border p-6">
+            <h3 className="mb-4">Fluxo de Integração</h3>
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div className="rounded-lg border p-4">
+                <p className="font-medium">N1</p>
+                <p className="text-sm text-muted-foreground">Inicial</p>
               </div>
+              <div className="grid place-items-center">→</div>
+              <div className="rounded-lg border p-4">
+                <p className="font-medium">N2</p>
+                <p className="text-sm text-muted-foreground">Intermediário</p>
+              </div>
+              <div className="grid place-items-center col-span-3 md:col-span-3">→</div>
+              <div className="rounded-lg border p-4 col-span-3">
+                <p className="font-medium">N3</p>
+                <p className="text-sm text-muted-foreground">Finalização</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Principais Recursos */}
+      <section id="recursos" className="mx-auto max-w-6xl px-4 py-16 md:py-24">
+        <div className="space-y-3 mb-10">
+          <p className="font-grotesk text-sm uppercase tracking-widest text-muted-foreground">Principais Recursos</p>
+          <h2>Funcionalidades desenvolvidas para otimizar a gestão acadêmica</h2>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-3">
+          {[
+            {t:"Sistema de Chamados N1/N2/N3",d:"Estrutura hierárquica de atendimento com diferentes níveis de complexidade."},
+            {t:"Histórico de Solicitações",d:"Rastreamento completo de todas as solicitações e suas evoluções."},
+            {t:"Upload/Download de Evidências",d:"Compartilhamento seguro de documentos e arquivos entre os usuários."},
+            {t:"Visualização Centralizada",d:"Dashboard intuitivo com todas as informações relevantes em um só lugar."},
+            {t:"Logs e Auditoria",d:"Registro detalhado de todas as ações para conformidade e segurança."},
+            {t:"Integração Entre Setores",d:"Comunicação fluida e integrada entre secretaria, professores e alunos."},
+          ].map((f, i) => (
+            <div key={i} className="rounded-2xl border p-6 bg-card">
+              <h3 className="mb-2">{f.t}</h3>
+              <p className="text-sm text-muted-foreground">{f.d}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Desenvolvimento e Tecnologias */}
+      <section className="border-t border-b bg-secondary/40">
+        <div className="mx-auto max-w-6xl px-4 py-16 md:py-24">
+          <div className="space-y-3 mb-10">
+            <p className="font-grotesk text-sm uppercase tracking-widest text-muted-foreground">
+              Desenvolvimento e Tecnologias
+            </p>
+            <h2>Construído com as melhores práticas e tecnologias de mercado</h2>
+          </div>
+
+          <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+            {["Node.js","React","TypeScript","PostgreSQL","Prisma","JWT","Docker"].map((tool) => (
+              <div key={tool} className="rounded-xl border p-4 text-center bg-card">{tool}</div>
             ))}
           </div>
 
-          {/* Fluxo N1 → N2 → N3 */}
-          <div className="mt-10 rounded-2xl border bg-white p-6">
-            <h3 className="mb-4 font-semibold text-center">Fluxo de Integração</h3>
-            <div className="flex flex-col md:flex-row items-center justify-center gap-4">
-              {[
-                { n: "N1", d: "Inicial" },
-                { n: "N2", d: "Intermediário" },
-                { n: "N3", d: "Produção" },
-              ].map((s, idx) => (
-                <div key={s.n} className="flex items-center gap-4">
-                  <div className="w-40 rounded-lg border p-4 text-center">
-                    <p className="font-medium">{s.n}</p>
-                    <p className="text-xs text-muted-foreground">{s.d}</p>
-                  </div>
-                  {idx < 2 && <span className="text-xl md:mx-2">→</span>}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* PRINCIPAIS RECURSOS */}
-      <section id="recursos" className="mx-auto max-w-6xl px-4 py-16 md:py-20">
-        <div className="text-center space-y-2 mb-10">
-          <h2 className="text-2xl md:text-3xl font-bold">Principais Recursos</h2>
-          <p className="text-sm text-muted-foreground">
-            Explore as ferramentas que tornam a gestão acadêmica mais ágil, transparente e colaborativa.
+          <p className="mt-6 text-muted-foreground max-w-3xl">
+            A plataforma foi desenvolvida seguindo as melhores práticas de engenharia de software, incluindo testes
+            automatizados, CI/CD, segurança de dados e escalabilidade.
           </p>
-        </div>
 
-        {/* Grade com cards */}
-        <div className="grid gap-6 md:grid-cols-3">
-          {/* CARD 1 */}
-          <div className="rounded-2xl border bg-white p-6 grid gap-3 hover:shadow-sm transition">
-            <div className="w-10 h-10 flex items-center justify-center rounded-md bg-red-50 border border-red-100 text-red-600 font-bold text-lg">
-              💬
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            <div className="rounded-xl border p-4">
+              <p className="font-medium">Versionamento</p>
+              <p className="text-sm text-muted-foreground">Git com estratégia de branches</p>
             </div>
-            <h3 className="font-semibold text-lg">Central de Chamados</h3>
-            <p className="text-sm text-muted-foreground">
-              Abertura e acompanhamento de solicitações entre alunos, secretaria e coordenação, com status e histórico em tempo real.
-            </p>
-          </div>
-
-          {/* CARD 2 */}
-          <div className="rounded-2xl border bg-white p-6 grid gap-3 hover:shadow-sm transition">
-            <div className="w-10 h-10 flex items-center justify-center rounded-md bg-red-50 border border-red-100 text-red-600 font-bold text-lg">
-              🗂️
+            <div className="rounded-xl border p-4">
+              <p className="font-medium">CI/CD</p>
+              <p className="text-sm text-muted-foreground">Integração e deploy contínuos</p>
             </div>
-            <h3 className="font-semibold text-lg">Histórico Acadêmico Integrado</h3>
-            <p className="text-sm text-muted-foreground">
-              Visualize informações de matrícula, notas e frequência em um só ambiente conectado ao sistema institucional.
-            </p>
-          </div>
-
-          {/* CARD 3 */}
-          <div className="rounded-2xl border bg-white p-6 grid gap-3 hover:shadow-sm transition">
-            <div className="w-10 h-10 flex items-center justify-center rounded-md bg-red-50 border border-red-100 text-red-600 font-bold text-lg">
-              🧩
+            <div className="rounded-xl border p-4">
+              <p className="font-medium">Segurança</p>
+              <p className="text-sm text-muted-foreground">Autenticação e criptografia</p>
             </div>
-            <h3 className="font-semibold text-lg">Suporte Técnico e Administrativo</h3>
-            <p className="text-sm text-muted-foreground">
-              Encaminhe chamados diretamente para os setores responsáveis (N1, N2, N3), garantindo agilidade e rastreabilidade.
-            </p>
-          </div>
-
-          {/* CARD 4 */}
-          <div className="rounded-2xl border bg-white p-6 grid gap-3 hover:shadow-sm transition">
-            <div className="w-10 h-10 flex items-center justify-center rounded-md bg-red-50 border border-red-100 text-red-600 font-bold text-lg">
-              🔐
-            </div>
-            <h3 className="font-semibold text-lg">Gestão de Usuários e Permissões</h3>
-            <p className="text-sm text-muted-foreground">
-              Controle de perfis e níveis de acesso para alunos, professores e servidores, com autenticação segura e centralizada.
-            </p>
-          </div>
-
-          {/* CARD 5 */}
-          <div className="rounded-2xl border bg-white p-6 grid gap-3 hover:shadow-sm transition">
-            <div className="w-10 h-10 flex items-center justify-center rounded-md bg-red-50 border border-red-100 text-red-600 font-bold text-lg">
-              🔔
-            </div>
-            <h3 className="font-semibold text-lg">Notificações e Alertas</h3>
-            <p className="text-sm text-muted-foreground">
-              Receba alertas automáticos sobre prazos, comunicados e atualizações de chamados diretamente na plataforma.
-            </p>
-          </div>
-
-          {/* CARD 6 */}
-          <div className="rounded-2xl border bg-white p-6 grid gap-3 hover:shadow-sm transition">
-            <div className="w-10 h-10 flex items-center justify-center rounded-md bg-red-50 border border-red-100 text-red-600 font-bold text-lg">
-              📊
-            </div>
-            <h3 className="font-semibold text-lg">Painel de Indicadores</h3>
-            <p className="text-sm text-muted-foreground">
-              Visualize métricas institucionais, volume de chamados e relatórios gerenciais em tempo real para decisões estratégicas.
-            </p>
           </div>
         </div>
       </section>
 
+      {/* Impacto Acadêmico */}
+      <section id="impacto" className="mx-auto max-w-6xl px-4 py-16 md:py-24">
+        <div className="space-y-3 mb-10">
+          <p className="font-grotesk text-sm uppercase tracking-widest text-muted-foreground">Impacto Acadêmico</p>
+          <h2>Métricas e resultados do projeto na FATEC Cotia</h2>
+        </div>
 
-      {/* FOOTER minimalista */}
-      <footer className="bg-[#F3F4F6] border-t">
+        <div className="grid gap-6 md:grid-cols-4">
+          <div className="rounded-2xl border p-6 text-center bg-card">
+            <p className="text-4xl font-grotesk font-bold">+200</p>
+            <p className="text-sm text-muted-foreground">Chamados Testados</p>
+          </div>
+          <div className="rounded-2xl border p-6 text-center bg-card">
+            <p className="text-4xl font-grotesk font-bold">+30</p>
+            <p className="text-sm text-muted-foreground">Usuários em Fase Piloto</p>
+          </div>
+          <div className="rounded-2xl border p-6 text-center bg-card">
+            <p className="text-4xl font-grotesk font-bold">100%</p>
+            <p className="text-sm text-muted-foreground">Código Open Source</p>
+          </div>
+          <div className="rounded-2xl border p-6 text-center bg-card">
+            <p className="text-4xl font-grotesk font-bold">∞</p>
+            <p className="text-sm text-muted-foreground">Inovação Aplicada</p>
+          </div>
+        </div>
+
+        <div className="mt-8 grid gap-4 md:grid-cols-3">
+          <div className="rounded-xl border p-4">
+            <p className="font-medium">Mais Agilidade</p>
+            <p className="text-sm text-muted-foreground">Redução de tempo em processos administrativos da secretaria</p>
+          </div>
+          <div className="rounded-xl border p-4">
+            <p className="font-medium">Mais Transparência</p>
+            <p className="text-sm text-muted-foreground">Alunos e professores com visibilidade total do andamento</p>
+          </div>
+          <div className="rounded-xl border p-4">
+            <p className="font-medium">Inovação Aplicada</p>
+            <p className="text-sm text-muted-foreground">Rotina acadêmica modernizada com tecnologia de mercado</p>
+          </div>
+        </div>
+
+        <p className="mt-6 text-muted-foreground max-w-3xl">
+          Projeto que faz a diferença — O Workflow Fatec demonstra como a inovação tecnológica pode ser aplicada aos desafios reais
+          da instituição, criando valor tanto para a comunidade acadêmica quanto para os alunos desenvolvedores.
+        </p>
+      </section>
+
+      {/* Equipe e Créditos */}
+      <section className="border-t border-b bg-secondary/40">
+        <div className="mx-auto max-w-6xl px-4 py-16 md:py-24">
+          <div className="space-y-3 mb-10">
+            <p className="font-grotesk text-sm uppercase tracking-widest text-muted-foreground">Equipe e Créditos</p>
+            <h2>Projeto desenvolvido por alunos e professores da FATEC Cotia</h2>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="rounded-2xl border p-6 bg-card">
+              <h3 className="mb-2">Alunos Desenvolvedores</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                O projeto é desenvolvido por alunos do curso de Desenvolvimento de Software Multiplataforma (DSM), aplicando
+                conhecimentos de engenharia de software, metodologias ágeis e tecnologias modernas em um contexto real.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                {["D1","D2","D3","D4"].map((n) => (
+                  <div key={n} className="rounded-lg border p-4">
+                    <p className="font-medium">{n}</p>
+                    <p className="text-sm text-muted-foreground">Desenvolvedor</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border p-6 bg-card">
+              <h3 className="mb-2">Orientação</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                O projeto conta com a orientação de professores experientes do curso DSM, que contribuem com supervisão técnica,
+                feedback construtivo e direcionamento estratégico.
+              </p>
+              <div className="grid grid-cols-3 gap-3">
+                {["P1","P2","P3"].map((n) => (
+                  <div key={n} className="rounded-lg border p-4 text-center">
+                    <p className="font-medium">{n}</p>
+                    <p className="text-sm text-muted-foreground">Professor</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Identidade institucional */}
+          <div className="mt-10 grid gap-4 md:grid-cols-3">
+            <div className="rounded-xl border p-4 text-center">
+              <p className="font-grotesk text-2xl">FC</p>
+              <p className="text-sm text-muted-foreground">FATEC</p>
+              <p className="text-sm">FATEC Cotia</p>
+              <p className="text-xs text-muted-foreground">Instituição de ensino superior técnico</p>
+            </div>
+            <div className="rounded-xl border p-4 text-center">
+              <p className="font-grotesk text-2xl">DSM</p>
+              <p className="text-sm text-muted-foreground">Curso</p>
+              <p className="text-sm">Desenvolvimento de Software Multiplataforma</p>
+              <p className="text-xs text-muted-foreground">Curso técnico de nível superior</p>
+              <p className="text-xs">Preparando profissionais para o mercado de tecnologia</p>
+            </div>
+            <div className="rounded-xl border p-4 text-center">
+              <p className="font-grotesk text-2xl">WF</p>
+              <p className="text-sm text-muted-foreground">Workflow Fatec</p>
+              <p className="text-sm">
+                Plataforma de gestão acadêmica integrada para a FATEC Cotia.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="bg-secondary/40">
         <div className="mx-auto max-w-6xl px-4 py-12 grid gap-8 md:grid-cols-4">
           <div className="space-y-2">
-            <div className="size-8 grid place-items-center rounded-md bg-red-600 text-white font-bold">WF</div>
+            <div className="size-9 grid place-items-center rounded-lg bg-primary text-primary-foreground font-bold">WF</div>
             <p className="text-sm text-muted-foreground max-w-xs">
               Plataforma de gestão acadêmica integrada para a FATEC Cotia.
             </p>
@@ -318,7 +404,7 @@ export default function Home() {
             <p className="font-medium mb-3">Contato</p>
             <ul className="space-y-2 text-sm">
               <li><a href="mailto:workflow@fatec.sp.gov.br" className="hover:underline">workflow@fatec.sp.gov.br</a></li>
-              <li className="text-muted-foreground">© 2025 Workflow Fatec. Projeto acadêmico DSM – FATEC Cotia.</li>
+              <li className="text-muted-foreground">© 2025 Workflow Fatec. Projeto acadêmico do Curso DSM – FATEC Cotia.</li>
               <li className="flex gap-4">
                 <a href="#" className="text-sm hover:underline">Privacidade</a>
                 <a href="#" className="text-sm hover:underline">Termos de Uso</a>
