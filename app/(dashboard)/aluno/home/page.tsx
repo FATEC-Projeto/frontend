@@ -129,7 +129,7 @@ function Kpi({
 
 /* ------------------------- PÁGINA ------------------------- */
 export default function AlunoHomePage() {
-  
+
   const [chamados, setChamados] = useState<Chamado[]>([]);
   const [loading, setLoading] = useState(true);
   const [limite, setLimite] = useState(20);
@@ -142,13 +142,13 @@ export default function AlunoHomePage() {
         setLoading(true);
         const token = localStorage.getItem("accessToken");
         if (!token) throw new Error("Token não encontrado");
-    
+
         const base = `${process.env.NEXT_PUBLIC_API_BASE_URL}/tickets?include=setor`;
         const pageSize = 100; // limite do backend
         let page = 1;
         let total = 0;
         const all: any[] = [];
-    
+
         while (true) {
           const res = await fetch(`${base}&page=${page}&pageSize=${pageSize}`, {
             headers: { Authorization: `Bearer ${token}` },
@@ -156,15 +156,15 @@ export default function AlunoHomePage() {
           if (!res.ok) throw new Error("Erro ao buscar chamados");
           const data = await res.json(); // { total, page, pageSize, items }
           if (page === 1) total = data.total ?? 0;
-    
+
           const items = Array.isArray(data.items) ? data.items : [];
           all.push(...items);
-    
+
           const fetched = all.length;
-          if (fetched >= total || items.length < pageSize) break; 
+          if (fetched >= total || items.length < pageSize) break;
           page += 1;
         }
-    
+
         setChamados(all);
       } catch (err) {
         console.error(err);
@@ -173,7 +173,7 @@ export default function AlunoHomePage() {
         setLoading(false);
       }
     }
-    
+
 
     fetchChamados();
     const interval = setInterval(fetchChamados, 60000);
@@ -262,6 +262,7 @@ export default function AlunoHomePage() {
                   <th className="text-left font-medium px-4 py-3">Setor</th>
                   <th className="text-left font-medium px-4 py-3">Status</th>
                   <th className="text-left font-medium px-4 py-3">Criado em</th>
+                  <th className="text-right font-medium px-4 py-3">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -281,6 +282,14 @@ export default function AlunoHomePage() {
                     <td className="px-4 py-3">
                       {new Date(c.criadoEm).toLocaleDateString("pt-BR")}
                     </td>
+                    <td className="px-4 py-3 text-right">
+                      <Link
+                        href={`/aluno/chamados/${c.id}`}
+                        className="inline-flex items-center h-9 px-3 rounded-md border border-[var(--brand-teal)]/40 text-[var(--brand-teal)] hover:bg-[var(--brand-teal)]/10 text-sm transition"
+                      >
+                        Ver detalhes
+                      </Link>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -292,7 +301,7 @@ export default function AlunoHomePage() {
                 <button
                   onClick={() => setLimite(chamadosAtivos.length)}
                   className="text-sm font-medium text-[var(--brand-red)] hover:underline"
-                  >
+                >
                   Ver todos os {chamadosAtivos.length} chamados
                 </button>
               </div>
@@ -302,7 +311,7 @@ export default function AlunoHomePage() {
                 <button
                   onClick={() => setLimite(20)}
                   className="text-sm font-medium text-[var(--brand-red)] hover:underline"
-                  >
+                >
                   Mostrar menos
                 </button>
               </div>
