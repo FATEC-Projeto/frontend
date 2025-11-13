@@ -42,7 +42,7 @@ export default function SidebarAluno({
     { href: "/aluno/chamados", label: "Meus chamados", icon: <Ticket className="size-4" />},
     { href: "/aluno/catalogo", label: "Catálogo de serviços", icon: <BookOpen className="size-4" /> },
     { href: "/aluno/dados", label: "Meus dados", icon: <User className="size-4" /> },
-    { href: "/aluno/notificacoes", label: "Notificações", icon: <Bell className="size-4" />, badge: aguardandoCount },
+    { href: "/aluno/notificacoes", label: "Notificações", icon: <Bell className="size-4" /> },
     { href: "/aluno/ajuda", label: "Ajuda / FAQ", icon: <HelpCircle className="size-4" /> },
     { href: "/aluno/configuracoes", label: "Configurações", icon: <Settings className="size-4" /> },
   ];
