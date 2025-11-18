@@ -252,7 +252,7 @@ export default function LoginPage() {
 
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">Mínimo de 8 caracteres.</span>
-                <Link href="/recuperar-senha" className="text-xs underline underline-offset-4 hover:opacity-80">
+                <Link href="/esqueci-senha" className="text-xs underline underline-offset-4 hover:opacity-80">
                   Esqueci a senha
                 </Link>
               </div>
