@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { X, Info } from "lucide-react";
 
 type ResultRow = {
   idx: number;
@@ -30,7 +30,6 @@ function parseCsvSimple(text: string): string[][] {
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
-const DEFAULT_PASSWORD = "Mudar123#"; // atende o Zod atual (senha Required)
 
 export default function ImportAlunos({
   onClose,
@@ -163,7 +162,7 @@ export default function ImportAlunos({
       const nomeFinal =
         (r.nome?.trim() || "").length >= 2 ? r.nome!.trim() : `Aluno ${ra}`;
 
-      const payload = {
+      const payload: any = {
         emailPessoal: r.emailPessoal?.trim() || edu,
         emailEducacional: edu,
         ra,
@@ -172,8 +171,11 @@ export default function ImportAlunos({
         cursoSigla: r.cursoSigla || undefined,
         papel: "USUARIO",
         ativo: true,
-        precisaTrocarSenha: true, // exige troca no 1º login
-        senha: DEFAULT_PASSWORD,  // atende Zod (Required)
+        // ❗ não envia senha nem precisaTrocarSenha
+        // Backend (createUser) detecta aluno via RA e:
+        // - define senha temporária padrão
+        // - marca precisaTrocarSenha = true
+        // - opcional: envia link de primeiro acesso / reset
       };
 
       try {
@@ -244,7 +246,17 @@ export default function ImportAlunos({
         </button>
       </div>
 
-      {/* Seletor */}
+      {/* Aviso de fluxo */}
+      <div className="mb-3 flex items-start gap-2 rounded-lg border border-dashed border-[var(--border)] bg-muted/40 p-3 text-xs text-muted-foreground">
+        <Info className="mt-0.5 size-4" />
+        <p>
+          Cada aluno importado será criado com uma <strong>senha temporária</strong> definida no backend
+          e marcado para <strong>trocar a senha no primeiro acesso</strong>. Se configurado, o sistema
+          pode enviar um e-mail automático com o link de primeiro acesso / redefinição.
+        </p>
+      </div>
+
+      {/* Seletor de arquivo */}
       <div className="flex items-center gap-2">
         <button
           onClick={() => fileRef.current?.click()}
@@ -378,7 +390,8 @@ export default function ImportAlunos({
       {/* Info */}
       <div className="mt-3 text-xs text-muted-foreground">
         Modelo CSV: <code>ra,emailEducacional,emailPessoal,nome,cursoNome,cursoSigla</code>.<br />
-        <b>Obrigatórios:</b> <code>ra</code>, <code>emailEducacional</code>. Senha é definida automaticamente no import (padrão) e será exigida a troca no primeiro acesso.
+        <b>Obrigatórios:</b> <code>ra</code>, <code>emailEducacional</code>.<br />
+        A senha temporária é definida automaticamente no backend e será exigida a troca no primeiro acesso.
       </div>
     </div>
   );

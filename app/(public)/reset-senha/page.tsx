@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Eye, EyeOff, Info, LockKeyhole, MailCheck, Loader2, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, Info, LockKeyhole, Loader2, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import Cookies from "js-cookie";
@@ -41,27 +41,21 @@ function passwordScore(pw: string) {
   return Math.min(score, 4);
 }
 
-export default function FirstAccessPage() {
+export default function ResetPasswordPage() {
   const q = useSearchParams();
 
-  // 🔁 antes: userId | agora: token do link mágico
   const [token, setToken] = useState<string | null>(null);
-
-  const [personalEmail, setPersonalEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const fromQuery = q.get("token"); // ?token=... na URL
+    const fromQuery = q.get("token");
     setToken(fromQuery || null);
   }, [q]);
 
   const score = useMemo(() => passwordScore(newPassword), [newPassword]);
-
-  const validEmail =
-    !personalEmail || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(personalEmail);
 
   const meetsPolicy =
     newPassword.length >= 8 &&
@@ -71,13 +65,15 @@ export default function FirstAccessPage() {
     /[^A-Za-z0-9]/.test(newPassword);
 
   const canSubmit =
-    !!token && meetsPolicy && validEmail && newPassword === confirm && !loading;
+    !!token &&
+    meetsPolicy &&
+    newPassword === confirm &&
+    !loading;
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-
     if (!token) {
-      toast.error("Link inválido ou ausente.");
+      toast.error("Token de redefinição não encontrado.");
       return;
     }
     if (!meetsPolicy) {
@@ -91,26 +87,19 @@ export default function FirstAccessPage() {
 
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/auth/primeiro-acesso`, {
+      const res = await fetch(`${API_BASE}/auth/reset-senha`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          token, // 🔁 antes: userId; agora: token
+          token,
           newPassword,
-          personalEmail: personalEmail || undefined,
         }),
       });
 
       if (!res.ok) {
-        if (res.status === 409) {
-          // 409 = token já usado / primeiro acesso concluído
-          toast.info("Primeiro acesso já concluído. Faça login normalmente.");
-          window.location.href = "/login";
-          return;
-        }
         const txt = await res.text().catch(() => "");
-        throw new Error(txt || `Falha ao concluir primeiro acesso (${res.status})`);
+        throw new Error(txt || `Falha ao redefinir senha (${res.status})`);
       }
 
       const data = await res.json();
@@ -124,7 +113,6 @@ export default function FirstAccessPage() {
         });
         localStorage.setItem("accessToken", data.accessToken);
       }
-
       if (data?.refreshToken) {
         Cookies.set("refreshToken", data.refreshToken, {
           expires: 30,
@@ -134,15 +122,13 @@ export default function FirstAccessPage() {
         localStorage.setItem("refreshToken", data.refreshToken);
       }
 
-      toast.success("Senha atualizada com sucesso!", {
-        description: personalEmail
-          ? "Pronto! Seu e-mail pessoal foi vinculado à sua conta."
-          : "Você pode adicionar seu e-mail pessoal depois nas configurações.",
+      toast.success("Senha redefinida com sucesso!", {
+        description: "Você já pode acessar normalmente com a nova senha.",
       });
 
       window.location.href = getRedirectPath(user);
     } catch (err: any) {
-      toast.error("Não foi possível concluir o primeiro acesso.", {
+      toast.error("Não foi possível redefinir a senha.", {
         description: err?.message ?? "Tente novamente em instantes.",
       });
     } finally {
@@ -163,50 +149,19 @@ export default function FirstAccessPage() {
           </span>
         </div>
         <p className="text-muted-foreground text-sm mt-1">
-          Primeiro acesso — defina sua nova senha
+          Redefinir senha
         </p>
       </div>
 
       {/* Card */}
       <div className="w-full max-w-md rounded-2xl bg-card shadow-sm ring-1 ring-border">
         <form onSubmit={onSubmit} className="p-5 sm:p-6 space-y-5">
-          {/* Nota de contexto */}
+          {/* Nota */}
           <div className="flex items-start gap-2 text-xs text-muted-foreground">
             <Info className="mt-0.5 size-4" />
             <p>
-              Para sua segurança, a senha padrão precisa ser alterada. Se quiser, você já pode
-              informar um <strong>e-mail pessoal</strong> para recuperar a senha no futuro.
+              Você solicitou a redefinição da sua senha. Crie uma nova senha forte para proteger sua conta.
             </p>
-          </div>
-
-          {/* Aviso se não houver token */}
-          {!token && (
-            <p className="text-xs text-destructive border border-destructive/40 bg-destructive/5 rounded-md px-3 py-2">
-              Link inválido ou expirado. Solicite um novo link de primeiro acesso ao suporte.
-            </p>
-          )}
-
-          {/* Email pessoal (opcional) */}
-          <div>
-            <label className="text-sm font-medium" htmlFor="personalEmail">
-              E-mail pessoal (opcional)
-            </label>
-            <div className="relative mt-1">
-              <input
-                id="personalEmail"
-                type="email"
-                placeholder="seuemail@exemplo.com"
-                className="w-full h-11 rounded-lg bg-input ring-1 ring-border focus:outline-none focus:ring-2 focus:ring-ring px-3"
-                value={personalEmail}
-                onChange={(e) => setPersonalEmail(e.target.value)}
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                <MailCheck className="size-4" />
-              </span>
-            </div>
-            {!validEmail && (
-              <p className="mt-1 text-xs text-destructive">Informe um e-mail válido.</p>
-            )}
           </div>
 
           {/* Nova senha */}
@@ -236,21 +191,11 @@ export default function FirstAccessPage() {
 
             {/* Regras */}
             <ul className="mt-2 text-xs space-y-1 text-muted-foreground">
-              <li className={newPassword.length >= 8 ? "text-foreground" : ""}>
-                • Mínimo de 8 caracteres
-              </li>
-              <li className={/[A-Z]/.test(newPassword) ? "text-foreground" : ""}>
-                • Uma letra maiúscula
-              </li>
-              <li className={/[a-z]/.test(newPassword) ? "text-foreground" : ""}>
-                • Uma letra minúscula
-              </li>
-              <li className={/\d/.test(newPassword) ? "text-foreground" : ""}>
-                • Um número
-              </li>
-              <li className={/[^A-Za-z0-9]/.test(newPassword) ? "text-foreground" : ""}>
-                • Um símbolo
-              </li>
+              <li className={newPassword.length >= 8 ? "text-foreground" : ""}>• Mínimo de 8 caracteres</li>
+              <li className={/[A-Z]/.test(newPassword) ? "text-foreground" : ""}>• Uma letra maiúscula</li>
+              <li className={/[a-z]/.test(newPassword) ? "text-foreground" : ""}>• Uma letra minúscula</li>
+              <li className={/\d/.test(newPassword) ? "text-foreground" : ""}>• Um número</li>
+              <li className={/[^A-Za-z0-9]/.test(newPassword) ? "text-foreground" : ""}>• Um símbolo</li>
             </ul>
 
             {/* Barra de força */}
@@ -303,29 +248,20 @@ export default function FirstAccessPage() {
             >
               {loading ? (
                 <>
-                  <Loader2 className="size-4 animate-spin" /> Salvando…
+                  <Loader2 className="size-4 animate-spin" /> Redefinindo…
                 </>
               ) : (
                 <>
-                  <LockKeyhole className="size-4" /> Concluir primeiro acesso
+                  <LockKeyhole className="size-4" /> Redefinir senha
                 </>
               )}
             </button>
-          </div>
-
-          {/* Observação da senha padrão */}
-          <div className="text-[11px] text-muted-foreground flex items-start gap-2">
-            <Info className="size-3 mt-0.5" />
-            <p>
-              Se você entrou com a senha padrão <strong>Mudar123#</strong>, ela será substituída
-              pela nova senha definida acima.
-            </p>
           </div>
         </form>
       </div>
 
       <p className="mt-6 text-xs text-muted-foreground">
-        Precisa de ajuda? Fale com o suporte.
+        Não foi você que pediu isso? Ignore o e-mail ou entre em contato com o suporte.
       </p>
     </div>
   );
