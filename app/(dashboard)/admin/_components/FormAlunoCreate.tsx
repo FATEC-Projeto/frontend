@@ -21,7 +21,7 @@ type Props = {
   onCancel?: () => void;
 };
 
-export default function FormAlunoCreate({ onSuccess, onCancel }: Props) {
+export default function FormAlunoCreate({ onSuccess, onCancel }: Readonly<Props>) {
   const [nome, setNome] = useState("");
   const [emailEducacional, setEmailEducacional] = useState("");
   const [ra, setRa] = useState("");
