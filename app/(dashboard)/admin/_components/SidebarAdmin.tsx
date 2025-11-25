@@ -32,15 +32,16 @@ export default function SidebarAdmin({
   chamadosAbertosCount = 0,
   notificacoesCount = 0,
   pendenciasCount = 0,
-  mensagensCount = 0, // ✅ novo badge opcional
+  mensagensCount = 0, // novo badge opcional
   onClose,
-}: {
+}: Readonly<{
   chamadosAbertosCount?: number;
   notificacoesCount?: number;
   pendenciasCount?: number;
   mensagensCount?: number;
   onClose?: () => void;
-}) {
+}>) {
+
   const pathname = usePathname();
   const router = useRouter();
 
