@@ -137,7 +137,7 @@ export default function ImportAlunos({ onClose, onDone }: ImportAlunosProps) {
     (globalThis as any).localStorage?.getItem("accessToken")) ||
   process.env.NEXT_PUBLIC_ACCESS_TOKEN ||
   "";
-  
+
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       Accept: "application/json",
@@ -190,7 +190,18 @@ export default function ImportAlunos({ onClose, onDone }: ImportAlunosProps) {
           body: JSON.stringify(payload),
         });
 
-        if (!resp.ok) {
+              try {
+        const resp = await fetch(`${API_URL}/usuarios`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(payload),
+        });
+
+        if (resp.ok) {
+          // CASO DE SUCESSO
+          clone[i] = { ...r, status: "OK" };
+        } else {
+          // CASO DE ERRO
           const text = await resp.text().catch(() => "");
 
           const isDuplicate =
@@ -202,9 +213,11 @@ export default function ImportAlunos({ onClose, onDone }: ImportAlunosProps) {
 
           clone[i] = isDuplicate
             ? { ...r, status: "OK", note: "Já existia" }
-            : { ...r, status: "ERROR", errorMsg: text || `HTTP ${resp.status}` };
-        } else {
-          clone[i] = { ...r, status: "OK" };
+            : {
+                ...r,
+                status: "ERROR",
+                errorMsg: text || `HTTP ${resp.status}`,
+              };
         }
       } catch (e: any) {
         clone[i] = {
@@ -213,6 +226,7 @@ export default function ImportAlunos({ onClose, onDone }: ImportAlunosProps) {
           errorMsg: String(e?.message ?? e),
         };
       }
+
 
       setRows([...clone]);
     }
