@@ -16,16 +16,16 @@ const COURSES = [
   { key: "COMEX",sigla: "COMEX",nome: "Comércio Exterior" },
 ] as const;
 
-type Props = {
-  onSuccess?: (createdUser: any) => void;
+type Props = Readonly<{
+  onSuccess?: (createdUser: unknown) => void;
   onCancel?: () => void;
-};
+}>;
 
 export default function FormAlunoCreate({ onSuccess, onCancel }: Props) {
   const [nome, setNome] = useState("");
   const [emailEducacional, setEmailEducacional] = useState("");
   const [ra, setRa] = useState("");
-
+  
   // seleção guiada de curso
   const [courseKey, setCourseKey] = useState<string>(""); // "", "DSM", "CD", ... ou "OUTRO"
   const [cursoNome, setCursoNome] = useState("");
