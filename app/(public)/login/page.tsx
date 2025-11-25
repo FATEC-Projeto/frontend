@@ -60,6 +60,69 @@ export default function LoginPage() {
     }
   }
 
+  // Funções auxiliares extraídas
+  const handleFirstAccess = (data: any) => {
+    const uid = data?.user?.id;
+    if (uid) localStorage.setItem("firstAccessUserId", uid);
+    toast.message("Primeiro acesso", {
+      description: "Você precisa criar uma nova senha antes de continuar.",
+    });
+    window.location.href = `/primeiro-acesso${uid ? `?uid=${uid}` : ""}`;
+  };
+
+  const handleErrorResponse = async (res: Response) => {
+    if (res.status === 401) {
+      const j = await res.json().catch(() => ({}));
+      throw new Error(j?.error || "Credenciais inválidas");
+    }
+    if (res.status === 423) {
+      const j = await res.json().catch(() => ({}));
+      throw new Error(j?.message || "Conta temporariamente bloqueada");
+    }
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(text || "Erro no servidor");
+    }
+  };
+
+  const handleSuccessfulLogin = (data: any) => {
+    toast.success("Login realizado com sucesso!", {
+      description: `Bem-vindo(a), ${data?.user?.nome ?? "usuário"} 👋`,
+    });
+
+    // Extrair tratamento de tokens para função separada
+    storeAuthTokens(data);
+
+    const to = getRedirectPath(data?.user);
+    window.location.href = to;
+  };
+
+  const storeAuthTokens = (data: any) => {
+    if (data?.accessToken) {
+      Cookies.set("accessToken", data.accessToken, {
+        expires: 7,
+        secure: process.env.NODE_ENV === 'production',
+        path: '/'
+      });
+      localStorage.setItem("accessToken", data.accessToken);
+
+      try {
+        const payload = JSON.parse(atob(String(data.accessToken).split(".")[1] || ""));
+        if (payload?.sub) localStorage.setItem("userId", payload.sub);
+      } catch { }
+    }
+
+    if (data?.refreshToken) {
+      Cookies.set("refreshToken", data.refreshToken, {
+        expires: 30,
+        secure: process.env.NODE_ENV === 'production',
+        path: '/'
+      });
+      localStorage.setItem("refreshToken", data.refreshToken);
+    }
+  };
+
+  // Função principal refatorada
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
@@ -80,59 +143,17 @@ export default function LoginPage() {
       // 428 = precisa trocar senha (primeiro acesso)
       if (res.status === 428) {
         const data = await res.json().catch(() => ({}));
-        const uid = data?.user?.id;
-        if (uid) localStorage.setItem("firstAccessUserId", uid);
-        toast.message("Primeiro acesso", {
-          description: "Você precisa criar uma nova senha antes de continuar.",
-        });
-        window.location.href = `/primeiro-acesso${uid ? `?uid=${uid}` : ""}`;
+        handleFirstAccess(data);
         return;
       }
 
-      // erros comuns
-      if (res.status === 401) {
-        const j = await res.json().catch(() => ({}));
-        throw new Error(j?.error || "Credenciais inválidas");
-      }
-      if (res.status === 423) {
-        const j = await res.json().catch(() => ({}));
-        throw new Error(j?.message || "Conta temporariamente bloqueada");
-      }
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(text || "Erro no servidor");
-      }
+      // Tratamento de erros
+      await handleErrorResponse(res);
 
+      // Login bem-sucedido
       const data = await res.json();
+      handleSuccessfulLogin(data);
 
-      toast.success("Login realizado com sucesso!", {
-        description: `Bem-vindo(a), ${data?.user?.nome ?? "usuário"} 👋`,
-      });
-
-      if (data?.accessToken) {
-        Cookies.set("accessToken", data.accessToken, { 
-          expires: 7, 
-          secure: process.env.NODE_ENV === 'production',
-          path: '/' 
-        });
-
-        localStorage.setItem("accessToken", data.accessToken);
-        try {
-          const payload = JSON.parse(atob(String(data.accessToken).split(".")[1] || ""));
-          if (payload?.sub) localStorage.setItem("userId", payload.sub);
-        } catch {}
-      }
-      if (data?.refreshToken) {
-        Cookies.set("refreshToken", data.refreshToken, { 
-          expires: 30, 
-          secure: process.env.NODE_ENV === 'production', 
-          path: '/' 
-        });
-        localStorage.setItem("refreshToken", data.refreshToken);
-      }
-
-      const to = getRedirectPath(data?.user);
-      window.location.href = to;
     } catch (e: any) {
       const msg = e?.message ?? "Erro ao autenticar";
       setErr(msg);
@@ -165,18 +186,16 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => setMode("email")}
-              className={`h-9 rounded-md text-sm font-medium transition ${
-                mode === "email" ? "bg-background ring-1 ring-border" : "opacity-70 hover:opacity-100"
-              }`}
+              className={`h-9 rounded-md text-sm font-medium transition ${mode === "email" ? "bg-background ring-1 ring-border" : "opacity-70 hover:opacity-100"
+                }`}
             >
               Funcionário (Email)
             </button>
             <button
               type="button"
               onClick={() => setMode("ra")}
-              className={`h-9 rounded-md text-sm font-medium transition ${
-                mode === "ra" ? "bg-background ring-1 ring-border" : "opacity-70 hover:opacity-100"
-              }`}
+              className={`h-9 rounded-md text-sm font-medium transition ${mode === "ra" ? "bg-background ring-1 ring-border" : "opacity-70 hover:opacity-100"
+                }`}
             >
               Aluno (RA)
             </button>
