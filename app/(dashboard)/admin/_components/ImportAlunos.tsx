@@ -132,11 +132,11 @@ export default function ImportAlunos({ onClose, onDone }: ImportAlunosProps) {
     setRunning(true);
     setFinished(false);
 
-   const token =
-  (typeof globalThis !== "undefined" &&
-    (globalThis as any).localStorage?.getItem("accessToken")) ||
-  process.env.NEXT_PUBLIC_ACCESS_TOKEN ||
-  "";
+    const token =
+      (typeof globalThis !== "undefined" &&
+        (globalThis as any).localStorage?.getItem("accessToken")) ||
+      process.env.NEXT_PUBLIC_ACCESS_TOKEN ||
+      "";
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -190,18 +190,11 @@ export default function ImportAlunos({ onClose, onDone }: ImportAlunosProps) {
           body: JSON.stringify(payload),
         });
 
-              try {
-        const resp = await fetch(`${API_URL}/usuarios`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(payload),
-        });
-
         if (resp.ok) {
-          // CASO DE SUCESSO
+          // sucesso
           clone[i] = { ...r, status: "OK" };
         } else {
-          // CASO DE ERRO
+          // erro HTTP
           const text = await resp.text().catch(() => "");
 
           const isDuplicate =
@@ -226,7 +219,6 @@ export default function ImportAlunos({ onClose, onDone }: ImportAlunosProps) {
           errorMsg: String(e?.message ?? e),
         };
       }
-
 
       setRows([...clone]);
     }
@@ -363,7 +355,11 @@ export default function ImportAlunos({ onClose, onDone }: ImportAlunosProps) {
               : "bg-[var(--muted)] text-muted-foreground cursor-not-allowed",
           )}
         >
-          {running ? "Processando..." : rows.length ? "Processar importação" : "Selecionar CSV"}
+          {running
+            ? "Processando..."
+            : rows.length
+            ? "Processar importação"
+            : "Selecionar CSV"}
         </button>
 
         <button
@@ -395,8 +391,7 @@ export default function ImportAlunos({ onClose, onDone }: ImportAlunosProps) {
         <code>
           ra,emailEducacional,emailPessoal,nome,cursoNome,cursoSigla
         </code>
-        .
-        <br />
+        .<br />
         <strong>Obrigatórios:</strong> <code>ra</code>,{" "}
         <code>emailEducacional</code>.
       </div>
