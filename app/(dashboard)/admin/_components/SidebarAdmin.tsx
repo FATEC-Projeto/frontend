@@ -11,7 +11,6 @@ import {
   Settings,
   MessageSquareText,
   Building2,
-  Bell,
   LogOut,
   //MessageCircleMore, // 💬 ícone de mensagens(Removido da sidebar)
 } from "lucide-react";
