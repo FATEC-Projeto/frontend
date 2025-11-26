@@ -1,10 +1,9 @@
 "use client";
 import { apiFetch } from "../../../../utils/api";
 import { useMemo, useState } from "react";
-import { Loader2, KeyRound, Info } from "lucide-react";
+import { Loader2, Info, Mail } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
-const DEFAULT_PASSWORD = "Mudar123#";
 
 /** Catálogo prático — Fatec Cotia */
 const COURSES = [
@@ -55,7 +54,6 @@ export default function FormAlunoCreate({ onSuccess, onCancel }: Props) {
   const canSubmit = useMemo(() => {
     const idOk = ra.trim().length > 0;
     const mailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailEducacional);
-    // se escolheu OUTRO, não obriga preencher agora (opcional)
     return idOk && mailOk && !submitting;
   }, [ra, emailEducacional, submitting]);
 
@@ -73,7 +71,8 @@ export default function FormAlunoCreate({ onSuccess, onCancel }: Props) {
         ra,
         papel: "USUARIO",
         ativo: true,
-        senha: DEFAULT_PASSWORD, // Zod atual exige senha
+        // ❗ não envia senha: o backend define a senha temporária
+        // e marca precisaTrocarSenha = true para alunos (tem RA)
       };
 
       // só envia curso se tiver algo preenchido (seletor ou manual)
@@ -120,6 +119,15 @@ export default function FormAlunoCreate({ onSuccess, onCancel }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Linha 0 — aviso de fluxo */}
+      <div className="flex items-start gap-2 rounded-lg border border-dashed border-[var(--border)] bg-muted/40 p-3 text-xs text-muted-foreground">
+        <Info className="mt-0.5 size-4" />
+        <p>
+          Ao cadastrar o aluno, o sistema define uma <strong>senha temporária</strong> automaticamente
+          e, se configurado no backend, envia um <strong>link de primeiro acesso</strong> para o e-mail educacional.
+        </p>
+      </div>
+
       {/* Linha 1 */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
@@ -148,30 +156,30 @@ export default function FormAlunoCreate({ onSuccess, onCancel }: Props) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="text-sm text-muted-foreground">E-mail educacional *</label>
-          <input
-            type="email"
-            className="mt-1 w-full h-10 rounded-lg border border-[var(--border)] bg-background px-3"
-            placeholder="nome.sobrenome@fatec.sp.gov.br"
-            value={emailEducacional}
-            onChange={(e) => setEmailEducacional(e.target.value)}
-            required
-          />
-        </div>
-
-        <div>
-          <label className="text-sm text-muted-foreground">Senha inicial (padrão)</label>
           <div className="relative">
             <input
-              className="mt-1 w-full h-10 rounded-lg border border-[var(--border)] bg-muted px-3 font-mono text-sm"
-              value={DEFAULT_PASSWORD}
-              readOnly
-              disabled
+              type="email"
+              className="mt-1 w-full h-10 rounded-lg border border-[var(--border)] bg-background px-3 pr-9"
+              placeholder="nome.sobrenome@fatec.sp.gov.br"
+              value={emailEducacional}
+              onChange={(e) => setEmailEducacional(e.target.value)}
+              required
             />
-            <div className="mt-1 text-xs text-muted-foreground inline-flex items-center gap-1">
-              <Info className="size-3" />
-              A senha inicial é <b className="mx-1">{DEFAULT_PASSWORD}</b>. No primeiro acesso, o aluno deverá alterá-la.
-            </div>
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground">
+              <Mail className="size-4" />
+            </span>
           </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            É para esse e-mail que será enviado o link de primeiro acesso / redefinição de senha.
+          </p>
+        </div>
+
+        <div className="text-xs text-muted-foreground flex items-start gap-2 mt-6 sm:mt-7">
+          <Info className="size-3 mt-0.5" />
+          <p>
+            Você não precisa informar a senha ao aluno. Ele definirá uma <strong>senha nova</strong> no primeiro acesso,
+            usando o link enviado por e-mail.
+          </p>
         </div>
       </div>
 
@@ -243,7 +251,7 @@ export default function FormAlunoCreate({ onSuccess, onCancel }: Props) {
             </>
           ) : (
             <>
-              <KeyRound className="size-4" /> Criar aluno
+              Criar aluno
             </>
           )}
         </button>
