@@ -6,6 +6,9 @@ import { Filter, Search, ChevronRight, Ticket, User, FileChartColumn } from "luc
 import MobileSidebarTriggerAdmin from "../_components/MobileSidebarTriggerAdmin";
 import { apiFetch } from "../../../../utils/api";
 
+import { cx } from '../../../../utils/cx'
+import TicketStatusBadge from "../../../components/shared/TicketStatusBadge";
+
 /* ----------------------------- Tipos ----------------------------- */
 type Status = "ABERTO" | "EM_ATENDIMENTO" | "AGUARDANDO_USUARIO" | "RESOLVIDO" | "ENCERRADO";
 type Prioridade = "BAIXA" | "MEDIA" | "ALTA" | "URGENTE";
@@ -28,12 +31,12 @@ type PageResp = {
   items: Chamado[];
 };
 
-/* ----------------------------- Utils ----------------------------- */
+/* ----------------------------- Utils ----------------------------- 
 function cx(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
-}
+}*/
 
-function StatusBadge({ status }: { status: Status }) {
+/*function StatusBadge({ status }: { status: Status }) {
   const map: Record<Status, { label: string; cls: string }> = {
     ABERTO: { label: "Aberto", cls: "bg-[var(--brand-cyan)]/12 text-[var(--brand-cyan)] border-[var(--brand-cyan)]/30" },
     EM_ATENDIMENTO: { label: "Em atendimento", cls: "bg-[var(--brand-teal)]/12 text-[var(--brand-teal)] border-[var(--brand-teal)]/30" },
@@ -47,7 +50,7 @@ function StatusBadge({ status }: { status: Status }) {
       {v.label}
     </span>
   );
-}
+}*/
 
 function PrioridadeDot({ p }: { p: Prioridade }) {
   const map: Record<Prioridade, string> = {
@@ -243,7 +246,7 @@ export default function AdminHomePage() {
                     </td>
                     <td className="px-4 py-3 hidden md:table-cell">{c.criadoPor?.nome ?? "—"}</td>
                     <td className="px-4 py-3 hidden xl:table-cell">{c.setor?.nome ?? "—"}</td>
-                    <td className="px-4 py-3"><StatusBadge status={c.status} /></td>
+                    <td className="px-4 py-3"><TicketStatusBadge status={c.status} /></td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className="inline-flex items-center gap-2">
                         <PrioridadeDot p={c.prioridade} />

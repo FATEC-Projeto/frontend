@@ -11,6 +11,9 @@ import {
 import { apiFetch } from "../../../../../utils/api";
 import { toast } from "sonner";
 
+import { cx } from '../../../../../utils/cx'
+import TicketStatusBadge from "../../../../components/shared/TicketStatusBadge";
+
 /* ===== Tipos ===== */
 type Nivel = "N1" | "N2" | "N3";
 type Status = "ABERTO" | "EM_ATENDIMENTO" | "AGUARDANDO_USUARIO" | "RESOLVIDO" | "ENCERRADO";
@@ -72,12 +75,12 @@ type Ticket = {
   historico?: Historico[];
 };
 
-/* ===== Utils ===== */
+/* ===== Utils ===== 
 function cx(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
-}
+}*/
 
-function BadgeStatus({ s }: { s: Status }) {
+/*function BadgeStatus({ s }: { s: Status }) {
   const map: Record<Status, string> = {
     ABERTO: "bg-[var(--brand-cyan)]/12 text-[var(--brand-cyan)] border-[var(--brand-cyan)]/30",
     EM_ATENDIMENTO: "bg-[var(--brand-teal)]/12 text-[var(--brand-teal)] border-[var(--brand-teal)]/30",
@@ -90,7 +93,7 @@ function BadgeStatus({ s }: { s: Status }) {
       {s.replace("_", " ")}
     </span>
   );
-}
+}*/
 
 /* ===== Página ===== */
 export default function AdminChamadoPage() {
@@ -370,7 +373,7 @@ export default function AdminChamadoPage() {
             <p className="mt-2 text-sm text-muted-foreground whitespace-pre-wrap">{ticket.descricao}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2 flex-shrink-0 pt-1">
-            <BadgeStatus s={ticket.status} />
+            <TicketStatusBadge status={ticket.status} />
             <span className="inline-flex items-center gap-2 text-sm border rounded-md px-2 py-1">
               Prioridade {ticket.prioridade}
             </span>
@@ -668,9 +671,9 @@ export default function AdminChamadoPage() {
                 historico.map((h) => (
                   <div key={h.id} className="text-sm">
                     <div className="font-medium flex items-center gap-1">
-                      {h.de && <BadgeStatus s={h.de} />}
+                      {h.de && <TicketStatusBadge status={h.de} />}
                       <span>→</span>
-                      <BadgeStatus s={h.para} />
+                      <TicketStatusBadge status={h.para} />
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {new Date(h.criadoEm).toLocaleString("pt-BR")}{" "}

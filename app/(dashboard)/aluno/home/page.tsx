@@ -11,6 +11,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import MobileSidebarTriggerAluno from "../_components/MobileSidebarTriggerAluno";
+import { cx } from '../../../../utils/cx'
+import TicketStatusBadge from "../../../components/shared/TicketStatusBadge";
+import KpiCard from "../../../components/shared/KpiCard";
 
 /* ------------------------- TIPOS ------------------------- */
 type Status =
@@ -31,13 +34,13 @@ type Chamado = {
   setor?: { nome?: string } | null;
 };
 
-/* ------------------------- UTIL ------------------------- */
+/* ------------------------- UTIL ------------------------- 
 function cx(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
-}
+}*/
 
 /* ------------------------- COMPONENTES ------------------------- */
-function StatusBadge({ status }: { status: Status }) {
+/*function StatusBadge({ status }: { status: Status }) {
   const map: Record<Status, { label: string; cls: string }> = {
     ABERTO: {
       label: "Aberto",
@@ -71,9 +74,9 @@ function StatusBadge({ status }: { status: Status }) {
       {v.label}
     </span>
   );
-}
+}*/
 
-function Kpi({
+/*function Kpi({
   icon,
   label,
   value,
@@ -125,7 +128,7 @@ function Kpi({
       </div>
     </div>
   );
-}
+}*/
 
 /* ------------------------- PÁGINA ------------------------- */
 export default function AlunoHomePage() {
@@ -214,27 +217,27 @@ export default function AlunoHomePage() {
 
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Kpi
+        <KpiCard
           icon={<Ticket className="size-4" />}
           label="Abertos"
           value={kpi.abertos}
           tone="brand-cyan"
           hint="Chamados em aberto"
         />
-        <Kpi
+        <KpiCard
           icon={<AlertTriangle className="size-4" />}
           label="Aguardando minha ação"
           value={kpi.aguardandoEu}
           tone="warning"
           hint="Responda ou anexe arquivos"
         />
-        <Kpi
+        <KpiCard
           icon={<Clock className="size-4" />}
           label="Em atendimento"
           value={kpi.emAtendimento}
           tone="brand-teal"
         />
-        <Kpi
+        <KpiCard
           icon={<CheckCircle2 className="size-4" />}
           label="Resolvidos"
           value={kpi.resolvidos}
@@ -277,7 +280,7 @@ export default function AlunoHomePage() {
                     <td className="px-4 py-3">{c.titulo}</td>
                     <td className="px-4 py-3">{c.setor?.nome ?? "—"}</td>
                     <td className="px-4 py-3">
-                      <StatusBadge status={c.status} />
+                      <TicketStatusBadge status={c.status} />
                     </td>
                     <td className="px-4 py-3">
                       {new Date(c.criadoEm).toLocaleDateString("pt-BR")}

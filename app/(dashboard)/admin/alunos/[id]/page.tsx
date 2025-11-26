@@ -6,8 +6,12 @@ import Link from "next/link";
 import {
   ArrowLeft, Mail, User, Badge, Shield, CheckCircle2, XCircle,
   Pencil, Trash2, KeyRound, AlertTriangle, Search, Filter,
-  ChevronRight, Loader2, Check, X
+  ChevronRight, Loader2, Check, X, Ticket, Clock
 } from "lucide-react";
+
+import { cx } from '../../../../../utils/cx'
+import TicketStatusBadge from "../../../../components/shared/TicketStatusBadge";
+import KpiCard from "../../../../components/shared/KpiCard";
 
 /* ===================== Tipos (alinhados ao Prisma) ===================== */
 type Papel = "USUARIO" | "BACKOFFICE" | "TECNICO" | "ADMINISTRADOR";
@@ -41,12 +45,12 @@ type Chamado = {
 /* ===================== ENV ===================== */
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
 
-/* ===================== Utils UI ===================== */
+/* ===================== Utils UI ===================== 
 function cx(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
-}
+}*/
 
-function StatusBadge({ status }: { status: StatusChamado }) {
+/*function StatusBadge({ status }: { status: StatusChamado }) {
   const map: Record<StatusChamado, { label: string; cls: string }> = {
     ABERTO: { label: "Aberto", cls: "bg-[var(--brand-cyan)]/12 text-[var(--brand-cyan)] border-[var(--brand-cyan)]/30" },
     EM_ATENDIMENTO: { label: "Em atendimento", cls: "bg-[var(--brand-teal)]/12 text-[var(--brand-teal)] border-[var(--brand-teal)]/30" },
@@ -60,7 +64,7 @@ function StatusBadge({ status }: { status: StatusChamado }) {
       {v.label}
     </span>
   );
-}
+}*/
 
 function Pill({ children }: { children: React.ReactNode }) {
   return <span className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-background px-2 py-0.5 text-xs">{children}</span>;
@@ -307,11 +311,11 @@ export default function PageAlunoDetalhe() {
 
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <Kpi label="Total" value={counts.total} />
-        <Kpi label="Abertos" value={counts.abertos} tone="brand-cyan" />
-        <Kpi label="Em atendimento" value={counts.andamento} tone="brand-teal" />
-        <Kpi label="Aguard. usuário" value={counts.aguard} tone="warning" />
-        <Kpi label="Resolvidos/Enc." value={counts.resolvidos} tone="success" />
+        <KpiCard icon={<Ticket className="size-4" />} label="Total" value={counts.total} />
+        <KpiCard icon={<Ticket className="size-4" />} label="Abertos" value={counts.abertos} tone="brand-cyan" />
+        <KpiCard icon={<Clock className="size-4" />} label="Em atendimento" value={counts.andamento} tone="brand-teal" />
+        <KpiCard icon={<AlertTriangle className="size-4" />} label="Aguard. usuário" value={counts.aguard} tone="warning" />
+        <KpiCard icon={<CheckCircle2 className="size-4" />} label="Resolvidos/Enc." value={counts.resolvidos} tone="success" />
       </div>
 
       {/* Filtros + lista de chamados */}
@@ -393,7 +397,7 @@ export default function PageAlunoDetalhe() {
                   <td className="px-4 py-3 hidden md:table-cell">{c.setor ?? "—"}</td>
                   <td className="px-4 py-3 hidden lg:table-cell">{c.nivel}</td>
                   <td className="px-4 py-3">
-                    <StatusBadge status={c.status} />
+                    <TicketStatusBadge status={c.status} />
                   </td>
                   <td className="px-4 py-3 hidden lg:table-cell">{c.prioridade}</td>
                   <td className="px-4 py-3 hidden lg:table-cell">
@@ -477,7 +481,7 @@ export default function PageAlunoDetalhe() {
 }
 
 /* ===================== Componentes auxiliares ===================== */
-function Kpi({
+/*function Kpi({
   label,
   value,
   tone,
@@ -515,4 +519,4 @@ function Kpi({
       </div>
     </div>
   );
-}
+}*/

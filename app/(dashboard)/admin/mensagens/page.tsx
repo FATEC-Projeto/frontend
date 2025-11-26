@@ -7,6 +7,9 @@ import {
   Search, Loader2, MessageSquareText, SendHorizonal, Paperclip, Building2, User, Clock, Info
 } from "lucide-react";
 
+import { cx } from '../../../../utils/cx'
+import TicketStatusBadge from "../../../components/shared/TicketStatusBadge";
+
 /* =========================
    Tipos (ajuste conforme seu backend)
    ========================= */
@@ -35,10 +38,10 @@ type Me = { id: string; nome?: string | null };
 
 /* =========================
    Utils
-   ========================= */
+   ========================= 
 function cx(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
-}
+}*/
 function shortDateTime(iso?: string | null) {
   if (!iso) return "";
   const d = new Date(iso);
@@ -400,7 +403,7 @@ function ChatHeader({ conversas, currentId }: { conversas: ChamadoSummary[]; cur
           {c.setor?.nome ?? "—"}
         </span>
         <span>•</span>
-        <StatusBadge status={c.status} />
+        <TicketStatusBadge status={c.status} />
       </div>
     </div>
   );
@@ -435,7 +438,7 @@ function Bubble({
   );
 }
 
-function StatusBadge({ status }: { status: Status }) {
+/*function StatusBadge({ status }: { status: Status }) {
   const map: Record<Status, { label: string; cls: string }> = {
     ABERTO: { label: "Aberto", cls: "bg-[var(--brand-cyan)]/12 text-[var(--brand-cyan)] border-[var(--brand-cyan)]/30" },
     EM_ATENDIMENTO: { label: "Em atendimento", cls: "bg-[var(--brand-teal)]/12 text-[var(--brand-teal)] border-[var(--brand-teal)]/30" },
@@ -449,7 +452,7 @@ function StatusBadge({ status }: { status: Status }) {
       {v.label}
     </span>
   );
-}
+}*/
 
 function EmptyHint() {
   return (
