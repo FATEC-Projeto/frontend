@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import MobileSidebarTriggerAluno from "../_components/MobileSidebarTriggerAluno";
+import TicketStatusBadge from "../../../components/shared/TicketStatusBadge";
+import KpiCard from "../../../components/shared/KpiCard";
 
 /* ------------------------- TIPOS ------------------------- */
 type Status =
@@ -30,102 +32,6 @@ type Chamado = {
   prioridade: Prioridade;
   setor?: { nome?: string } | null;
 };
-
-/* ------------------------- UTIL ------------------------- */
-function cx(...xs: Array<string | false | null | undefined>) {
-  return xs.filter(Boolean).join(" ");
-}
-
-/* ------------------------- COMPONENTES ------------------------- */
-function StatusBadge({ status }: { status: Status }) {
-  const map: Record<Status, { label: string; cls: string }> = {
-    ABERTO: {
-      label: "Aberto",
-      cls: "bg-[var(--brand-cyan)]/12 text-[var(--brand-cyan)] border-[var(--brand-cyan)]/30",
-    },
-    EM_ATENDIMENTO: {
-      label: "Em atendimento",
-      cls: "bg-[var(--brand-teal)]/12 text-[var(--brand-teal)] border-[var(--brand-teal)]/30",
-    },
-    AGUARDANDO_USUARIO: {
-      label: "Aguardando você",
-      cls: "bg-[var(--warning)]/12 text-[var(--warning)] border-[var(--warning)]/30",
-    },
-    RESOLVIDO: {
-      label: "Resolvido",
-      cls: "bg-[var(--success)]/12 text-[var(--success)] border-[var(--success)]/30",
-    },
-    ENCERRADO: {
-      label: "Encerrado",
-      cls: "bg-[var(--muted)] text-muted-foreground border-[var(--border)]",
-    },
-  };
-  const v = map[status];
-  return (
-    <span
-      className={cx(
-        "inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium border",
-        v.cls
-      )}
-    >
-      {v.label}
-    </span>
-  );
-}
-
-function Kpi({
-  icon,
-  label,
-  value,
-  tone,
-  hint,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: number | string;
-  tone?: "brand-cyan" | "brand-teal" | "warning" | "success";
-  hint?: string;
-}) {
-  const bgMap: Record<string, string> = {
-    "brand-cyan": "bg-[var(--brand-cyan)]/10",
-    "brand-teal": "bg-[var(--brand-teal)]/10",
-    warning: "bg-[var(--warning)]/10",
-    success: "bg-[var(--success)]/10",
-  };
-  const textMap: Record<string, string> = {
-    "brand-cyan": "text-[var(--brand-cyan)]",
-    "brand-teal": "text-[var(--brand-teal)]",
-    warning: "text-[var(--warning)]",
-    success: "text-[var(--success)]",
-  };
-
-  return (
-    <div className="rounded-xl border border-[var(--border)] bg-card p-4">
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <div className="text-sm text-muted-foreground">{label}</div>
-          <div className="text-2xl font-semibold">{value}</div>
-          {hint && <div className="text-xs text-muted-foreground/80">{hint}</div>}
-        </div>
-        <div
-          className={cx(
-            "size-10 rounded-lg grid place-items-center",
-            tone ? bgMap[tone] : "bg-[var(--muted)]"
-          )}
-        >
-          <div
-            className={cx(
-              "opacity-90",
-              tone ? textMap[tone] : "text-muted-foreground"
-            )}
-          >
-            {icon}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /* ------------------------- PÁGINA ------------------------- */
 export default function AlunoHomePage() {
@@ -214,27 +120,27 @@ export default function AlunoHomePage() {
 
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Kpi
+        <KpiCard
           icon={<Ticket className="size-4" />}
           label="Abertos"
           value={kpi.abertos}
           tone="brand-cyan"
           hint="Chamados em aberto"
         />
-        <Kpi
+        <KpiCard
           icon={<AlertTriangle className="size-4" />}
           label="Aguardando minha ação"
           value={kpi.aguardandoEu}
           tone="warning"
           hint="Responda ou anexe arquivos"
         />
-        <Kpi
+        <KpiCard
           icon={<Clock className="size-4" />}
           label="Em atendimento"
           value={kpi.emAtendimento}
           tone="brand-teal"
         />
-        <Kpi
+        <KpiCard
           icon={<CheckCircle2 className="size-4" />}
           label="Resolvidos"
           value={kpi.resolvidos}
@@ -277,7 +183,7 @@ export default function AlunoHomePage() {
                     <td className="px-4 py-3">{c.titulo}</td>
                     <td className="px-4 py-3">{c.setor?.nome ?? "—"}</td>
                     <td className="px-4 py-3">
-                      <StatusBadge status={c.status} />
+                      <TicketStatusBadge status={c.status} />
                     </td>
                     <td className="px-4 py-3">
                       {new Date(c.criadoEm).toLocaleDateString("pt-BR")}

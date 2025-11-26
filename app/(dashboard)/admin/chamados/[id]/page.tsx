@@ -11,6 +11,10 @@ import {
 import { apiFetch } from "../../../../../utils/api";
 import { toast } from "sonner";
 
+import { cx } from '../../../../../utils/cx'
+import TicketStatusBadge from "../../../../components/shared/TicketStatusBadge";
+import LoadingSpinner from "../../../../components/shared/LoadingSpinner";
+
 /* ===== Tipos ===== */
 type Nivel = "N1" | "N2" | "N3";
 type Status = "ABERTO" | "EM_ATENDIMENTO" | "AGUARDANDO_USUARIO" | "RESOLVIDO" | "ENCERRADO";
@@ -71,26 +75,6 @@ type Ticket = {
   mensagens?: Mensagem[];
   historico?: Historico[];
 };
-
-/* ===== Utils ===== */
-function cx(...xs: Array<string | false | null | undefined>) {
-  return xs.filter(Boolean).join(" ");
-}
-
-function BadgeStatus({ s }: { s: Status }) {
-  const map: Record<Status, string> = {
-    ABERTO: "bg-[var(--brand-cyan)]/12 text-[var(--brand-cyan)] border-[var(--brand-cyan)]/30",
-    EM_ATENDIMENTO: "bg-[var(--brand-teal)]/12 text-[var(--brand-teal)] border-[var(--brand-teal)]/30",
-    AGUARDANDO_USUARIO: "bg-[var(--warning)]/12 text-[var(--warning)] border-[var(--warning)]/30",
-    RESOLVIDO: "bg-[var(--success)]/12 text-[var(--success)] border-[var(--success)]/30",
-    ENCERRADO: "bg-[var(--muted)] text-muted-foreground border-[var(--border)]",
-  };
-  return (
-    <span className={cx("inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium border", map[s])}>
-      {s.replace("_", " ")}
-    </span>
-  );
-}
 
 /* ===== Página ===== */
 export default function AdminChamadoPage() {
@@ -331,7 +315,7 @@ export default function AdminChamadoPage() {
   if (loading && !ticket) {
     return (
       <div className="p-6 flex items-center gap-2 text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" /> Carregando chamado…
+        <LoadingSpinner label="Carregando chamado…" />
       </div>
     );
   }
@@ -370,7 +354,7 @@ export default function AdminChamadoPage() {
             <p className="mt-2 text-sm text-muted-foreground whitespace-pre-wrap">{ticket.descricao}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2 flex-shrink-0 pt-1">
-            <BadgeStatus s={ticket.status} />
+            <TicketStatusBadge status={ticket.status} />
             <span className="inline-flex items-center gap-2 text-sm border rounded-md px-2 py-1">
               Prioridade {ticket.prioridade}
             </span>
@@ -501,7 +485,7 @@ export default function AdminChamadoPage() {
 
             {loadingAnexos ? (
               <div className="text-sm text-muted-foreground">
-                <Loader2 className="size-4 animate-spin inline mr-1" /> Carregando anexos...
+                <LoadingSpinner label="Carregando anexos..." />
               </div>
             ) : anexos.length === 0 ? (
               <div className="text-sm text-muted-foreground border rounded-md p-3 bg-background">
@@ -668,9 +652,9 @@ export default function AdminChamadoPage() {
                 historico.map((h) => (
                   <div key={h.id} className="text-sm">
                     <div className="font-medium flex items-center gap-1">
-                      {h.de && <BadgeStatus s={h.de} />}
+                      {h.de && <TicketStatusBadge status={h.de} />}
                       <span>→</span>
-                      <BadgeStatus s={h.para} />
+                      <TicketStatusBadge status={h.para} />
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {new Date(h.criadoEm).toLocaleString("pt-BR")}{" "}

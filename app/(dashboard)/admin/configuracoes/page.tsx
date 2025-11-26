@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { Check, X, Shield, Download, Upload, RotateCcw, Info } from "lucide-react";
+import { cx } from '../../../../utils/cx'
 
 /* ===================== PAPÉIS (alinhados ao enum Papel) ===================== */
 type Role = "USUARIO" | "BACKOFFICE" | "TECNICO" | "ADMINISTRADOR";
@@ -255,10 +256,6 @@ const ROW_ROLE_SCOPES: Partial<Record<ResourceKey, Partial<Record<Role, Scope[]>
   },
 };
 
-/* ===================== UI helpers ===================== */
-function cx(...xs: Array<string | false | null | undefined>) {
-  return xs.filter(Boolean).join(" ");
-}
 
 /* ===================== Página ===================== */
 export default function ConfiguracoesPermissoesPage() {

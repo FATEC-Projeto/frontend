@@ -5,6 +5,7 @@ import {
   Search, Filter, Download, RefreshCcw,
   Clock, CheckCircle2, AlertTriangle, BarChart3, PieChart,
 } from "lucide-react";
+import { cx } from '../../../../utils/cx'
 
 /* ===================== Tipos ===================== */
 type Status = "ABERTO" | "EM_ATENDIMENTO" | "AGUARDANDO_USUARIO" | "RESOLVIDO" | "ENCERRADO";
@@ -40,9 +41,7 @@ const MOCK: Chamado[] = [
 ];
 
 /* ===================== Utils ===================== */
-function cx(...xs: Array<string | false | null | undefined>) {
-  return xs.filter(Boolean).join(" ");
-}
+
 function parseISO(s: string) { return new Date(s).getTime(); }
 
 function toCSV(rows: Array<Record<string, any>>) {

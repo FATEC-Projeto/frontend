@@ -6,8 +6,12 @@ import Link from "next/link";
 import {
   ArrowLeft, Mail, User, Badge, Shield, CheckCircle2, XCircle,
   Pencil, Trash2, KeyRound, AlertTriangle, Search, Filter,
-  ChevronRight, Loader2, Check, X
+  ChevronRight, Loader2, Check, X, Ticket, Clock
 } from "lucide-react";
+
+import { cx } from '../../../../../utils/cx'
+import TicketStatusBadge from "../../../../components/shared/TicketStatusBadge";
+import KpiCard from "../../../../components/shared/KpiCard";
 
 /* ===================== Tipos (alinhados ao Prisma) ===================== */
 type Papel = "USUARIO" | "BACKOFFICE" | "TECNICO" | "ADMINISTRADOR";
@@ -41,26 +45,6 @@ type Chamado = {
 /* ===================== ENV ===================== */
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
 
-/* ===================== Utils UI ===================== */
-function cx(...xs: Array<string | false | null | undefined>) {
-  return xs.filter(Boolean).join(" ");
-}
-
-function StatusBadge({ status }: { status: StatusChamado }) {
-  const map: Record<StatusChamado, { label: string; cls: string }> = {
-    ABERTO: { label: "Aberto", cls: "bg-[var(--brand-cyan)]/12 text-[var(--brand-cyan)] border-[var(--brand-cyan)]/30" },
-    EM_ATENDIMENTO: { label: "Em atendimento", cls: "bg-[var(--brand-teal)]/12 text-[var(--brand-teal)] border-[var(--brand-teal)]/30" },
-    AGUARDANDO_USUARIO: { label: "Aguard. usuário", cls: "bg-[var(--warning)]/12 text-[var(--warning)] border-[var(--warning)]/30" },
-    RESOLVIDO: { label: "Resolvido", cls: "bg-[var(--success)]/12 text-[var(--success)] border-[var(--success)]/30" },
-    ENCERRADO: { label: "Encerrado", cls: "bg-[var(--muted)] text-muted-foreground border-[var(--border)]" },
-  };
-  const v = map[status];
-  return (
-    <span className={cx("inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium border", v.cls)}>
-      {v.label}
-    </span>
-  );
-}
 
 function Pill({ children }: { children: React.ReactNode }) {
   return <span className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-background px-2 py-0.5 text-xs">{children}</span>;
@@ -307,11 +291,11 @@ export default function PageAlunoDetalhe() {
 
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <Kpi label="Total" value={counts.total} />
-        <Kpi label="Abertos" value={counts.abertos} tone="brand-cyan" />
-        <Kpi label="Em atendimento" value={counts.andamento} tone="brand-teal" />
-        <Kpi label="Aguard. usuário" value={counts.aguard} tone="warning" />
-        <Kpi label="Resolvidos/Enc." value={counts.resolvidos} tone="success" />
+        <KpiCard icon={<Ticket className="size-4" />} label="Total" value={counts.total} />
+        <KpiCard icon={<Ticket className="size-4" />} label="Abertos" value={counts.abertos} tone="brand-cyan" />
+        <KpiCard icon={<Clock className="size-4" />} label="Em atendimento" value={counts.andamento} tone="brand-teal" />
+        <KpiCard icon={<AlertTriangle className="size-4" />} label="Aguard. usuário" value={counts.aguard} tone="warning" />
+        <KpiCard icon={<CheckCircle2 className="size-4" />} label="Resolvidos/Enc." value={counts.resolvidos} tone="success" />
       </div>
 
       {/* Filtros + lista de chamados */}
@@ -393,7 +377,7 @@ export default function PageAlunoDetalhe() {
                   <td className="px-4 py-3 hidden md:table-cell">{c.setor ?? "—"}</td>
                   <td className="px-4 py-3 hidden lg:table-cell">{c.nivel}</td>
                   <td className="px-4 py-3">
-                    <StatusBadge status={c.status} />
+                    <TicketStatusBadge status={c.status} />
                   </td>
                   <td className="px-4 py-3 hidden lg:table-cell">{c.prioridade}</td>
                   <td className="px-4 py-3 hidden lg:table-cell">
@@ -476,43 +460,3 @@ export default function PageAlunoDetalhe() {
   );
 }
 
-/* ===================== Componentes auxiliares ===================== */
-function Kpi({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number | string;
-  tone?: "brand-cyan" | "brand-teal" | "warning" | "success";
-}) {
-  const bg: Record<string, string> = {
-    "brand-cyan": "bg-[var(--brand-cyan)]/10",
-    "brand-teal": "bg-[var(--brand-teal)]/10",
-    warning: "bg-[var(--warning)]/10",
-    success: "bg-[var(--success)]/10",
-  };
-  const fg: Record<string, string> = {
-    "brand-cyan": "text-[var(--brand-cyan)]",
-    "brand-teal": "text-[var(--brand-teal)]",
-    warning: "text-[var(--warning)]",
-    success: "text-[var(--success)]",
-  };
-  return (
-    <div className="rounded-xl border border-[var(--border)] bg-card p-4">
-      <div className="text-sm text-muted-foreground">{label}</div>
-      <div className="mt-1 flex items-center justify-between">
-        <div className="text-2xl font-semibold">{value}</div>
-        <div className={cx("size-6 rounded-md grid place-items-center", tone ? bg[tone] : "bg-[var(--muted)]")}>
-          {tone === "success" ? (
-            <CheckCircle2 className={cx("size-4", tone ? fg[tone] : "text-muted-foreground")} />
-          ) : tone ? (
-            <XCircle className={cx("size-4", fg[tone])} />
-          ) : (
-            <Check className="size-4 text-muted-foreground" />
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
