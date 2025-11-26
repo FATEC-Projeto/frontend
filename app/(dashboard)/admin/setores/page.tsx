@@ -6,7 +6,7 @@ import {
   Search, Plus, Building2, Users, Pencil, Trash2, X, Check, ChevronRight,
   User as UserIcon, BadgeCheck, Filter, ArrowRightLeft
 } from "lucide-react";
-
+import { cx } from '../../../../utils/cx'
 /* ===================== Tipos alinhados ao seu schema ===================== */
 type PapelKey = "BACKOFFICE" | "TECNICO" | "ADMINISTRADOR";
 
@@ -64,9 +64,6 @@ const USUARIOS_SETORES: UsuarioSetor[] = [
 ];
 
 /* ===================== Utils ===================== */
-function cx(...xs: Array<string | false | null | undefined>) {
-  return xs.filter(Boolean).join(" ");
-}
 const papelById = (id?: string | null) => PAPEIS.find(p => p.id === id) ?? null;
 
 /* ===================== Chips / Badges ===================== */

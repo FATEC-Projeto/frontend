@@ -8,6 +8,8 @@ import {
   CheckCircle2, XCircle, Plus, Trash2, X, Loader2
 } from "lucide-react";
 
+import { cx } from '../../../../../utils/cx'
+
 /* ===== Tipos ===== */
 type Papel = "USUARIO" | "BACKOFFICE" | "TECNICO" | "ADMINISTRADOR";
 
@@ -45,10 +47,6 @@ const API_URL    = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
 const USERS_PATH = process.env.NEXT_PUBLIC_USERS_PATH ?? "/auth/usuarios";
 const FUNC_LIST  = "/admin/funcionarios";
 
-/* ===== Utils ===== */
-function cx(...xs: Array<string | false | null | undefined>) {
-  return xs.filter(Boolean).join(" ");
-}
 
 function extrairPapel(u: UsuarioApi): Funcionario["papel"] {
   if (u.papel && u.papel !== "USUARIO") return u.papel as any;

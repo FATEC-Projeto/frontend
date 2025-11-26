@@ -5,6 +5,7 @@ import { Loader2, Save, Shield, User, Mail, IdCard, Eye, EyeOff} from "lucide-re
 import { toast } from "sonner";
 import MobileSidebarTriggerAluno from "../_components/MobileSidebarTriggerAluno";
 import { logoutAndRedirect } from "../../../../utils/auth";
+import { cx } from '../../../../utils/cx'
 
 type Usuario = {
   id: string;
@@ -14,9 +15,6 @@ type Usuario = {
   ra?: string | null;
 };
 
-function cx(...xs: Array<string | false | null | undefined>) {
-  return xs.filter(Boolean).join(" ");
-}
 
 function Field({
   label,

@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import MobileSidebarTriggerAluno from "../_components/MobileSidebarTriggerAluno";
-import { cx } from '../../../../utils/cx'
 import TicketStatusBadge from "../../../components/shared/TicketStatusBadge";
 import KpiCard from "../../../components/shared/KpiCard";
 
@@ -33,102 +32,6 @@ type Chamado = {
   prioridade: Prioridade;
   setor?: { nome?: string } | null;
 };
-
-/* ------------------------- UTIL ------------------------- 
-function cx(...xs: Array<string | false | null | undefined>) {
-  return xs.filter(Boolean).join(" ");
-}*/
-
-/* ------------------------- COMPONENTES ------------------------- */
-/*function StatusBadge({ status }: { status: Status }) {
-  const map: Record<Status, { label: string; cls: string }> = {
-    ABERTO: {
-      label: "Aberto",
-      cls: "bg-[var(--brand-cyan)]/12 text-[var(--brand-cyan)] border-[var(--brand-cyan)]/30",
-    },
-    EM_ATENDIMENTO: {
-      label: "Em atendimento",
-      cls: "bg-[var(--brand-teal)]/12 text-[var(--brand-teal)] border-[var(--brand-teal)]/30",
-    },
-    AGUARDANDO_USUARIO: {
-      label: "Aguardando você",
-      cls: "bg-[var(--warning)]/12 text-[var(--warning)] border-[var(--warning)]/30",
-    },
-    RESOLVIDO: {
-      label: "Resolvido",
-      cls: "bg-[var(--success)]/12 text-[var(--success)] border-[var(--success)]/30",
-    },
-    ENCERRADO: {
-      label: "Encerrado",
-      cls: "bg-[var(--muted)] text-muted-foreground border-[var(--border)]",
-    },
-  };
-  const v = map[status];
-  return (
-    <span
-      className={cx(
-        "inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium border",
-        v.cls
-      )}
-    >
-      {v.label}
-    </span>
-  );
-}*/
-
-/*function Kpi({
-  icon,
-  label,
-  value,
-  tone,
-  hint,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: number | string;
-  tone?: "brand-cyan" | "brand-teal" | "warning" | "success";
-  hint?: string;
-}) {
-  const bgMap: Record<string, string> = {
-    "brand-cyan": "bg-[var(--brand-cyan)]/10",
-    "brand-teal": "bg-[var(--brand-teal)]/10",
-    warning: "bg-[var(--warning)]/10",
-    success: "bg-[var(--success)]/10",
-  };
-  const textMap: Record<string, string> = {
-    "brand-cyan": "text-[var(--brand-cyan)]",
-    "brand-teal": "text-[var(--brand-teal)]",
-    warning: "text-[var(--warning)]",
-    success: "text-[var(--success)]",
-  };
-
-  return (
-    <div className="rounded-xl border border-[var(--border)] bg-card p-4">
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <div className="text-sm text-muted-foreground">{label}</div>
-          <div className="text-2xl font-semibold">{value}</div>
-          {hint && <div className="text-xs text-muted-foreground/80">{hint}</div>}
-        </div>
-        <div
-          className={cx(
-            "size-10 rounded-lg grid place-items-center",
-            tone ? bgMap[tone] : "bg-[var(--muted)]"
-          )}
-        >
-          <div
-            className={cx(
-              "opacity-90",
-              tone ? textMap[tone] : "text-muted-foreground"
-            )}
-          >
-            {icon}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}*/
 
 /* ------------------------- PÁGINA ------------------------- */
 export default function AlunoHomePage() {

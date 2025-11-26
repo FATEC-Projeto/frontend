@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Search, Layers, BookOpen, Plus, Loader2 } from "lucide-react";
 import MobileSidebarTriggerAluno from "../_components/MobileSidebarTriggerAluno";
+import { cx } from '../../../../utils/cx'
 
 /* ----------------------------- Tipos ----------------------------- */
 type Servico = {
@@ -25,11 +26,6 @@ type Categoria = {
 type CatalogResponse = {
   categorias: Categoria[];
 };
-
-/* ----------------------------- Utils ----------------------------- */
-function cx(...xs: Array<string | false | null | undefined>) {
-  return xs.filter(Boolean).join(" ");
-}
 
 /* ----------------------------- MOCK (fallback) ----------------------------- */
 const MOCK: CatalogResponse = {

@@ -8,6 +8,7 @@ import { apiFetch } from "../../../../utils/api";
 
 import { cx } from '../../../../utils/cx'
 import TicketStatusBadge from "../../../components/shared/TicketStatusBadge";
+import PriorityDot from "../../../components/shared/PriorityDot";
 
 /* ----------------------------- Tipos ----------------------------- */
 type Status = "ABERTO" | "EM_ATENDIMENTO" | "AGUARDANDO_USUARIO" | "RESOLVIDO" | "ENCERRADO";
@@ -31,36 +32,6 @@ type PageResp = {
   items: Chamado[];
 };
 
-/* ----------------------------- Utils ----------------------------- 
-function cx(...xs: Array<string | false | null | undefined>) {
-  return xs.filter(Boolean).join(" ");
-}*/
-
-/*function StatusBadge({ status }: { status: Status }) {
-  const map: Record<Status, { label: string; cls: string }> = {
-    ABERTO: { label: "Aberto", cls: "bg-[var(--brand-cyan)]/12 text-[var(--brand-cyan)] border-[var(--brand-cyan)]/30" },
-    EM_ATENDIMENTO: { label: "Em atendimento", cls: "bg-[var(--brand-teal)]/12 text-[var(--brand-teal)] border-[var(--brand-teal)]/30" },
-    AGUARDANDO_USUARIO: { label: "Aguardando usuário", cls: "bg-[var(--warning)]/12 text-[var(--warning)] border-[var(--warning)]/30" },
-    RESOLVIDO: { label: "Resolvido", cls: "bg-[var(--success)]/12 text-[var(--success)] border-[var(--success)]/30" },
-    ENCERRADO: { label: "Encerrado", cls: "bg-[var(--muted)] text-muted-foreground border-[var(--border)]" },
-  };
-  const v = map[status];
-  return (
-    <span className={cx("inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium border", v.cls)}>
-      {v.label}
-    </span>
-  );
-}*/
-
-function PrioridadeDot({ p }: { p: Prioridade }) {
-  const map: Record<Prioridade, string> = {
-    BAIXA: "bg-[var(--muted-foreground)]",
-    MEDIA: "bg-[var(--brand-cyan)]",
-    ALTA: "bg-[var(--brand-teal)]",
-    URGENTE: "bg-[var(--brand-red)]",
-  };
-  return <span className={cx("inline-block size-2 rounded-full", map[p])} />;
-}
 
 /* ----------------------------- Página ----------------------------- */
 export default function AdminHomePage() {
@@ -249,7 +220,7 @@ export default function AdminHomePage() {
                     <td className="px-4 py-3"><TicketStatusBadge status={c.status} /></td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className="inline-flex items-center gap-2">
-                        <PrioridadeDot p={c.prioridade} />
+                        <PriorityDot prioridade={c.prioridade} />
                         <span>{c.prioridade}</span>
                       </span>
                     </td>
