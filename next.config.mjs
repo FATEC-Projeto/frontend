@@ -1,11 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  experimental: { 
-    turbo: true, // opcional, como você já tinha
+
+  // Turbopack novo estilo (Next 15)
+  turbopack: {
+    // se quiser, pode pôr configs aqui depois
   },
+
   eslint: {
-    // Não deixa o build falhar por causa de erro de ESLint no Vercel
+    // não quebrar o build por causa de ESLint
     ignoreDuringBuilds: true,
   },
 };
