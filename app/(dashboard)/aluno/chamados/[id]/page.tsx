@@ -395,7 +395,6 @@ function confirmarReabertura() {
         </div>
       </div>
 
-{/* Aviso para o aluno quando o chamado estiver resolvido */}
 {chamado.status === "RESOLVIDO" && (
   <div className="mt-4 rounded-lg border border-yellow-400/30 bg-yellow-100/20 text-yellow-700 dark:text-yellow-300 dark:bg-yellow-900/20 px-4 py-3 text-sm flex items-start gap-2">
     <svg
