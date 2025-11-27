@@ -7,6 +7,9 @@ import {
   Search, Loader2, MessageSquareText, SendHorizonal, Paperclip, Building2, User, Clock, Info
 } from "lucide-react";
 
+import { cx } from '../../../../utils/cx'
+import TicketStatusBadge from "../../../components/shared/TicketStatusBadge";
+
 /* =========================
    Tipos (ajuste conforme seu backend)
    ========================= */
@@ -33,12 +36,6 @@ type Mensagem = {
 
 type Me = { id: string; nome?: string | null };
 
-/* =========================
-   Utils
-   ========================= */
-function cx(...xs: Array<string | false | null | undefined>) {
-  return xs.filter(Boolean).join(" ");
-}
 function shortDateTime(iso?: string | null) {
   if (!iso) return "";
   const d = new Date(iso);
@@ -400,7 +397,7 @@ function ChatHeader({ conversas, currentId }: { conversas: ChamadoSummary[]; cur
           {c.setor?.nome ?? "—"}
         </span>
         <span>•</span>
-        <StatusBadge status={c.status} />
+        <TicketStatusBadge status={c.status} />
       </div>
     </div>
   );
@@ -435,21 +432,6 @@ function Bubble({
   );
 }
 
-function StatusBadge({ status }: { status: Status }) {
-  const map: Record<Status, { label: string; cls: string }> = {
-    ABERTO: { label: "Aberto", cls: "bg-[var(--brand-cyan)]/12 text-[var(--brand-cyan)] border-[var(--brand-cyan)]/30" },
-    EM_ATENDIMENTO: { label: "Em atendimento", cls: "bg-[var(--brand-teal)]/12 text-[var(--brand-teal)] border-[var(--brand-teal)]/30" },
-    AGUARDANDO_USUARIO: { label: "Aguardando usuário", cls: "bg-[var(--warning)]/12 text-[var(--warning)] border-[var(--warning)]/30" },
-    RESOLVIDO: { label: "Resolvido", cls: "bg-[var(--success)]/12 text-[var(--success)] border-[var(--success)]/30" },
-    ENCERRADO: { label: "Encerrado", cls: "bg-[var(--muted)] text-muted-foreground border-[var(--border)]" },
-  };
-  const v = map[status];
-  return (
-    <span className={cx("inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium border", v.cls)}>
-      {v.label}
-    </span>
-  );
-}
 
 function EmptyHint() {
   return (

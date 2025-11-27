@@ -4,10 +4,7 @@ import { useEffect, useState } from "react";
 import { Bell, Globe, Loader2, Moon, Save, Settings, Sun, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import MobileSidebarTriggerAluno from "../_components/MobileSidebarTriggerAluno";
-
-function cx(...xs: Array<string | false | null | undefined>) {
-  return xs.filter(Boolean).join(" ");
-}
+import { cx } from '../../../../utils/cx'
 
 const LS_KEYS = {
   theme: "theme",

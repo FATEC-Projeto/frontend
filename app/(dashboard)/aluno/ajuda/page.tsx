@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { HelpCircle, Search, MessageSquare, BookOpenCheck, ExternalLink } from "lucide-react";
 import MobileSidebarTriggerAluno from "../_components/MobileSidebarTriggerAluno";
+import { cx } from '../../../../utils/cx'
 
 type FAQ = {
   id: string;
@@ -58,10 +59,6 @@ const FAQS: FAQ[] = [
     links: [{ label: "Meus Dados", href: "/aluno/dados" }],
   },
 ];
-
-function cx(...xs: Array<string | false | null | undefined>) {
-  return xs.filter(Boolean).join(" ");
-}
 
 /* ---------- Acordeon simples ---------- */
 function FAQItem({ f }: { f: FAQ }) {

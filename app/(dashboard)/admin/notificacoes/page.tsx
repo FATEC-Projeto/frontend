@@ -13,7 +13,7 @@ import {
   Info,
 } from "lucide-react";
 import MobileSidebarTriggerAdmin from "../_components/MobileSidebarTriggerAdmin";
-
+import { cx } from '../../../../utils/cx'
 /* ---------- Tipos ---------- */
 type Tipo =
   | "CHAMADO_CRIADO"
@@ -43,10 +43,6 @@ type PageResp = {
   items: Notificacao[];
 };
 
-/* ---------- Utils ---------- */
-function cx(...xs: Array<string | false | null | undefined>) {
-  return xs.filter(Boolean).join(" ");
-}
 
 function TipoIcon({ tipo }: { tipo: Tipo }) {
   const cls = "size-4";

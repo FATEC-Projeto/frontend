@@ -3,12 +3,21 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  Plus, Upload, Download, Search, Filter,
-  Mail, IdCard, User as UserIcon
+  Plus,
+  Upload,
+  Download,
+  Search,
+  Filter,
+  Mail,
+  IdCard,
+  User as UserIcon,
+  Trash2, // 👈 novo
 } from "lucide-react";
 
 import FormAlunoCreate from "./../_components/FormAlunoCreate";
 import ImportAlunos from "./../_components/ImportAlunos";
+
+import { cx } from '../../../../utils/cx'
 
 /* ========= Tipos ========= */
 type Papel = "USUARIO" | "BACKOFFICE" | "TECNICO" | "ADMINISTRADOR";
@@ -41,10 +50,10 @@ const USERS_PATH = process.env.NEXT_PUBLIC_USERS_PATH ?? "/auth/usuarios";
 // detalhe do aluno
 const ALUNO_DETAIL_PREFIX = "/admin/alunos/";
 
-/* ========= Utils ========= */
+/* ========= Utils ========= 
 function cx(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
-}
+}*/
 
 function StatusBadge({ status }: { status: StatusAtivo }) {
   const map: Record<StatusAtivo, string> = {
@@ -53,7 +62,12 @@ function StatusBadge({ status }: { status: StatusAtivo }) {
   };
   const label = status === "ATIVO" ? "Ativo" : "Inativo";
   return (
-    <span className={cx("inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium border", map[status])}>
+    <span
+      className={cx(
+        "inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium border",
+        map[status],
+      )}
+    >
       {label}
     </span>
   );
@@ -70,6 +84,10 @@ export default function AdminAlunosPage() {
   const [rows, setRows] = useState<AlunoRow[]>([]);
   const [total, setTotal] = useState<number>(0);
   const [error, setError] = useState<null | string>(null);
+
+  // seleção em massa
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
 
   // paginação simples
   const [page, setPage] = useState(1);
@@ -97,10 +115,16 @@ export default function AdminAlunosPage() {
       qs.set("perPage", String(perPage));
 
       // tenta USERS_PATH; se falhar, tenta /usuarios
-      let res = await fetch(`${API_URL}${USERS_PATH}?${qs}`, { headers, cache: "no-store" });
+      let res = await fetch(`${API_URL}${USERS_PATH}?${qs}`, {
+        headers,
+        cache: "no-store",
+      });
       if (!res.ok) {
         const fallback = USERS_PATH === "/usuarios" ? "/auth/usuarios" : "/usuarios";
-        const res2 = await fetch(`${API_URL}${fallback}?${qs}`, { headers, cache: "no-store" });
+        const res2 = await fetch(`${API_URL}${fallback}?${qs}`, {
+          headers,
+          cache: "no-store",
+        });
         if (!res2.ok) {
           const text = await res2.text().catch(() => "");
           throw new Error(text || `Falha ao buscar alunos (${res2.status})`);
@@ -109,13 +133,12 @@ export default function AdminAlunosPage() {
       }
 
       const json = await res.json();
-      const usuarios: Usuario[] = Array.isArray(json) ? json : (json.data ?? []);
+      const usuarios: Usuario[] = Array.isArray(json) ? json : json.data ?? [];
 
       // === FILTRO CLIENT-SIDE: somente alunos ===
       // Regra: é aluno se papel === "USUARIO" OU se papel estiver ausente/null.
       const alunosApenas = usuarios.filter((u) => (u.papel ?? "USUARIO") === "USUARIO");
 
-      // Mapeia linhas
       const mapped: AlunoRow[] = alunosApenas.map((u) => ({
         id: u.id,
         ra: u.ra ?? "",
@@ -125,15 +148,16 @@ export default function AdminAlunosPage() {
         criadoEm: u.criadoEm,
       }));
 
-      // Ajusta total de forma resiliente (se o backend já filtra, o total dele bate;
-      // se não filtra, mostramos o total pós-filtro local).
-      const totalCount: number =
-        Array.isArray(json)
-          ? alunosApenas.length
-          : (typeof json.total === "number" ? json.total : alunosApenas.length);
+      const totalCount: number = Array.isArray(json)
+        ? alunosApenas.length
+        : typeof json.total === "number"
+        ? json.total
+        : alunosApenas.length;
 
       setRows(mapped);
       setTotal(totalCount);
+      // ao recarregar, limpa seleção (pra não ficar com IDs de outra página / filtro)
+      setSelectedIds(new Set());
     } catch (e: unknown) {
       console.error(e);
       const message = e instanceof Error ? e.message : String(e);
@@ -146,70 +170,64 @@ export default function AdminAlunosPage() {
   }
 
   useEffect(() => {
-    // evita primeira chamada sem API_URL em SSR; mas como é "use client", ok.
     fetchAlunos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, status, page]);
 
-function baixarModeloCSV() {
-  
-  // - OBRIGATÓRIOS: ra, emailEducacional
-  // - OPCIONAIS: nome, emailPessoal, cursoNome, cursoSigla, ativo
-  // Observações:
-  // - "ativo" aceita TRUE/FALSE; default no backend é TRUE se omitido
-  // - senha NÃO vai no CSV: o backend gera a senha padrão e força 1º acesso
-  const headers = [
-    "ra",
-    "emailEducacional",
-    "nome",
-    "emailPessoal",
-    "cursoNome",
-    "cursoSigla",
-    "ativo",
-  ];
+  function baixarModeloCSV() {
+    // - OBRIGATÓRIOS: ra, emailEducacional
+    // - OPCIONAIS: nome, emailPessoal, cursoNome, cursoSigla, ativo
+    const headers = [
+      "ra",
+      "emailEducacional",
+      "nome",
+      "emailPessoal",
+      "cursoNome",
+      "cursoSigla",
+      "ativo",
+    ];
 
-  const exemploMinimo = [
-    "123456",
-    "joao.silva@fatec.sp.gov.br",
-    "",        
-    "",        
-    "",        
-    "",        
-    "",       
-  ];
+    const exemploMinimo = [
+      "123456",
+      "joao.silva@fatec.sp.gov.br",
+      "",
+      "",
+      "",
+      "",
+      "",
+    ];
 
-  const exemploCompleto = [
-    "654321",
-    "maria.souza@fatec.sp.gov.br",
-    "Maria Souza",
-    "maria.souza@gmail.com",
-    "Desenvolvimento de Software Multiplataforma",
-    "DSM",
-    "TRUE", 
-  ];
+    const exemploCompleto = [
+      "654321",
+      "maria.souza@fatec.sp.gov.br",
+      "Maria Souza",
+      "maria.souza@gmail.com",
+      "Desenvolvimento de Software Multiplataforma",
+      "DSM",
+      "TRUE",
+    ];
 
+    const rows = [headers, exemploMinimo, exemploCompleto]
+      .map((r) =>
+        r
+          .map((cell) => {
+            const v = String(cell ?? "");
+            return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+          })
+          .join(","),
+      )
+      .join("\n");
 
-  const rows = [headers, exemploMinimo, exemploCompleto]
-    .map(r =>
-      r
-        .map((cell) => {
-        
-          const v = String(cell ?? "");
-          return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
-        })
-        .join(",")
-    )
-    .join("\n");
-
-  const blob = new Blob([`\uFEFF${rows}`], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "modelo_alunos_primeiro_acesso.csv";
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
+    const blob = new Blob([`\uFEFF${rows}`], {
+      type: "text/csv;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "modelo_alunos_primeiro_acesso.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   const prevEnabled = page > 1;
   const nextEnabled = total ? page * perPage < total : rows.length === perPage;
@@ -227,6 +245,92 @@ function baixarModeloCSV() {
     });
   }, [rows, q, status]);
 
+  // ===== seleção derivada =====
+  const hasSelected = selectedIds.size > 0;
+  const allVisibleSelected =
+    visibleRows.length > 0 &&
+    visibleRows.every((r) => selectedIds.has(r.id));
+
+  function toggleSelectAllVisible(checked: boolean) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) {
+        visibleRows.forEach((r) => next.add(r.id));
+      } else {
+        visibleRows.forEach((r) => next.delete(r.id));
+      }
+      return next;
+    });
+  }
+
+  function toggleSelectOne(id: string, checked: boolean) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  async function handleDeleteSelected() {
+    if (!hasSelected) return;
+    const count = selectedIds.size;
+
+    const confirmMsg =
+      count === 1
+        ? "Tem certeza que deseja excluir este aluno?"
+        : `Tem certeza que deseja excluir ${count} alunos?`;
+
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      setDeleting(true);
+
+      const token =
+        (typeof window !== "undefined" && localStorage.getItem("accessToken")) ||
+        process.env.NEXT_PUBLIC_ACCESS_TOKEN ||
+        "";
+
+      const headers: Record<string, string> = {
+        Accept: "application/json",
+      };
+      if (token) headers.Authorization = `Bearer ${token}`;
+
+      const idsArray = Array.from(selectedIds);
+
+      const results = await Promise.allSettled(
+        idsArray.map((id) =>
+          // 👇 ajuste essa rota se o seu backend usar outro padrão (ex.: /auth/usuarios/:id ou /usuarios/:id/soft)
+          fetch(`${API_URL}/usuarios/${id}`, {
+            method: "DELETE",
+            headers,
+          }),
+        ),
+      );
+
+      const failed = results.filter(
+        (r) =>
+          r.status === "rejected" ||
+          (r.status === "fulfilled" && !r.value.ok),
+      );
+
+      if (failed.length) {
+        alert(
+          `Alguns registros não puderam ser excluídos (${failed.length}/${idsArray.length}).`,
+        );
+      }
+
+      setSelectedIds(new Set());
+      setPage(1);
+      fetchAlunos();
+    } catch (e) {
+      console.error(e);
+      alert("Erro ao excluir alunos selecionados.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       {error && (
@@ -239,7 +343,10 @@ function baixarModeloCSV() {
       {/* ===== Modal: Importar CSV ===== */}
       {showImport && (
         <div className="fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-black/30" onClick={() => setShowImport(false)} />
+          <div
+            className="absolute inset-0 bg-black/30"
+            onClick={() => setShowImport(false)}
+          />
           <div className="absolute left-1/2 top-1/2 w-[92%] max-w-[880px] -translate-x-1/2 -translate-y-1/2 bg-background rounded-xl shadow-xl border border-[var(--border)] p-4">
             <ImportAlunos
               onClose={() => setShowImport(false)}
@@ -280,7 +387,7 @@ function baixarModeloCSV() {
           <div className="rounded-xl border border-[var(--border)] bg-card p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               {/* Ações à esquerda */}
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => setShowForm(true)}
                   className="inline-flex items-center gap-2 h-10 px-3 rounded-lg bg-primary text-primary-foreground text-sm hover:brightness-95"
@@ -306,6 +413,27 @@ function baixarModeloCSV() {
                 >
                   <Download className="size-4" />
                   Modelo CSV
+                </button>
+
+                {/* 👇 botão de excluir em massa */}
+                <button
+                  type="button"
+                  onClick={handleDeleteSelected}
+                  disabled={!hasSelected || deleting}
+                  className={cx(
+                    "inline-flex items-center gap-2 h-10 px-3 rounded-lg border text-sm",
+                    hasSelected && !deleting
+                      ? "border-destructive/40 text-destructive hover:bg-destructive/10"
+                      : "border-[var(--border)] text-muted-foreground opacity-60 cursor-not-allowed",
+                  )}
+                  title={
+                    hasSelected
+                      ? "Excluir alunos selecionados"
+                      : "Selecione pelo menos um aluno para excluir"
+                  }
+                >
+                  <Trash2 className="size-4" />
+                  {deleting ? "Excluindo..." : "Excluir selecionados"}
                 </button>
               </div>
 
@@ -351,18 +479,39 @@ function baixarModeloCSV() {
               <table className="min-w-full text-sm">
                 <thead className="bg-[var(--muted)] text-foreground/90">
                   <tr>
-                    <th className="text-left font-medium px-4 py-3 hidden xl:table-cell">RA</th>
-                    <th className="text-left font-medium px-4 py-3">E-mail educacional</th>
-                    <th className="text-left font-medium px-4 py-3 hidden md:table-cell">Nome (opcional)</th>
+                    {/* checkbox header */}
+                    <th className="px-3 py-3 w-8">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-[var(--border)]"
+                        checked={allVisibleSelected}
+                        onChange={(e) => toggleSelectAllVisible(e.target.checked)}
+                        aria-label="Selecionar todos desta página"
+                      />
+                    </th>
+                    <th className="text-left font-medium px-4 py-3 hidden xl:table-cell">
+                      RA
+                    </th>
+                    <th className="text-left font-medium px-4 py-3">
+                      E-mail educacional
+                    </th>
+                    <th className="text-left font-medium px-4 py-3 hidden md:table-cell">
+                      Nome (opcional)
+                    </th>
                     <th className="text-left font-medium px-4 py-3">Status</th>
-                    <th className="text-left font-medium px-4 py-3 hidden lg:table-cell">Criado em</th>
+                    <th className="text-left font-medium px-4 py-3 hidden lg:table-cell">
+                      Criado em
+                    </th>
                     <th className="text-right font-medium px-4 py-3">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading && (
                     <tr>
-                      <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
+                      <td
+                        colSpan={7}
+                        className="px-4 py-6 text-center text-muted-foreground"
+                      >
                         Carregando...
                       </td>
                     </tr>
@@ -370,11 +519,29 @@ function baixarModeloCSV() {
 
                   {!loading &&
                     visibleRows.map((a) => (
-                      <tr key={a.id} className="border-t border-[var(--border)]">
+                      <tr
+                        key={a.id}
+                        className="border-t border-[var(--border)]"
+                      >
+                        {/* checkbox da linha */}
+                        <td className="px-3 py-3">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-[var(--border)]"
+                            checked={selectedIds.has(a.id)}
+                            onChange={(e) =>
+                              toggleSelectOne(a.id, e.target.checked)
+                            }
+                            aria-label={`Selecionar aluno RA ${a.ra}`}
+                          />
+                        </td>
+
                         <td className="px-4 py-3 hidden xl:table-cell">
                           <div className="inline-flex items-center gap-2">
                             <IdCard className="size-4 text-muted-foreground" />
-                            <span className="font-medium">{a.ra || "—"}</span>
+                            <span className="font-medium">
+                              {a.ra || "—"}
+                            </span>
                           </div>
                         </td>
 
@@ -422,8 +589,13 @@ function baixarModeloCSV() {
 
                   {!loading && visibleRows.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
-                        {error ? "Falha ao carregar dados." : "Nenhum aluno encontrado com os filtros atuais."}
+                      <td
+                        colSpan={7}
+                        className="px-4 py-10 text-center text-muted-foreground"
+                      >
+                        {error
+                          ? "Falha ao carregar dados."
+                          : "Nenhum aluno encontrado com os filtros atuais."}
                       </td>
                     </tr>
                   )}
@@ -435,16 +607,24 @@ function baixarModeloCSV() {
             <div className="flex items-center justify-between p-3 text-xs text-muted-foreground border-t border-[var(--border)]">
               <div>
                 {total ? (
-                  <>Mostrando {(page - 1) * perPage + 1}-{Math.min(page * perPage, total)} de {total}</>
+                  <>
+                    Mostrando {(page - 1) * perPage + 1}-
+                    {Math.min(page * perPage, total)} de {total}
+                  </>
                 ) : (
-                  <>Mostrando {visibleRows.length}{visibleRows.length === perPage ? "+" : ""}</>
+                  <>
+                    Mostrando {visibleRows.length}
+                    {visibleRows.length === perPage ? "+" : ""}
+                  </>
                 )}
               </div>
               <div className="inline-flex items-center gap-1">
                 <button
                   className={cx(
                     "h-8 px-2 rounded-md",
-                    prevEnabled ? "hover:bg-[var(--muted)]" : "opacity-50 cursor-not-allowed"
+                    prevEnabled
+                      ? "hover:bg-[var(--muted)]"
+                      : "opacity-50 cursor-not-allowed",
                   )}
                   disabled={!prevEnabled}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
@@ -455,7 +635,9 @@ function baixarModeloCSV() {
                 <button
                   className={cx(
                     "h-8 px-2 rounded-md",
-                    nextEnabled ? "hover:bg-[var(--muted)]" : "opacity-50 cursor-not-allowed"
+                    nextEnabled
+                      ? "hover:bg-[var(--muted)]"
+                      : "opacity-50 cursor-not-allowed",
                   )}
                   disabled={!nextEnabled}
                   onClick={() => setPage((p) => p + 1)}

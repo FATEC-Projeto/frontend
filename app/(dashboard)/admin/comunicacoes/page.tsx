@@ -5,6 +5,7 @@ import {
   Search, Mail, Eye, Send, Download, Upload, Save, Check, X,
   Filter, ToggleLeft, ToggleRight, FileText, TriangleAlert
 } from "lucide-react";
+import { cx } from '../../../../utils/cx'
 
 type TemplateKey =
   | "WELCOME_FIRST_ACCESS"
@@ -27,9 +28,6 @@ type Template = {
   variaveis: string[]; // lista de chaves disponíveis {{...}}
 };
 
-function cx(...xs: Array<string | false | null | undefined>) {
-  return xs.filter(Boolean).join(" ");
-}
 
 /** ---- Mock inicial (você vai carregar do backend futuramente) ---- */
 const DEFAULT_TEMPLATES: Template[] = [

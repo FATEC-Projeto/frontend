@@ -7,6 +7,8 @@ import {
   Mail, BadgeCheck, Building2, User as UserIcon
 } from "lucide-react";
 
+import { cx } from '../../../../utils/cx'
+
 /* ========= Tipos ========= */
 type Papel = "BACKOFFICE" | "TECNICO" | "ADMINISTRADOR" | "USUARIO";
 type StatusAtivo = "ATIVO" | "INATIVO";
@@ -41,10 +43,6 @@ const USERS_PATH = process.env.NEXT_PUBLIC_USERS_PATH ?? "/auth/usuarios";
 // detalhe do funcionário
 const FUNC_DETAIL_PREFIX = "/admin/funcionarios";
 
-/* ========= Utils ========= */
-function cx(...xs: Array<string | false | null | undefined>) {
-  return xs.filter(Boolean).join(" ");
-}
 
 function StatusBadge({ status }: { status: StatusAtivo }) {
   const map: Record<StatusAtivo, string> = {

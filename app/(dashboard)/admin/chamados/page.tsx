@@ -8,6 +8,12 @@ import {
 import { apiFetch } from "../../../../utils/api"; 
 import Link from "next/link";
 
+import { cx } from '../../../../utils/cx'
+import TicketStatusBadge from "../../../components/shared/TicketStatusBadge";
+import PriorityDot from "../../../components/shared/PriorityDot"; 
+import NivelBadge from "../../../components/shared/NivelBadge";   
+import SetorChip from "../../../components/shared/SetorChip";
+
 /* ===== Tipos ===== */
 type Status = "ABERTO" | "EM_ATENDIMENTO" | "AGUARDANDO_USUARIO" | "RESOLVIDO" | "ENCERRADO";
 type Prioridade = "BAIXA" | "MEDIA" | "ALTA" | "URGENTE";
@@ -47,10 +53,6 @@ type PageResp = {
   items: ApiChamado[];
 };
 
-/* ===== Utils ===== */
-function cx(...xs: Array<string | false | null | undefined>) {
-  return xs.filter(Boolean).join(" ");
-}
 
 function toUI(x: ApiChamado): ChamadoUI {
   return {
@@ -65,42 +67,6 @@ function toUI(x: ApiChamado): ChamadoUI {
     responsavel: x.responsavel?.nome || null,
     setor: x.setor?.nome || null,
   };
-}
-
-/* ===== Badges / Chips ===== */
-function StatusBadge({ status }: { status: Status }) {
-  const map: Record<Status, { label: string; cls: string }> = {
-    ABERTO: { label: "Aberto", cls: "bg-[var(--brand-cyan)]/12 text-[var(--brand-cyan)] border-[var(--brand-cyan)]/30" },
-    EM_ATENDIMENTO: { label: "Em atendimento", cls: "bg-[var(--brand-teal)]/12 text-[var(--brand-teal)] border-[var(--brand-teal)]/30" },
-    AGUARDANDO_USUARIO: { label: "Aguard. usuário", cls: "bg-[var(--warning)]/12 text-[var(--warning)] border-[var(--warning)]/30" },
-    RESOLVIDO: { label: "Resolvido", cls: "bg-[var(--success)]/12 text-[var(--success)] border-[var(--success)]/30" },
-    ENCERRADO: { label: "Encerrado", cls: "bg-[var(--muted)] text-muted-foreground border-[var(--border)]" },
-  };
-  const v = map[status];
-  return <span className={cx("inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium border", v.cls)}>{v.label}</span>;
-}
-function PrioridadeDot({ p }: { p: Prioridade }) {
-  const map: Record<Prioridade, string> = {
-    BAIXA: "bg-[var(--muted-foreground)]", MEDIA: "bg-[var(--brand-cyan)]",
-    ALTA: "bg-[var(--brand-teal)]", URGENTE: "bg-[var(--brand-red)]",
-  };
-  return <span className={cx("inline-block size-2 rounded-full", map[p])} />;
-}
-function NivelBadge({ n }: { n: Nivel }) {
-  const map: Record<Nivel, string> = {
-    N1: "bg-blue-500/12 text-blue-600 border-blue-500/30",
-    N2: "bg-purple-500/12 text-purple-600 border-purple-500/30",
-    N3: "bg-rose-500/12 text-rose-600 border-rose-500/30",
-  };
-  return <span className={cx("inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold border", map[n])}>{n}</span>;
-}
-function SetorChip({ s }: { s?: string | null }) {
-  if (!s) return <span className="text-muted-foreground">—</span>;
-  return (
-    <span className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-background px-2 py-0.5 text-xs">
-      <Building2 className="size-3" /> {s}
-    </span>
-  );
 }
 
 /* ---- Filtros / Estado ---- */
@@ -324,22 +290,22 @@ function Lista({ dados, sortDesc, setSortDesc }: {
                 <td className="px-4 py-3 max-w-[380px]">
                   <div className="line-clamp-1">{c.titulo}</div>
                   <div className="md:hidden mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                    <SetorChip s={c.setor} />
+                    <SetorChip nome={c.setor} />
                     <span className="inline-flex items-center gap-1">
                       <User className="size-3" /> {c.responsavel ?? "—"}
                     </span>
                   </div>
                 </td>
                 <td className="px-4 py-3 hidden md:table-cell">{c.solicitante}</td>
-                <td className="px-4 py-3 hidden xl:table-cell"><SetorChip s={c.setor} /></td>
-                <td className="px-4 py-3"><NivelBadge n={c.nivel} /></td>
+                <td className="px-4 py-3 hidden xl:table-cell"><SetorChip nome={c.setor} /></td>
+                <td className="px-4 py-3"><NivelBadge nivel={c.nivel} /></td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   <span className="inline-flex items-center gap-2">
-                    <PrioridadeDot p={c.prioridade} />
+                    <PriorityDot prioridade={c.prioridade} />
                     <span>{c.prioridade}</span>
                   </span>
                 </td>
-                <td className="px-4 py-3"><StatusBadge status={c.status} /></td>
+                <td className="px-4 py-3"><TicketStatusBadge status={c.status} /></td>
                 <td className="px-4 py-3 hidden lg:table-cell">
                   {new Date(c.criadoEm).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })}{" "}
                   <span className="inline-flex items-center gap-1 text-xs text-muted-foreground ml-1"><Clock className="size-3" /> {new Date(c.criadoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
@@ -382,7 +348,7 @@ function Kanban({ dados }: { dados: ChamadoUI[] }) {
         <div key={col} className="rounded-xl border border-[var(--border)] bg-card overflow-hidden">
           <div className="px-3 py-2 bg-[var(--muted)] flex items-center justify-between">
             <div className="text-sm font-semibold flex items-center gap-2">
-              <StatusBadge status={col} />
+              <TicketStatusBadge status={col} />
               <span className="text-muted-foreground font-normal">({byStatus[col]?.length ?? 0})</span>
             </div>
           </div>
@@ -418,14 +384,14 @@ function CardKanban({ c }: { c: ChamadoUI }) {
             {c.titulo}
           </div>
         </div>
-        <NivelBadge n={c.nivel} />
+        <NivelBadge nivel={c.nivel} />
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
         <span className="inline-flex items-center gap-1">
           <Tag className="size-3" /> <strong>{c.prioridade}</strong>
         </span>
-        <SetorChip s={c.setor} />
+        <SetorChip nome={c.setor} />
         <span className="inline-flex items-center gap-1">
           <User className="size-3" /> {c.responsavel ?? "—"}
         </span>

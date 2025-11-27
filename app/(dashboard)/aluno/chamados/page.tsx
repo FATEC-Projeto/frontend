@@ -14,6 +14,8 @@ import {
 import { toast } from "sonner";
 import MobileSidebarTriggerAluno from "../_components/MobileSidebarTriggerAluno";
 import { apiFetch } from "../../../../utils/api";
+import { cx } from '../../../../utils/cx'
+import TicketStatusBadge from "../../../components/shared/TicketStatusBadge";
 
 /* ---------- Tipos ---------- */
 type Status =
@@ -41,42 +43,6 @@ type PageResp = {
   items: Chamado[];
 };
 
-/* ---------- Utils ---------- */
-function cx(...xs: Array<string | false | null | undefined>) {
-  return xs.filter(Boolean).join(" ");
-}
-
-/* ---------- Badges ---------- */
-function StatusBadge({ status }: { status: Status }) {
-  const map: Record<Status, { label: string; cls: string }> = {
-    ABERTO: {
-      label: "Aberto",
-      cls: "bg-[var(--brand-cyan)]/12 text-[var(--brand-cyan)] border-[var(--brand-cyan)]/30",
-    },
-    EM_ATENDIMENTO: {
-      label: "Em atendimento",
-      cls: "bg-[var(--brand-teal)]/12 text-[var(--brand-teal)] border-[var(--brand-teal)]/30",
-    },
-    AGUARDANDO_USUARIO: {
-      label: "Aguardando você",
-      cls: "bg-[var(--warning)]/12 text-[var(--warning)] border-[var(--warning)]/30",
-    },
-    RESOLVIDO: {
-      label: "Resolvido",
-      cls: "bg-[var(--success)]/12 text-[var(--success)] border-[var(--success)]/30",
-    },
-    ENCERRADO: {
-      label: "Encerrado",
-      cls: "bg-[var(--muted)] text-muted-foreground border-[var(--border)]",
-    },
-  };
-  const v = map[status];
-  return (
-    <span className={cx("inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium border", v.cls)}>
-      {v.label}
-    </span>
-  );
-}
 
 function AcoesChamado({ c }: { c: Chamado }) {
   const base =
@@ -282,7 +248,7 @@ export default function MeusChamadosPage() {
                       </td>
                       <td className="px-4 py-3">{c.setor?.nome ?? "—"}</td>
                       <td className="px-4 py-3">
-                        <StatusBadge status={c.status} />
+                        <TicketStatusBadge status={c.status} />
                       </td>
                       <td className="px-4 py-3">
                         {new Date(c.criadoEm).toLocaleDateString("pt-BR")}
@@ -307,7 +273,7 @@ export default function MeusChamadosPage() {
                       </div>
                       <div className="font-medium">{c.titulo}</div>
                     </div>
-                    <StatusBadge status={c.status} />
+                    <TicketStatusBadge status={c.status} />
                   </div>
 
                   <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
