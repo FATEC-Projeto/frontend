@@ -5,6 +5,7 @@ import { Bell, Globe, Loader2, Moon, Save, Settings, Sun, Trash2 } from "lucide-
 import { toast } from "sonner";
 import MobileSidebarTriggerAluno from "../_components/MobileSidebarTriggerAluno";
 import { cx } from "../../../../utils/cx";
+import { cx } from '../../../../utils/cx'
 
 const LS_KEYS = {
   theme: "theme",
