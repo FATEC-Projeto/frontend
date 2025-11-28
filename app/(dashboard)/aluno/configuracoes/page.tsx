@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Bell, Globe, Loader2, Moon, Save, Settings, Sun, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import MobileSidebarTriggerAluno from "../_components/MobileSidebarTriggerAluno";
-import { cx } from '../../../../utils/cx'
+import { cx } from "../../../../utils/cx";
 
 const LS_KEYS = {
   theme: "theme",
@@ -23,18 +23,32 @@ function getInitialTheme(): "light" | "dark" {
 export default function ConfiguracoesAlunoPage() {
   const [saving, setSaving] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">(getInitialTheme);
-  const [lang, setLang] = useState<string>(() => localStorage.getItem(LS_KEYS.lang) || "pt-BR");
-  const [emailNotif, setEmailNotif] = useState<boolean>(() => {
+  const [lang, setLang] = useState<string>("pt-BR");
+  const [emailNotif, setEmailNotif] = useState<boolean>(true); // default ligado
+
+  // carrega lang / emailNotif do localStorage só no cliente
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const storedLang = localStorage.getItem(LS_KEYS.lang);
+    if (storedLang) {
+      setLang(storedLang);
+    }
+
     const v = localStorage.getItem(LS_KEYS.emailNotif);
-    return v ? v === "1" : true; // default: ligado
-  });
+    if (v !== null) {
+      setEmailNotif(v === "1");
+    }
+  }, []);
 
   // aplica o tema no <html> e persiste
   useEffect(() => {
-    if (typeof document === "undefined") return;
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+
     const root = document.documentElement;
     if (theme === "dark") root.classList.add("dark");
     else root.classList.remove("dark");
+
     localStorage.setItem(LS_KEYS.theme, theme);
   }, [theme]);
 
@@ -43,11 +57,14 @@ export default function ConfiguracoesAlunoPage() {
   }
 
   function handleClearCache() {
+    if (typeof window === "undefined") return;
+
     // limpa apenas as chaves locais desta página
     localStorage.removeItem(LS_KEYS.theme);
     localStorage.removeItem(LS_KEYS.lang);
     localStorage.removeItem(LS_KEYS.emailNotif);
     toast.info("Preferências locais limpas!");
+
     // re-aplica defaults
     setTheme(getInitialTheme());
     setLang("pt-BR");
@@ -58,12 +75,14 @@ export default function ConfiguracoesAlunoPage() {
     e.preventDefault();
     try {
       setSaving(true);
-      // persistência local
-      localStorage.setItem(LS_KEYS.lang, lang);
-      localStorage.setItem(LS_KEYS.emailNotif, emailNotif ? "1" : "0");
 
-      // se quiser, aqui dá pra chamar o backend no futuro (/me/preferences)
-      // await apiFetch(`${apiBase}/me/preferences`, { method: "PATCH", body: JSON.stringify({ theme, lang, emailNotif }) })
+      if (typeof window !== "undefined") {
+        // persistência local
+        localStorage.setItem(LS_KEYS.lang, lang);
+        localStorage.setItem(LS_KEYS.emailNotif, emailNotif ? "1" : "0");
+      }
+
+      // futuro: chamada pro backend (/me/preferences)
 
       toast.success("Configurações salvas com sucesso!");
     } catch (e) {
