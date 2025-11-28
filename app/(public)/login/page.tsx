@@ -41,7 +41,6 @@ export default function LoginPage() {
 
   // Regex de RA atual (sem '/'). Se seu RA tiver '/', troque para a linha comentada abaixo.
   const raRegex = /^[A-Za-z0-9._-]{3,32}$/;
-  // const raRegex = /^[A-Za-z0-9._\/-]{3,32}$/; // permite '/'
 
   // validação com trim (evita travar por espaço invisível)
   const isValid = useMemo(() => {
@@ -63,11 +62,12 @@ export default function LoginPage() {
   // Funções auxiliares extraídas
   const handleFirstAccess = (data: any) => {
     const uid = data?.user?.id;
+    const nestedUidTemplate = uid ? `?uid=${uid}` : "";
     if (uid) localStorage.setItem("firstAccessUserId", uid);
     toast.message("Primeiro acesso", {
       description: "Você precisa criar uma nova senha antes de continuar.",
     });
-    window.location.href = `/primeiro-acesso${uid ? `?uid=${uid}` : ""}`;
+    window.location.href = `/primeiro-acesso${nestedUidTemplate}`;
   };
 
   const handleErrorResponse = async (res: Response) => {
