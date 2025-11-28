@@ -1,13 +1,5 @@
-import { Suspense } from "react";
-import PrimeiroAcessoContent from "./PrimeiroAcessoContent";
+"use client";
 
-export const dynamic = "force-dynamic";
-
-export default function FirstAccessPage() {
-  return (
-    <Suspense fallback={<div className="min-h-dvh flex items-center justify-center">Carregando…</div>}>
-      <PrimeiroAcessoContent />
-    </Suspense>
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Info, LockKeyhole, MailCheck, Loader2, ShieldCheck } from "lucide-react";
@@ -49,7 +41,7 @@ function passwordScore(pw: string) {
   return Math.min(score, 4);
 }
 
-export default function FirstAccessPage() {
+export default function PrimeiroAcessoContent() {
   const q = useSearchParams();
 
   // 🔁 antes: userId | agora: token do link mágico
