@@ -2,10 +2,18 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Mail, Hash, Lock, ArrowRight, Eye, EyeOff, Info } from "lucide-react";
+import {
+  Mail,
+  Hash,
+  Lock,
+  ArrowRight,
+  Eye,
+  EyeOff,
+  Info,
+} from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
-import Cookies from 'js-cookie';
+import Cookies from "js-cookie";
 
 type Mode = "email" | "ra";
 
@@ -16,7 +24,8 @@ type Usuario = {
   papel?: "USUARIO" | "BACKOFFICE" | "TECNICO" | "ADMINISTRADOR";
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3333";
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3333";
 
 function getRedirectPath(user?: Usuario | null) {
   switch (user?.papel) {
@@ -39,7 +48,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  // Regex de RA atual (sem '/'). Se seu RA tiver '/', troque para a linha comentada abaixo.
+  // Regex de RA atual (sem '/')
   const raRegex = /^[A-Za-z0-9._-]{3,32}$/;
   // const raRegex = /^[A-Za-z0-9._\/-]{3,32}$/; // permite '/'
 
@@ -47,7 +56,10 @@ export default function LoginPage() {
   const isValid = useMemo(() => {
     const id = identifier.trim();
     const passOk = password.trim().length >= 8;
-    const idOk = mode === "email" ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(id) : raRegex.test(id);
+    const idOk =
+      mode === "email"
+        ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(id)
+        : raRegex.test(id);
     return idOk && passOk;
   }, [identifier, password, mode]);
 
@@ -60,7 +72,6 @@ export default function LoginPage() {
     }
   }
 
-  // Funções auxiliares extraídas
   const handleFirstAccess = (data: any) => {
     const uid = data?.user?.id;
     if (uid) localStorage.setItem("firstAccessUserId", uid);
@@ -85,44 +96,55 @@ export default function LoginPage() {
     }
   };
 
+  const storeAuthTokens = (data: any) => {
+    console.log("🔐 storeAuthTokens() dados recebidos:", data);
+    console.log("🍪 antes de setar cookie:", document.cookie);
+
+    if (data?.accessToken) {
+      Cookies.set("accessToken", data.accessToken, {
+        expires: 7, // 7 dias
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/", // precisa ser / pro middleware enxergar em /admin/*
+      });
+
+      localStorage.setItem("accessToken", data.accessToken);
+
+      try {
+        const payload = JSON.parse(
+          atob(String(data.accessToken).split(".")[1] || "")
+        );
+        if (payload?.sub) localStorage.setItem("userId", payload.sub);
+      } catch {
+        // ignora erro de decode
+      }
+    }
+
+    if (data?.refreshToken) {
+      Cookies.set("refreshToken", data.refreshToken, {
+        expires: 30,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+      });
+      localStorage.setItem("refreshToken", data.refreshToken);
+    }
+
+    console.log("🍪 depois de setar cookie:", document.cookie);
+  };
+
   const handleSuccessfulLogin = (data: any) => {
     toast.success("Login realizado com sucesso!", {
       description: `Bem-vindo(a), ${data?.user?.nome ?? "usuário"} 👋`,
     });
 
-    // Extrair tratamento de tokens para função separada
+    // garante que os cookies existem antes do redirect
     storeAuthTokens(data);
 
     const to = getRedirectPath(data?.user);
     window.location.href = to;
   };
 
-  const storeAuthTokens = (data: any) => {
-    if (data?.accessToken) {
-      Cookies.set("accessToken", data.accessToken, {
-        expires: 7,
-        secure: process.env.NODE_ENV === 'production',
-        path: '/'
-      });
-      localStorage.setItem("accessToken", data.accessToken);
-
-      try {
-        const payload = JSON.parse(atob(String(data.accessToken).split(".")[1] || ""));
-        if (payload?.sub) localStorage.setItem("userId", payload.sub);
-      } catch { }
-    }
-
-    if (data?.refreshToken) {
-      Cookies.set("refreshToken", data.refreshToken, {
-        expires: 30,
-        secure: process.env.NODE_ENV === 'production',
-        path: '/'
-      });
-      localStorage.setItem("refreshToken", data.refreshToken);
-    }
-  };
-
-  // Função principal refatorada
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
@@ -131,12 +153,13 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const id = identifier.trim();
-      const body = mode === "email" ? { email: id, password } : { ra: id, password };
+      const body =
+        mode === "email" ? { email: id, password } : { ra: id, password };
 
       const res = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
+        credentials: "include", // mantém caso você queira usar cookies HttpOnly no backend
         body: JSON.stringify(body),
       });
 
@@ -147,13 +170,12 @@ export default function LoginPage() {
         return;
       }
 
-      // Tratamento de erros
       await handleErrorResponse(res);
 
-      // Login bem-sucedido
       const data = await res.json();
-      handleSuccessfulLogin(data);
+      console.log("✅ LOGIN OK, resposta:", data);
 
+      handleSuccessfulLogin(data);
     } catch (e: any) {
       const msg = e?.message ?? "Erro ao autenticar";
       setErr(msg);
@@ -186,16 +208,22 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => setMode("email")}
-              className={`h-9 rounded-md text-sm font-medium transition ${mode === "email" ? "bg-background ring-1 ring-border" : "opacity-70 hover:opacity-100"
-                }`}
+              className={`h-9 rounded-md text-sm font-medium transition ${
+                mode === "email"
+                  ? "bg-background ring-1 ring-border"
+                  : "opacity-70 hover:opacity-100"
+              }`}
             >
               Funcionário (Email)
             </button>
             <button
               type="button"
               onClick={() => setMode("ra")}
-              className={`h-9 rounded-md text-sm font-medium transition ${mode === "ra" ? "bg-background ring-1 ring-border" : "opacity-70 hover:opacity-100"
-                }`}
+              className={`h-9 rounded-md text-sm font-medium transition ${
+                mode === "ra"
+                  ? "bg-background ring-1 ring-border"
+                  : "opacity-70 hover:opacity-100"
+              }`}
             >
               Aluno (RA)
             </button>
@@ -212,21 +240,31 @@ export default function LoginPage() {
                 <div className="relative group inline-flex items-center">
                   <Info className="size-4 text-muted-foreground" aria-hidden />
                   <div className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md bg-popover px-2 py-1 text-xs text-popover-foreground shadow ring-1 ring-border opacity-0 group-hover:opacity-100 transition">
-                    {mode === "email" ? "Use seu e-mail cadastrado" : "Seu RA sem espaços (3–32 caracteres)."}
+                    {mode === "email"
+                      ? "Use seu e-mail cadastrado"
+                      : "Seu RA sem espaços (3–32 caracteres)."}
                   </div>
                 </div>
               </div>
 
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                  {mode === "email" ? <Mail className="size-4" /> : <Hash className="size-4" />}
+                  {mode === "email" ? (
+                    <Mail className="size-4" />
+                  ) : (
+                    <Hash className="size-4" />
+                  )}
                 </span>
                 <input
                   id="identifier"
                   type={mode === "email" ? "email" : "text"}
                   inputMode={mode === "email" ? "email" : "text"}
                   autoComplete={mode === "email" ? "email" : "username"}
-                  placeholder={mode === "email" ? "nome.sobrenome@fatec.sp.gov.br" : "Ex.: 123456"}
+                  placeholder={
+                    mode === "email"
+                      ? "nome.sobrenome@fatec.sp.gov.br"
+                      : "Ex.: 123456"
+                  }
                   className={`w-full pl-9 pr-3 h-11 rounded-lg bg-input ring-1 ring-border focus:outline-none focus:ring-2 focus:ring-ring text-base`}
                   value={identifier}
                   onChange={(e) => handleIdentifierChange(e.target.value)}
@@ -265,13 +303,22 @@ export default function LoginPage() {
                   aria-label={showPass ? "Ocultar senha" : "Mostrar senha"}
                   title={showPass ? "Ocultar senha" : "Mostrar senha"}
                 >
-                  {showPass ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  {showPass ? (
+                    <EyeOff className="size-4" />
+                  ) : (
+                    <Eye className="size-4" />
+                  )}
                 </button>
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Mínimo de 8 caracteres.</span>
-                <Link href="/esqueci-senha" className="text-xs underline underline-offset-4 hover:opacity-80">
+                <span className="text-xs text-muted-foreground">
+                  Mínimo de 8 caracteres.
+                </span>
+                <Link
+                  href="/esqueci-senha"
+                  className="text-xs underline underline-offset-4 hover:opacity-80"
+                >
                   Esqueci a senha
                 </Link>
               </div>
@@ -297,7 +344,10 @@ export default function LoginPage() {
         </form>
       </div>
 
-      <Link href="/" className="mt-6 text-sm text-muted-foreground hover:underline">
+      <Link
+        href="/"
+        className="mt-6 text-sm text-muted-foreground hover:underline"
+      >
         Voltar para a página inicial
       </Link>
     </div>
