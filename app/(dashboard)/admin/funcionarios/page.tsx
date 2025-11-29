@@ -38,7 +38,7 @@ type FuncionarioRow = {
 };
 
 /* ========= ENV / Rotas ========= */
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
+const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3333";
 const USERS_PATH = process.env.NEXT_PUBLIC_USERS_PATH ?? "/auth/usuarios";
 // detalhe do funcionário
 const FUNC_DETAIL_PREFIX = "/admin/funcionarios";

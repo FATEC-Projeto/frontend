@@ -29,7 +29,7 @@ function parseCsvSimple(text: string): string[][] {
   return lines.map((l) => l.split(",").map((p) => p.trim()));
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
+const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3333";
 
 export default function ImportAlunos({
   onClose,

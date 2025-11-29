@@ -43,7 +43,7 @@ type Chamado = {
 };
 
 /* ===================== ENV ===================== */
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
+const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3333";
 
 
 function Pill({ children }: { children: React.ReactNode }) {

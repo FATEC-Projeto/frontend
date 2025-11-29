@@ -43,7 +43,7 @@ type SetorLite = {
 };
 
 /* ===== ENV ===== */
-const API_URL    = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
+const API_URL    = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3333";
 const USERS_PATH = process.env.NEXT_PUBLIC_USERS_PATH ?? "/auth/usuarios";
 const FUNC_LIST  = "/admin/funcionarios";
 
