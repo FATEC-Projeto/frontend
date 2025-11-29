@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
-import Cookies from "js-cookie";
 
 type Mode = "email" | "ra";
 
@@ -96,42 +95,45 @@ export default function LoginPage() {
     }
   };
 
-  const storeAuthTokens = (data: any) => {
-    console.log("🔐 storeAuthTokens() dados recebidos:", data);
-    console.log("🍪 antes de setar cookie:", document.cookie);
+const storeAuthTokens = (data: any) => {
+  if (!data?.accessToken) return;
 
-    if (data?.accessToken) {
-      Cookies.set("accessToken", data.accessToken, {
-        expires: 7, // 7 dias
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/", // precisa ser / pro middleware enxergar em /admin/*
-      });
+  const isProd = process.env.NODE_ENV === "production";
 
-      localStorage.setItem("accessToken", data.accessToken);
+  // 15 minutos (igual ao JWT_ACCESS_EXPIRES="15m")
+  const accessMaxAge = 15 * 60;
+  // 7 dias de refresh (qualquer coisa nessa linha tá ok pra agora)
+  const refreshMaxAge = 7 * 24 * 60 * 60;
 
-      try {
-        const payload = JSON.parse(
-          atob(String(data.accessToken).split(".")[1] || "")
-        );
-        if (payload?.sub) localStorage.setItem("userId", payload.sub);
-      } catch {
-        // ignora erro de decode
-      }
-    }
+  const secureFlag = isProd ? "; Secure" : "";
 
-    if (data?.refreshToken) {
-      Cookies.set("refreshToken", data.refreshToken, {
-        expires: 30,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-      });
-      localStorage.setItem("refreshToken", data.refreshToken);
-    }
+  // 🔐 Cookie que o middleware lê: "accessToken"
+  document.cookie =
+    `accessToken=${data.accessToken};` +
+    ` Path=/;` +
+    ` Max-Age=${accessMaxAge};` +
+    ` SameSite=Lax` +
+    secureFlag;
 
-    console.log("🍪 depois de setar cookie:", document.cookie);
-  };
+  if (data.refreshToken) {
+    document.cookie =
+      `refreshToken=${data.refreshToken};` +
+      ` Path=/;` +
+      ` Max-Age=${refreshMaxAge};` +
+      ` SameSite=Lax` +
+      secureFlag;
+  }
+
+  // opcional: manter também no localStorage pra API client (axios/fetch)
+  localStorage.setItem("accessToken", data.accessToken);
+  if (data.refreshToken) {
+    localStorage.setItem("refreshToken", data.refreshToken);
+  }
+
+  // debug temporário: ver se o cookie ficou
+  console.log("document.cookie depois do login:", document.cookie);
+};
+
 
   const handleSuccessfulLogin = (data: any) => {
     toast.success("Login realizado com sucesso!", {
