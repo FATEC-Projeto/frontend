@@ -5,13 +5,13 @@ import {
   Search, Filter, LayoutList, LayoutGrid, ChevronRight,
   Tag, User, Building2, Clock, ArrowUpDown
 } from "lucide-react";
-import { apiFetch } from "../../../../utils/api"; 
+import { apiFetch } from "../../../../utils/api";
 import Link from "next/link";
 
-import { cx } from '../../../../utils/cx'
+import { cx } from '../../../../utils/cx';
 import TicketStatusBadge from "../../../components/shared/TicketStatusBadge";
-import PriorityDot from "../../../components/shared/PriorityDot"; 
-import NivelBadge from "../../../components/shared/NivelBadge";   
+import PriorityDot from "../../../components/shared/PriorityDot";
+import NivelBadge from "../../../components/shared/NivelBadge";
 import SetorChip from "../../../components/shared/SetorChip";
 
 /* ===== Tipos ===== */
@@ -53,7 +53,6 @@ type PageResp = {
   items: ApiChamado[];
 };
 
-
 function toUI(x: ApiChamado): ChamadoUI {
   return {
     id: x.id,
@@ -74,6 +73,8 @@ type ViewMode = "LIST" | "KANBAN";
 const STATUS_COLS: Status[] = ["ABERTO", "EM_ATENDIMENTO", "AGUARDANDO_USUARIO", "RESOLVIDO"];
 
 export default function AdminChamadosPage() {
+  const API = process.env.NEXT_PUBLIC_API_BASE_URL;
+
   const [view, setView] = useState<ViewMode>("LIST");
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<Status | "ALL">("ALL");
@@ -86,15 +87,30 @@ export default function AdminChamadosPage() {
   const [dadosApi, setDadosApi] = useState<ChamadoUI[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  /* Fetch real */
+  /* Fetch real (alinhado com a Home) */
   useEffect(() => {
     let alive = true;
-    (async () => {
+
+    const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/tickets?include=setor,criadoPor,responsavel&pageSize=20`;
+        const params = new URLSearchParams();
+        params.set("page", "1");
+        params.set("pageSize", "20");
+        params.set("orderBy", "criadoEm");
+        params.set("orderDir", "desc");
+        params.set("include", "setor,criadoPor,responsavel");
+
+        // filtros que o backend já conhece (iguais à Home)
+        if (q.trim()) params.set("search", q.trim());
+        if (status !== "ALL") params.set("status", status);
+        if (prioridade !== "ALL") params.set("prioridade", prioridade);
+        // filtros de nível e setor continuam só no front por enquanto
+
+        const url = `${API}/tickets?${params.toString()}`;
+
         const res = await apiFetch(url, { cache: "no-store" });
         if (!res.ok) {
           const msg = await res.text().catch(() => "");
@@ -108,9 +124,14 @@ export default function AdminChamadosPage() {
       } finally {
         if (alive) setLoading(false);
       }
-    })();
-    return () => { alive = false; };
-  }, []);
+    };
+
+    fetchData();
+
+    return () => {
+      alive = false;
+    };
+  }, [API, q, status, prioridade]); // nivel/setor continuam sendo só filtro no front
 
   const setoresDisponiveis = useMemo(() => {
     const s = new Set(dadosApi.map(c => c.setor).filter(Boolean) as string[]);
@@ -308,7 +329,9 @@ function Lista({ dados, sortDesc, setSortDesc }: {
                 <td className="px-4 py-3"><TicketStatusBadge status={c.status} /></td>
                 <td className="px-4 py-3 hidden lg:table-cell">
                   {new Date(c.criadoEm).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })}{" "}
-                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground ml-1"><Clock className="size-3" /> {new Date(c.criadoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
+                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground ml-1">
+                    <Clock className="size-3" /> {new Date(c.criadoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                  </span>
                 </td>
                 <td className="px-4 py-3 text-right">
                   <Link

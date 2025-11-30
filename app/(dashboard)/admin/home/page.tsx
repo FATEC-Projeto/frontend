@@ -2,16 +2,27 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Filter, Search, ChevronRight, Ticket, User, FileChartColumn } from "lucide-react";
+import {
+  Filter,
+  Search,
+  ChevronRight,
+  Ticket,
+  User,
+  FileChartColumn,
+} from "lucide-react";
 import MobileSidebarTriggerAdmin from "../_components/MobileSidebarTriggerAdmin";
 import { apiFetch } from "../../../../utils/api";
 
-import { cx } from '../../../../utils/cx'
 import TicketStatusBadge from "../../../components/shared/TicketStatusBadge";
 import PriorityDot from "../../../components/shared/PriorityDot";
 
 /* ----------------------------- Tipos ----------------------------- */
-type Status = "ABERTO" | "EM_ATENDIMENTO" | "AGUARDANDO_USUARIO" | "RESOLVIDO" | "ENCERRADO";
+type Status =
+  | "ABERTO"
+  | "EM_ATENDIMENTO"
+  | "AGUARDANDO_USUARIO"
+  | "RESOLVIDO"
+  | "ENCERRADO";
 type Prioridade = "BAIXA" | "MEDIA" | "ALTA" | "URGENTE";
 
 type Chamado = {
@@ -32,7 +43,6 @@ type PageResp = {
   items: Chamado[];
 };
 
-
 /* ----------------------------- Página ----------------------------- */
 export default function AdminHomePage() {
   const API = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -44,6 +54,7 @@ export default function AdminHomePage() {
 
   // dados
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [pageData, setPageData] = useState<PageResp>({
     total: 0,
     page: 1,
@@ -51,7 +62,7 @@ export default function AdminHomePage() {
     items: [],
   });
 
-  // monta URL com filtros
+  // monta URL com filtros (alinhado com backend)
   const buildUrl = () => {
     const params = new URLSearchParams();
     params.set("page", "1");
@@ -70,7 +81,14 @@ export default function AdminHomePage() {
   const fetchData = async () => {
     try {
       setLoading(true);
+      setError(null);
+
       const res = await apiFetch(buildUrl(), { cache: "no-store" });
+      if (!res.ok) {
+        const msg = await res.text().catch(() => "");
+        throw new Error(msg || `HTTP ${res.status}`);
+      }
+
       const data = (await res.json()) as PageResp;
       setPageData({
         total: Number(data?.total ?? 0),
@@ -78,6 +96,8 @@ export default function AdminHomePage() {
         pageSize: Number(data?.pageSize ?? 50),
         items: Array.isArray(data?.items) ? data.items : [],
       });
+    } catch (e: any) {
+      setError(e?.message || "Falha ao carregar chamados");
     } finally {
       setLoading(false);
     }
@@ -187,37 +207,66 @@ export default function AdminHomePage() {
               <tr>
                 <th className="text-left font-medium px-4 py-3">Protocolo</th>
                 <th className="text-left font-medium px-4 py-3">Título</th>
-                <th className="text-left font-medium px-4 py-3 hidden md:table-cell">Solicitante</th>
-                <th className="text-left font-medium px-4 py-3 hidden xl:table-cell">Setor</th>
+                <th className="text-left font-medium px-4 py-3 hidden md:table-cell">
+                  Solicitante
+                </th>
+                <th className="text-left font-medium px-4 py-3 hidden xl:table-cell">
+                  Setor
+                </th>
                 <th className="text-left font-medium px-4 py-3">Status</th>
                 <th className="text-left font-medium px-4 py-3">Prioridade</th>
-                <th className="text-left font-medium px-4 py-3 hidden lg:table-cell">Criado em</th>
+                <th className="text-left font-medium px-4 py-3 hidden lg:table-cell">
+                  Criado em
+                </th>
                 <th className="text-right font-medium px-4 py-3">Ação</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
+                  <td
+                    colSpan={8}
+                    className="px-4 py-10 text-center text-muted-foreground"
+                  >
                     Carregando…
+                  </td>
+                </tr>
+              ) : error ? (
+                <tr>
+                  <td
+                    colSpan={8}
+                    className="px-4 py-10 text-center text-destructive"
+                  >
+                    Falha ao carregar: {error}
                   </td>
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
+                  <td
+                    colSpan={8}
+                    className="px-4 py-10 text-center text-muted-foreground"
+                  >
                     Nenhum chamado encontrado com os filtros atuais.
                   </td>
                 </tr>
               ) : (
                 items.map((c) => (
                   <tr key={c.id} className="border-t border-[var(--border)]">
-                    <td className="px-4 py-3 font-medium">{c.protocolo ?? `#${c.id}`}</td>
+                    <td className="px-4 py-3 font-medium">
+                      {c.protocolo ?? `#${c.id}`}
+                    </td>
                     <td className="px-4 py-3 max-w-[360px]">
                       <div className="line-clamp-1">{c.titulo}</div>
                     </td>
-                    <td className="px-4 py-3 hidden md:table-cell">{c.criadoPor?.nome ?? "—"}</td>
-                    <td className="px-4 py-3 hidden xl:table-cell">{c.setor?.nome ?? "—"}</td>
-                    <td className="px-4 py-3"><TicketStatusBadge status={c.status} /></td>
+                    <td className="px-4 py-3 hidden md:table-cell">
+                      {c.criadoPor?.nome ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 hidden xl:table-cell">
+                      {c.setor?.nome ?? "—"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <TicketStatusBadge status={c.status} />
+                    </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className="inline-flex items-center gap-2">
                         <PriorityDot prioridade={c.prioridade} />
