@@ -21,8 +21,8 @@ export const metadata: Metadata = {
   title: "Workflow Fatec",
   description: "Portal acadêmico",
   icons: {
-    icon: "images/favicon.svg", 
-    shortcut: "/favicon.svg", 
+    icon: "images/favicon.svg",
+    shortcut: "/favicon.svg",
   },
 };
 
@@ -34,10 +34,23 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR" className={`${inter.variable} ${grotesk.variable}`}>
+      <head>
+        <script
+          type="text/javascript"
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function(c,l,a,r,i,t,y){
+                c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+                t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/ueh2hk6os4";
+                y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+              })(window, document, "clarity", "script", "ueh2hk6os4");
+            `,
+          }}
+        />
+      </head>
+
       <body className="font-sans bg-background text-foreground">
         {children}
-
-        {/* Toaster global */}
         <Toaster richColors position="top-center" />
       </body>
     </html>
