@@ -44,11 +44,7 @@ type AlunoRow = {
 };
 
 /* ========= ENV ========= */
-/* ========= ENV ========= */
-const API_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ??
-  process.env.NEXT_PUBLIC_API_BASE_URL ??
-  "http://localhost:3333";
+const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 const USERS_PATH = process.env.NEXT_PUBLIC_USERS_PATH ?? "/auth/usuarios";
 
@@ -105,7 +101,6 @@ export default function AdminAlunosPage() {
 
       const token =
         (typeof window !== "undefined" && localStorage.getItem("accessToken")) ||
-        process.env.NEXT_PUBLIC_ACCESS_TOKEN ||
         "";
 
       const headers: Record<string, string> = { Accept: "application/json" };
@@ -293,7 +288,6 @@ export default function AdminAlunosPage() {
 
       const token =
         (typeof window !== "undefined" && localStorage.getItem("accessToken")) ||
-        process.env.NEXT_PUBLIC_ACCESS_TOKEN ||
         "";
 
       const headers: Record<string, string> = {

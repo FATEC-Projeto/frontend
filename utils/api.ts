@@ -3,7 +3,6 @@ import { logoutAndRedirect } from "./auth";
 export async function apiFetch(input: RequestInfo, init: RequestInit = {}) {
   const token =
     (typeof window !== "undefined" && localStorage.getItem("accessToken")) ||
-    process.env.NEXT_PUBLIC_ACCESS_TOKEN ||
     "";
 
   const headers = new Headers(init.headers || {});

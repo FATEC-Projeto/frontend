@@ -43,7 +43,7 @@ type Chamado = {
 };
 
 /* ===================== ENV ===================== */
-const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3333";
+const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 
 function Pill({ children }: { children: React.ReactNode }) {
@@ -83,7 +83,6 @@ export default function PageAlunoDetalhe() {
         setLoading(true);
         const token =
           (typeof window !== "undefined" && localStorage.getItem("accessToken")) ||
-          process.env.NEXT_PUBLIC_ACCESS_TOKEN ||
           "";
 
         // GET usuário

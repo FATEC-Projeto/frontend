@@ -9,7 +9,6 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "i": "^0.3.7",
     "jose": "6.1.0",
     "js-cookie": "^3.0.5",
     "lucide-react": "^0.546.0",

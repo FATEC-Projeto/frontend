@@ -14,7 +14,7 @@ type Usuario = {
   papel?: "USUARIO" | "BACKOFFICE" | "TECNICO" | "ADMINISTRADOR";
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3333";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 /** rota pós-login baseada no papel */
 function getRedirectPath(user?: Usuario | null) {

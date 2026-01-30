@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { MailCheck, Loader2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3333";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
