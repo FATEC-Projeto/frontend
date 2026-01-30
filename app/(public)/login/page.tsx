@@ -24,7 +24,7 @@ type Usuario = {
 };
 
 const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3333";
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 function getRedirectPath(user?: Usuario | null) {
   switch (user?.papel) {
@@ -131,7 +131,6 @@ const storeAuthTokens = (data: any) => {
   }
 
   // debug temporário: ver se o cookie ficou
-  console.log("document.cookie depois do login:", document.cookie);
 };
 
 
@@ -175,8 +174,6 @@ const storeAuthTokens = (data: any) => {
       await handleErrorResponse(res);
 
       const data = await res.json();
-      console.log("✅ LOGIN OK, resposta:", data);
-
       handleSuccessfulLogin(data);
     } catch (e: any) {
       const msg = e?.message ?? "Erro ao autenticar";

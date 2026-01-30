@@ -3,7 +3,7 @@ import { apiFetch } from "../../../../utils/api";
 import { useMemo, useState } from "react";
 import { Loader2, Info, Mail } from "lucide-react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3333";
+const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 /** Catálogo prático — Fatec Cotia */
 const COURSES = [
