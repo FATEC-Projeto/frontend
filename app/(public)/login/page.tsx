@@ -2,6 +2,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Mail,
   Hash,
@@ -23,8 +24,7 @@ type Usuario = {
   papel?: "USUARIO" | "BACKOFFICE" | "TECNICO" | "ADMINISTRADOR";
 };
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 function getRedirectPath(user?: Usuario | null) {
   switch (user?.papel) {
@@ -39,7 +39,18 @@ function getRedirectPath(user?: Usuario | null) {
   }
 }
 
+/** Aceita apenas caminhos internos para evitar open redirect */
+function safeRedirect(redirect: string | null, fallback: string): string {
+  if (!redirect) return fallback;
+  // Deve começar com '/' mas não com '//' (URL relativa a protocolo)
+  if (redirect.startsWith("/") && !redirect.startsWith("//")) return redirect;
+  return fallback;
+}
+
 export default function LoginPage() {
+  const searchParams = useSearchParams();
+  const redirectParam = searchParams.get("redirect");
+
   const [mode, setMode] = useState<Mode>("email");
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -90,38 +101,35 @@ export default function LoginPage() {
     }
   };
 
-const storeAuthTokens = (data: any) => {
-  if (!data?.accessToken) return;
+  const storeAuthTokens = (data: any) => {
+    if (!data?.accessToken) return;
 
-  const isProd = process.env.NODE_ENV === "production";
+    const isProd = process.env.NODE_ENV === "production";
+    const accessMaxAge = 15 * 60;
+    const refreshMaxAge = 7 * 24 * 60 * 60;
+    const secureFlag = isProd ? "; Secure" : "";
 
-  const accessMaxAge = 15 * 60;
-  const refreshMaxAge = 7 * 24 * 60 * 60;
-
-  const secureFlag = isProd ? "; Secure" : "";
-
-  document.cookie =
-    `accessToken=${data.accessToken};` +
-    ` Path=/;` +
-    ` Max-Age=${accessMaxAge};` +
-    ` SameSite=Lax` +
-    secureFlag;
-
-  if (data.refreshToken) {
     document.cookie =
-      `refreshToken=${data.refreshToken};` +
+      `accessToken=${data.accessToken};` +
       ` Path=/;` +
-      ` Max-Age=${refreshMaxAge};` +
+      ` Max-Age=${accessMaxAge};` +
       ` SameSite=Lax` +
       secureFlag;
-  }
 
-  localStorage.setItem("accessToken", data.accessToken);
-  if (data.refreshToken) {
-    localStorage.setItem("refreshToken", data.refreshToken);
-  }
-};
+    if (data.refreshToken) {
+      document.cookie =
+        `refreshToken=${data.refreshToken};` +
+        ` Path=/;` +
+        ` Max-Age=${refreshMaxAge};` +
+        ` SameSite=Lax` +
+        secureFlag;
+    }
 
+    localStorage.setItem("accessToken", data.accessToken);
+    if (data.refreshToken) {
+      localStorage.setItem("refreshToken", data.refreshToken);
+    }
+  };
 
   const handleSuccessfulLogin = (data: any) => {
     toast.success("Login realizado com sucesso!", {
@@ -130,7 +138,8 @@ const storeAuthTokens = (data: any) => {
 
     storeAuthTokens(data);
 
-    const to = getRedirectPath(data?.user);
+    const fallback = getRedirectPath(data?.user);
+    const to = safeRedirect(redirectParam, fallback);
     window.location.href = to;
   };
 
