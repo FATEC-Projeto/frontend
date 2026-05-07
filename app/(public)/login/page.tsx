@@ -2,6 +2,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Mail,
   Hash,
@@ -23,8 +24,7 @@ type Usuario = {
   papel?: "USUARIO" | "BACKOFFICE" | "TECNICO" | "ADMINISTRADOR";
 };
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 function getRedirectPath(user?: Usuario | null) {
   switch (user?.papel) {
@@ -39,19 +39,27 @@ function getRedirectPath(user?: Usuario | null) {
   }
 }
 
+/** Aceita apenas caminhos internos para evitar open redirect */
+function safeRedirect(redirect: string | null, fallback: string): string {
+  if (!redirect) return fallback;
+  // Deve começar com '/' mas não com '//' (URL relativa a protocolo)
+  if (redirect.startsWith("/") && !redirect.startsWith("//")) return redirect;
+  return fallback;
+}
+
 export default function LoginPage() {
-  const [mode, setMode] = useState<Mode>("email"); // "email" (funcionário) | "ra" (aluno)
+  const searchParams = useSearchParams();
+  const redirectParam = searchParams.get("redirect");
+
+  const [mode, setMode] = useState<Mode>("email");
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  // Regex de RA atual (sem '/')
   const raRegex = /^[A-Za-z0-9._-]{3,32}$/;
-  // const raRegex = /^[A-Za-z0-9._\/-]{3,32}$/; // permite '/'
 
-  // validação com trim (evita travar por espaço invisível)
   const isValid = useMemo(() => {
     const id = identifier.trim();
     const passOk = password.trim().length >= 8;
@@ -62,7 +70,6 @@ export default function LoginPage() {
     return idOk && passOk;
   }, [identifier, password, mode]);
 
-  // auto-switch opcional: se não tem '@' e só contém chars válidos, muda pra RA
   function handleIdentifierChange(v: string) {
     setIdentifier(v);
     const t = v.trim();
@@ -72,12 +79,11 @@ export default function LoginPage() {
   }
 
   const handleFirstAccess = (data: any) => {
-    const uid = data?.user?.id;
-    if (uid) localStorage.setItem("firstAccessUserId", uid);
+    const token = data?.token;
     toast.message("Primeiro acesso", {
       description: "Você precisa criar uma nova senha antes de continuar.",
     });
-    window.location.href = `/primeiro-acesso${uid ? `?uid=${uid}` : ""}`;
+    window.location.href = `/primeiro-acesso${token ? `?token=${token}` : ""}`;
   };
 
   const handleErrorResponse = async (res: Response) => {
@@ -95,54 +101,45 @@ export default function LoginPage() {
     }
   };
 
-const storeAuthTokens = (data: any) => {
-  if (!data?.accessToken) return;
+  const storeAuthTokens = (data: any) => {
+    if (!data?.accessToken) return;
 
-  const isProd = process.env.NODE_ENV === "production";
+    const isProd = process.env.NODE_ENV === "production";
+    const accessMaxAge = 15 * 60;
+    const refreshMaxAge = 7 * 24 * 60 * 60;
+    const secureFlag = isProd ? "; Secure" : "";
 
-  // 15 minutos (igual ao JWT_ACCESS_EXPIRES="15m")
-  const accessMaxAge = 15 * 60;
-  // 7 dias de refresh (qualquer coisa nessa linha tá ok pra agora)
-  const refreshMaxAge = 7 * 24 * 60 * 60;
-
-  const secureFlag = isProd ? "; Secure" : "";
-
-  // 🔐 Cookie que o middleware lê: "accessToken"
-  document.cookie =
-    `accessToken=${data.accessToken};` +
-    ` Path=/;` +
-    ` Max-Age=${accessMaxAge};` +
-    ` SameSite=Lax` +
-    secureFlag;
-
-  if (data.refreshToken) {
     document.cookie =
-      `refreshToken=${data.refreshToken};` +
+      `accessToken=${data.accessToken};` +
       ` Path=/;` +
-      ` Max-Age=${refreshMaxAge};` +
+      ` Max-Age=${accessMaxAge};` +
       ` SameSite=Lax` +
       secureFlag;
-  }
 
-  // opcional: manter também no localStorage pra API client (axios/fetch)
-  localStorage.setItem("accessToken", data.accessToken);
-  if (data.refreshToken) {
-    localStorage.setItem("refreshToken", data.refreshToken);
-  }
+    if (data.refreshToken) {
+      document.cookie =
+        `refreshToken=${data.refreshToken};` +
+        ` Path=/;` +
+        ` Max-Age=${refreshMaxAge};` +
+        ` SameSite=Lax` +
+        secureFlag;
+    }
 
-  // debug temporário: ver se o cookie ficou
-};
-
+    localStorage.setItem("accessToken", data.accessToken);
+    if (data.refreshToken) {
+      localStorage.setItem("refreshToken", data.refreshToken);
+    }
+  };
 
   const handleSuccessfulLogin = (data: any) => {
     toast.success("Login realizado com sucesso!", {
       description: `Bem-vindo(a), ${data?.user?.nome ?? "usuário"} 👋`,
     });
 
-    // garante que os cookies existem antes do redirect
     storeAuthTokens(data);
 
-    const to = getRedirectPath(data?.user);
+    const fallback = getRedirectPath(data?.user);
+    const to = safeRedirect(redirectParam, fallback);
     window.location.href = to;
   };
 
@@ -160,7 +157,7 @@ const storeAuthTokens = (data: any) => {
       const res = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include", // mantém caso você queira usar cookies HttpOnly no backend
+        credentials: "include",
         body: JSON.stringify(body),
       });
 
