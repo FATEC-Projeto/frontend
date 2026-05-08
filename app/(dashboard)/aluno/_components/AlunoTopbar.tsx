@@ -115,7 +115,7 @@ export default function AlunoTopbar({
           )}
         </h1>
         <p className="text-muted-foreground">
-          Encontre respostas rápidas ou abra um chamado se precisar de ajuda.
+          Encontre respostas rápidas ou abra uma solicitação acadêmica se precisar de ajuda.
         </p>
       </div>
 

@@ -19,6 +19,14 @@ import { apiFetch } from "../../../../../utils/api";
 /* ================= Tipos ================= */
 type Status = "ABERTO" | "EM_ATENDIMENTO" | "AGUARDANDO_USUARIO" | "RESOLVIDO" | "ENCERRADO";
 
+const STATUS_LABELS: Record<Status, string> = {
+  ABERTO: "Solicitação recebida pela Fatec.",
+  EM_ATENDIMENTO: "Em análise pelo setor responsável.",
+  AGUARDANDO_USUARIO: "Aguardando documento ou resposta do aluno.",
+  RESOLVIDO: "Solicitação respondida.",
+  ENCERRADO: "Atendimento finalizado.",
+};
+
 type Chamado = {
   id: string;
   titulo: string;
@@ -84,11 +92,11 @@ function confirmarEncerramento() {
 
         <div className="flex-1">
           <h3 className="text-sm font-semibold text-foreground">
-            Deseja encerrar este chamado?
+            Deseja finalizar esta solicitação acadêmica?
           </h3>
           <p className="text-sm text-muted-foreground mt-1 leading-snug">
-            Após encerrar, o chamado ficará <b>apenas para consulta</b> e{" "}
-            <b>não poderá ser reaberto</b>.
+            Após finalizar, a solicitação acadêmica ficará <b>apenas para consulta</b> e{" "}
+            <b>não poderá ser reaberta</b>.
           </p>
 
           <div className="mt-3 flex justify-end gap-2">
@@ -102,9 +110,9 @@ function confirmarEncerramento() {
               onClick={() => {
                 atualizarStatus("ENCERRADO");
                 toast.dismiss(t);
-                toast.success("Chamado encerrado com sucesso!", {
+                toast.success("Solicitação acadêmica finalizada com sucesso!", {
                   description:
-                    "Agora ele está disponível apenas para consulta no histórico.",
+                    "Agora ela está disponível apenas para consulta no histórico.",
                 });
               }}
               className="px-3 py-1.5 rounded-md text-sm bg-[#B91C1C] text-white hover:bg-[#991B1B] transition"
@@ -129,11 +137,11 @@ function confirmarReabertura() {
 
         <div className="flex-1">
           <h3 className="text-sm font-semibold text-foreground">
-            Reabrir chamado?
+            Reabrir solicitação acadêmica?
           </h3>
           <p className="text-sm text-muted-foreground mt-1 leading-snug">
-            O chamado voltará para o status <b>“Em atendimento”</b> e poderá
-            ser atualizado novamente pela secretaria.
+            A solicitação acadêmica voltará para o status <b>“Em análise pelo setor responsável”</b> e poderá
+            ser atualizada novamente pela secretaria.
           </p>
 
           <div className="mt-3 flex justify-end gap-2">
@@ -147,8 +155,8 @@ function confirmarReabertura() {
               onClick={() => {
                 atualizarStatus("EM_ATENDIMENTO");
                 toast.dismiss(t);
-                toast.success("Chamado reaberto com sucesso!", {
-                  description: "Agora ele está novamente em atendimento.",
+                toast.success("Solicitação acadêmica reaberta com sucesso!", {
+                  description: "Agora ela está novamente em análise pelo setor responsável.",
                 });
               }}
               className="px-3 py-1.5 rounded-md text-sm bg-blue-600 text-white hover:bg-blue-700 transition"
@@ -177,7 +185,7 @@ function confirmarReabertura() {
       const data: Chamado = await res.json();
       setChamado(data);
     } catch (err: any) {
-      toast.error(err.message || "Erro ao carregar chamado.");
+      toast.error(err.message || "Erro ao carregar solicitação acadêmica.");
     } finally {
       setLoading(false);
     }
@@ -327,8 +335,8 @@ function confirmarReabertura() {
       if (!res.ok) throw new Error(`Erro ${res.status}`);
       toast.success(
         novoStatus === "EM_ATENDIMENTO"
-          ? "Chamado reaberto com sucesso!"
-          : "Chamado encerrado com sucesso."
+          ? "Solicitação acadêmica reaberta com sucesso!"
+          : "Solicitação acadêmica finalizada com sucesso."
       );
       await fetchChamado();
     } catch (err: any) {
@@ -340,14 +348,14 @@ function confirmarReabertura() {
   if (loading && !chamado)
     return (
       <div className="flex items-center justify-center py-16 text-muted-foreground gap-2">
-        <Loader2 className="size-5 animate-spin" /> Carregando chamado...
+        <Loader2 className="size-5 animate-spin" /> Carregando solicitação acadêmica...
       </div>
     );
 
   if (!chamado)
     return (
       <div className="text-center py-16 text-muted-foreground">
-        Chamado não encontrado.
+        Solicitação acadêmica não encontrada.
       </div>
     );
 
@@ -369,7 +377,7 @@ function confirmarReabertura() {
           href="/aluno/chamados"
           className="inline-flex items-center gap-2 h-9 px-3 rounded-md border bg-background hover:bg-muted text-sm"
         >
-          Lista de chamados
+          Minhas solicitações
         </Link>
       </div>
 
@@ -386,7 +394,7 @@ function confirmarReabertura() {
             <span className="whitespace-pre-wrap">{chamado.descricao}</span>
           </p>
           <p>
-            <strong>Status:</strong> {chamado.status}
+            <strong>Status:</strong> {STATUS_LABELS[chamado.status] ?? chamado.status}
           </p>
           <p>
             <strong>Criado em:</strong>{" "}
@@ -395,7 +403,7 @@ function confirmarReabertura() {
         </div>
       </div>
 
-{/* Aviso para o aluno quando o chamado estiver resolvido */}
+{/* Aviso para o aluno quando a solicitação acadêmica estiver respondida */}
 {chamado.status === "RESOLVIDO" && (
   <div className="mt-4 rounded-lg border border-yellow-400/30 bg-yellow-100/20 text-yellow-700 dark:text-yellow-300 dark:bg-yellow-900/20 px-4 py-3 text-sm flex items-start gap-2">
     <svg
@@ -413,7 +421,7 @@ function confirmarReabertura() {
       />
     </svg>
     <div>
-      Este chamado foi marcado como <b>resolvido.</b> <br />
+      Esta solicitação acadêmica foi marcada como <b>respondida.</b> <br />
       Você pode <b>reabrir</b> caso o problema não tenha sido solucionado ou{" "}
       <b>encerrar</b> definitivamente se estiver tudo certo.
     </div>
@@ -432,14 +440,14 @@ function confirmarReabertura() {
       onClick={confirmarEncerramento}
       className="px-4 py-2 rounded-md bg-[#B91C1C] text-white text-sm font-medium hover:bg-[#991B1B] transition"
     >
-      Encerrar chamado
+      Finalizar atendimento
     </button>
 
     <button
       onClick={() => confirmarReabertura()}
       className="px-4 py-2 rounded-md bg-[#374151] text-white text-sm font-medium hover:bg-[#111827] transition"
     >
-      Reabrir chamado
+      Reabrir solicitação
     </button>
   </div>
 )}
@@ -449,7 +457,7 @@ function confirmarReabertura() {
       {/* Chat */}
       <section className="rounded-xl border border-[var(--border)] bg-card flex flex-col">
         <div className="p-3 border-b border-[var(--border)] text-xs text-muted-foreground">
-          Chat do chamado
+          Conversa sobre a solicitação
         </div>
 
         <div className="flex-1 p-4 space-y-3 overflow-y-auto max-h-[500px] rounded-b-lg scrollbar-thin">
@@ -510,7 +518,7 @@ function confirmarReabertura() {
           </div>
         ) : (
           <div className="p-3 border-t text-center text-sm text-muted-foreground">
-            🔒 Chamado encerrado. Disponível apenas para consulta.
+            🔒 Atendimento finalizado. Solicitação disponível apenas para consulta.
           </div>
         )}
       </section>

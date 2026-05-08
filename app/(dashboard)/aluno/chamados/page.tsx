@@ -50,7 +50,7 @@ function AcoesChamado({ c }: { c: Chamado }) {
 
   return (
     <div className="flex gap-2 justify-end">
-      {/* Link sempre visível: permite consultar o chamado mesmo encerrado */}
+      {/* Link sempre visível: permite consultar a solicitação acadêmica mesmo encerrada */}
       <Link
         href={`/aluno/chamados/${c.id}`}
         className={cx(base, "text-[var(--brand-teal)] border-[var(--brand-teal)]/40")}
@@ -109,7 +109,7 @@ export default function MeusChamadosPage() {
         const data: PageResp = await res.json();
         if (alive) setDados(data.items ?? []);
       } catch (err: any) {
-        toast.error("Erro ao carregar chamados", { description: err?.message });
+        toast.error("Erro ao carregar solicitações acadêmicas", { description: err?.message });
       } finally {
         if (alive) setLoading(false);
       }
@@ -141,7 +141,8 @@ export default function MeusChamadosPage() {
       {/* Topbar mínima (sem saudação; cabeçalho global está no layout) */}
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <p className="text-muted-foreground">Acompanhe e gerencie seus chamados.</p>
+          <h1 className="font-grotesk text-2xl font-semibold tracking-tight">Minhas solicitações acadêmicas</h1>
+          <p className="text-muted-foreground">Acompanhe suas solicitações acadêmicas junto à Fatec.</p>
         </div>
         <MobileSidebarTriggerAluno />
       </div>
@@ -153,7 +154,7 @@ export default function MeusChamadosPage() {
             <div className="flex items-start gap-3">
               <AlertTriangle className="size-5 text-[var(--warning)] mt-0.5" />
               <div>
-                <div className="font-medium">Você tem {aguardandoCount} chamado(s) aguardando sua ação.</div>
+                <div className="font-medium">Você tem {aguardandoCount} solicitação(ões) acadêmica(s) aguardando sua ação.</div>
                 <div className="text-sm text-muted-foreground">
                   Envie documentos, responda mensagens ou conclua a tarefa.
                 </div>
@@ -164,7 +165,7 @@ export default function MeusChamadosPage() {
               className="inline-flex items-center h-9 px-3 rounded-md border border-[var(--warning)]/40 text-[var(--warning)] hover:bg-[var(--warning)]/10"
               onClick={() => setStatus("AGUARDANDO_USUARIO")}
             >
-              Filtrar por “Aguardando você”
+              Filtrar solicitações aguardando você
             </button>
           </div>
         </div>
@@ -177,7 +178,7 @@ export default function MeusChamadosPage() {
             href="/aluno/catalogo"
             className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground hover:opacity-90"
           >
-            <Plus className="size-4" /> Abrir novo chamado
+            <Plus className="size-4" /> Abrir solicitação acadêmica
           </Link>
         </div>
 
@@ -199,11 +200,11 @@ export default function MeusChamadosPage() {
             onChange={(e) => setStatus(e.target.value as any)}
           >
             <option value="ALL">Todos os status</option>
-            <option value="ABERTO">Aberto</option>
-            <option value="EM_ATENDIMENTO">Em atendimento</option>
-            <option value="AGUARDANDO_USUARIO">Aguardando você</option>
-            <option value="RESOLVIDO">Resolvido</option>
-            <option value="ENCERRADO">Encerrado</option>
+            <option value="ABERTO">Solicitação recebida pela Fatec.</option>
+            <option value="EM_ATENDIMENTO">Em análise pelo setor responsável.</option>
+            <option value="AGUARDANDO_USUARIO">Aguardando documento ou resposta do aluno.</option>
+            <option value="RESOLVIDO">Solicitação respondida.</option>
+            <option value="ENCERRADO">Atendimento finalizado.</option>
           </select>
         </div>
       </div>
@@ -217,7 +218,7 @@ export default function MeusChamadosPage() {
           </div>
         ) : filtrados.length === 0 ? (
           <div className="p-8 text-center text-muted-foreground">
-            Nenhum chamado encontrado com os filtros atuais.
+            Nenhuma solicitação acadêmica encontrada com os filtros atuais.
           </div>
         ) : (
           <>

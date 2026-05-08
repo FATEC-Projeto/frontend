@@ -36,18 +36,18 @@ const FAQS: FAQ[] = [
     categoria: "Acadêmico",
     pergunta: "Como peço revisão de nota?",
     resposta:
-      "Acesse Catálogo → Secretaria → ‘Revisão de nota’. Abra um chamado com a disciplina, avaliação e justificativa. Anexe documentos se necessário.",
-    links: [{ label: "Abrir chamado (Revisão de nota)", href: "/aluno/novo-chamado?servicoId=revisao-nota" }],
+      "Acesse Catálogo → Secretaria → ‘Revisão de nota’. Abra uma solicitação acadêmica com a disciplina, avaliação e justificativa. Anexe documentos se necessário.",
+    links: [{ label: "Abrir solicitação acadêmica (Revisão de nota)", href: "/aluno/novo-chamado?servicoId=revisao-nota" }],
   },
   {
     id: "faq-4",
     categoria: "Documentos",
     pergunta: "Onde emito meu histórico escolar?",
     resposta:
-      "No Catálogo, procure por ‘Histórico escolar’ ou ‘Declarações’. Abra um chamado e acompanhe o andamento em ‘Meus chamados’.",
+      "No Catálogo, procure por ‘Histórico escolar’ ou ‘Declarações’. Abra uma solicitação acadêmica e acompanhe o andamento em ‘Minhas solicitações’.",
     links: [
       { label: "Catálogo de Serviços", href: "/aluno/catalogo" },
-      { label: "Meus Chamados", href: "/aluno/chamados" },
+      { label: "Minhas solicitações", href: "/aluno/chamados" },
     ],
   },
   {
@@ -187,7 +187,7 @@ export default function AjudaAlunoPage() {
           <div>
             <div className="font-medium">Não achou o que precisava?</div>
             <div className="text-sm text-muted-foreground">
-              Abra um chamado e nossa equipe ajuda você com o seu caso.
+              Abra uma solicitação acadêmica e nossa equipe ajuda você com o seu caso.
             </div>
           </div>
         </div>
@@ -204,7 +204,7 @@ export default function AjudaAlunoPage() {
             className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground hover:opacity-90"
           >
             <MessageSquare className="size-4" />
-            Abrir chamado
+            Abrir solicitação acadêmica
           </Link>
         </div>
       </div>
