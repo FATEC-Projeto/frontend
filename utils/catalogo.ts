@@ -1,7 +1,9 @@
+import { getServiceFormConfig } from "./serviceForms";
+
 export type FormularioCampo = {
   id: string;
   label: string;
-  tipo: "texto" | "textarea" | "select" | "arquivo" | "data";
+  tipo: "texto" | "textarea" | "select" | "arquivo" | "data" | "checkbox" | "numero";
   obrigatorio: boolean;
   opcoes?: string[];
   ajuda?: string;
@@ -59,6 +61,8 @@ function servico(
   palavrasChave: string[],
   ativo = true
 ): ServicoCatalogo {
+  const formConfig = getServiceFormConfig(id);
+
   return {
     id,
     nome,
@@ -66,7 +70,20 @@ function servico(
     ativo,
     categoriaId,
     palavrasChave: [...palavrasChave, ...fatecKeywords],
-    formulario: FORMULARIO_FUTURO,
+    formulario: formConfig
+      ? {
+          versao: 1,
+          disponivel: true,
+          campos: formConfig.campos.map((campo) => ({
+            id: campo.id,
+            label: campo.label,
+            tipo: campo.tipo,
+            obrigatorio: campo.obrigatorio,
+            opcoes: campo.opcoes?.map((opcao) => opcao.label),
+            ajuda: campo.ajuda,
+          })),
+        }
+      : FORMULARIO_FUTURO,
   };
 }
 
