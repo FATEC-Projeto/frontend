@@ -33,6 +33,24 @@ export type Usuario = {
   ra?: string | null;
   papel?: Papel;
   emailPessoal?: string | null;
+  emailEducacional?: string | null;
+  unidadeFatec?: string | null;
+  curso?: string | null;
+  eixoTecnologico?: string | null;
+  turno?: string | null;
+  turma?: string | null;
+  semestreAtual?: string | number | null;
+  matrizCurricular?: string | null;
+  situacaoAcademica?: string | null;
+  anoSemestreIngresso?: string | null;
+  coordenadorCurso?: string | null;
+  telefoneCelular?: string | null;
+  whatsapp?: string | null;
+  canalPreferencialContato?: string | null;
+  melhorPeriodoContato?: string | null;
+  necessitaAtendimentoAcessivel?: boolean | null;
+  tipoAcessibilidade?: string | null;
+  observacoesAtendimento?: string | null;
 };
 
 export const STATUS_LABEL: Record<Status, string> = {
