@@ -1,18 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { Search, Layers, BookOpen, Plus, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { Search, Layers, BookOpen, Plus, Loader2, ArrowRight } from "lucide-react";
 import MobileSidebarTriggerAluno from "../_components/MobileSidebarTriggerAluno";
 import { CATALOGO_INSTITUCIONAL, type CatalogResponse, type ServicoCatalogo } from "../../../../utils/catalogo";
 import { cx } from "../../../../utils/cx";
 
 type Servico = ServicoCatalogo & { categoriaNome?: string };
 
-function getErrorMessage(err: unknown, fallback: string) {
-  return err instanceof Error ? err.message : fallback;
-}
 
 /* ----------------------------- MOCK (fallback) ----------------------------- */
 const MOCK: CatalogResponse = CATALOGO_INSTITUCIONAL;
@@ -34,46 +30,6 @@ function CategoriaPill({ label, active, onClick }: { label: string; active?: boo
 
 /* ----------------------------- Card de Serviço ----------------------------- */
 function ServicoCard({ s }: { s: Servico }) {
-  const router = useRouter();
-  const [loading, setLoading] = useState(false);
-
-  async function handleAbrirSolicitacao() {
-    if (!s.ativo) return;
-    try {
-      setLoading(true);
-      const token = localStorage.getItem("accessToken");
-      if (!token) throw new Error("Sessão expirada. Faça login novamente.");
-
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/tickets`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          titulo: s.nome,
-          descricao: s.descricao || "Solicitação aberta via catálogo",
-          servicoId: s.id,
-          nivel: "N1",
-          prioridade: "MEDIA",
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || "Erro ao criar solicitação acadêmica");
-      }
-
-      const data = await res.json();
-      toast.success("Solicitação acadêmica criada com sucesso!");
-      router.push(`/aluno/chamados/${data.id}`);
-    } catch (err: unknown) {
-      toast.error(getErrorMessage(err, "Falha ao criar solicitação acadêmica"));
-    } finally {
-      setLoading(false);
-    }
-  }
-
   return (
     <div className="rounded-xl border border-[var(--border)] bg-card p-4 flex flex-col justify-between">
       <div className="mb-4">
@@ -92,26 +48,21 @@ function ServicoCard({ s }: { s: Servico }) {
 
       <div className="flex items-center justify-between">
         <div className="text-xs text-muted-foreground">ID: {s.id}</div>
-        <button
-          disabled={!s.ativo || loading}
-          onClick={handleAbrirSolicitacao}
-          className={cx(
-            "inline-flex items-center gap-1.5 h-9 px-3 rounded-md text-sm transition",
-            s.ativo
-              ? "bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-60"
-              : "bg-[var(--muted)] text-muted-foreground cursor-not-allowed"
-          )}
-        >
-          {loading ? (
-            <>
-              <Loader2 className="size-4 animate-spin" /> Abrindo...
-            </>
-          ) : (
-            <>
-              <Plus className="size-4" /> Iniciar solicitação
-            </>
-          )}
-        </button>
+        {s.ativo ? (
+          <Link
+            href={`/aluno/catalogo/${s.id}`}
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm transition hover:opacity-90"
+          >
+            <ArrowRight className="size-4" /> Preencher solicitação
+          </Link>
+        ) : (
+          <button
+            disabled
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-[var(--muted)] text-muted-foreground text-sm cursor-not-allowed"
+          >
+            <Plus className="size-4" /> Indisponível
+          </button>
+        )}
       </div>
     </div>
   );
@@ -184,7 +135,7 @@ export default function CatalogoAlunoPage() {
         <div>
           <h1 className="font-grotesk text-2xl font-semibold tracking-tight">Serviços acadêmicos da Fatec</h1>
           <p className="text-xs text-muted-foreground mt-2">
-            Central de Solicitações Acadêmicas Fatec: {kpis.ativos} disponíveis • {kpis.indisponiveis} indisponíveis
+            Escolha um serviço para iniciar o preenchimento guiado. O ticket só será criado após a revisão final: {kpis.ativos} disponíveis • {kpis.indisponiveis} indisponíveis
           </p>
         </div>
         <MobileSidebarTriggerAluno />
