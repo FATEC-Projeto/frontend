@@ -1,11 +1,24 @@
 "use client";
 import { apiFetch } from "../../../../utils/api";
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Save, Shield, User, Mail, IdCard, Eye, EyeOff} from "lucide-react";
+import {
+  Accessibility,
+  Building2,
+  Eye,
+  EyeOff,
+  GraduationCap,
+  IdCard,
+  Loader2,
+  Mail,
+  Phone,
+  Save,
+  Shield,
+  User,
+} from "lucide-react";
 import { toast } from "sonner";
 import MobileSidebarTriggerAluno from "../_components/MobileSidebarTriggerAluno";
 import { logoutAndRedirect } from "../../../../utils/auth";
-import { cx } from '../../../../utils/cx'
+import { cx } from "../../../../utils/cx";
 
 type Usuario = {
   id: string;
@@ -13,8 +26,43 @@ type Usuario = {
   emailPessoal: string;
   emailEducacional: string;
   ra?: string | null;
+  unidadeFatec?: string | null;
+  curso?: string | null;
+  eixoTecnologico?: string | null;
+  turno?: string | null;
+  turma?: string | null;
+  semestreAtual?: string | number | null;
+  matrizCurricular?: string | null;
+  situacaoAcademica?: string | null;
+  anoSemestreIngresso?: string | null;
+  coordenadorCurso?: string | null;
+  telefoneCelular?: string | null;
+  whatsapp?: string | null;
+  canalPreferencialContato?: string | null;
+  melhorPeriodoContato?: string | null;
+  necessitaAtendimentoAcessivel?: boolean | null;
+  tipoAcessibilidade?: string | null;
+  observacoesAtendimento?: string | null;
 };
 
+const CANAIS_CONTATO = ["E-mail pessoal", "E-mail educacional", "Telefone", "WhatsApp"];
+const PERIODOS_CONTATO = ["Manhã", "Tarde", "Noite", "Comercial"];
+
+function valueOrDash(value?: string | number | boolean | null) {
+  if (typeof value === "boolean") return value ? "Sim" : "Não";
+  if (value === null || value === undefined || value === "") return "—";
+  return String(value);
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : undefined;
+}
+
+function getResponseErrorMessage(value: unknown) {
+  if (typeof value !== "object" || value === null) return undefined;
+  const data = value as { error?: unknown; message?: unknown };
+  return typeof data.error === "string" ? data.error : typeof data.message === "string" ? data.message : undefined;
+}
 
 function Field({
   label,
@@ -38,6 +86,16 @@ function Field({
   );
 }
 
+function ReadOnlyField({ label, value }: { label: string; value?: string | number | boolean | null }) {
+  return (
+    <Field label={`${label} (somente leitura)`}>
+      <div className="min-h-10 w-full rounded-lg border border-[var(--border)] bg-muted px-3 py-2 grid items-center text-sm">
+        {valueOrDash(value)}
+      </div>
+    </Field>
+  );
+}
+
 export default function MeusDadosPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -46,7 +104,13 @@ export default function MeusDadosPage() {
 
   const [nome, setNome] = useState("");
   const [emailPessoal, setEmailPessoal] = useState("");
-  const [emailEducacional, setEmailEducacional] = useState("");
+  const [telefoneCelular, setTelefoneCelular] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
+  const [canalPreferencialContato, setCanalPreferencialContato] = useState("");
+  const [melhorPeriodoContato, setMelhorPeriodoContato] = useState("");
+  const [necessitaAtendimentoAcessivel, setNecessitaAtendimentoAcessivel] = useState(false);
+  const [tipoAcessibilidade, setTipoAcessibilidade] = useState("");
+  const [observacoesAtendimento, setObservacoesAtendimento] = useState("");
 
   const [currentPass, setCurrentPass] = useState("");
   const [newPass, setNewPass] = useState("");
@@ -55,7 +119,6 @@ export default function MeusDadosPage() {
 
   const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-  // Carrega o usuário e preenche o formulário (sem saudação)
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -66,9 +129,15 @@ export default function MeusDadosPage() {
         setUser(data);
         setNome(data?.nome ?? "");
         setEmailPessoal(data?.emailPessoal ?? "");
-        setEmailEducacional(data?.emailEducacional ?? "");
-      } catch (e: any) {
-        toast.error("Falha ao carregar seus dados", { description: e?.message });
+        setTelefoneCelular(data?.telefoneCelular ?? "");
+        setWhatsapp(data?.whatsapp ?? "");
+        setCanalPreferencialContato(data?.canalPreferencialContato ?? "");
+        setMelhorPeriodoContato(data?.melhorPeriodoContato ?? "");
+        setNecessitaAtendimentoAcessivel(Boolean(data?.necessitaAtendimentoAcessivel));
+        setTipoAcessibilidade(data?.tipoAcessibilidade ?? "");
+        setObservacoesAtendimento(data?.observacoesAtendimento ?? "");
+      } catch (e: unknown) {
+        toast.error("Falha ao carregar seus dados", { description: getErrorMessage(e) });
       } finally {
         if (alive) setLoading(false);
       }
@@ -78,26 +147,36 @@ export default function MeusDadosPage() {
     };
   }, [apiBase]);
 
-  /* ---------- VALIDAÇÕES ---------- */
   const canSave = useMemo(() => {
     if (!user) return false;
     const changed =
       nome !== (user.nome ?? "") ||
-      emailPessoal !== (user.emailPessoal ?? "") || 
-      emailEducacional !== (user.emailEducacional ?? "");
-    const emailOk = /\S+@\S+\.\S+/.test(emailPessoal);
-    const eduOk = /\S+@\S+\.\S+/.test(emailEducacional);
-    return changed && emailOk && eduOk;
-  }, [user, nome, emailPessoal, emailEducacional]);
+      emailPessoal !== (user.emailPessoal ?? "") ||
+      telefoneCelular !== (user.telefoneCelular ?? "") ||
+      whatsapp !== (user.whatsapp ?? "") ||
+      canalPreferencialContato !== (user.canalPreferencialContato ?? "") ||
+      melhorPeriodoContato !== (user.melhorPeriodoContato ?? "") ||
+      necessitaAtendimentoAcessivel !== Boolean(user.necessitaAtendimentoAcessivel) ||
+      tipoAcessibilidade !== (user.tipoAcessibilidade ?? "") ||
+      observacoesAtendimento !== (user.observacoesAtendimento ?? "");
+    const emailOk = !emailPessoal || /\S+@\S+\.\S+/.test(emailPessoal);
+    return changed && nome.trim().length > 0 && emailOk;
+  }, [
+    user,
+    nome,
+    emailPessoal,
+    telefoneCelular,
+    whatsapp,
+    canalPreferencialContato,
+    melhorPeriodoContato,
+    necessitaAtendimentoAcessivel,
+    tipoAcessibilidade,
+    observacoesAtendimento,
+  ]);
 
   async function saveProfile(e: React.FormEvent) {
     e.preventDefault();
     if (!user) return;
-
-    if (!emailEducacional) {
-      toast.error("O e-mail educacional é obrigatório para o aluno.");
-      return;
-    }
 
     try {
       setSaving(true);
@@ -106,93 +185,88 @@ export default function MeusDadosPage() {
         body: JSON.stringify({
           nome: nome.trim(),
           emailPessoal: emailPessoal.trim(),
-          emailEducacional: emailEducacional.trim(),
+          telefoneCelular: telefoneCelular.trim(),
+          whatsapp: whatsapp.trim(),
+          canalPreferencialContato,
+          melhorPeriodoContato,
+          necessitaAtendimentoAcessivel,
+          tipoAcessibilidade: necessitaAtendimentoAcessivel ? tipoAcessibilidade.trim() : "",
+          observacoesAtendimento: necessitaAtendimentoAcessivel ? observacoesAtendimento.trim() : "",
         }),
       });
       if (!res.ok) throw new Error("Erro ao salvar alterações");
       const updated = (await res.json()) as Usuario;
       setUser(updated);
       toast.success("Dados atualizados com sucesso!");
-    } catch (e: any) {
-      toast.error("Falha ao salvar", { description: e?.message });
+    } catch (e: unknown) {
+      toast.error("Falha ao salvar", { description: getErrorMessage(e) });
     } finally {
       setSaving(false);
     }
   }
 
   const meetsPolicy =
-  newPass.length >= 8 &&
-  /[A-Z]/.test(newPass) &&
-  /[a-z]/.test(newPass) &&
-  /\d/.test(newPass) &&
-  /[^A-Za-z0-9]/.test(newPass);
+    newPass.length >= 8 &&
+    /[A-Z]/.test(newPass) &&
+    /[a-z]/.test(newPass) &&
+    /\d/.test(newPass) &&
+    /[^A-Za-z0-9]/.test(newPass);
 
-const canChangePass =
-  currentPass.length > 0 && 
-  meetsPolicy &&
-  newPass === newPass2;
+  const canChangePass = currentPass.length > 0 && meetsPolicy && newPass === newPass2;
 
-async function changePassword(e: React.FormEvent) {
-  e.preventDefault();
-  if (!canChangePass || !user) return;
+  async function changePassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canChangePass || !user) return;
 
-  if (!meetsPolicy) {
-     toast.error("Falha ao alterar senha", { 
-       description: "A nova senha não cumpre todos os critérios de segurança (8+ caracteres, maiúscula, minúscula, número e símbolo)." 
-     });
-     return;
-  }
-
-  try {
-    setChanging(true);
-    const token = localStorage.getItem("accessToken") || "";
-    const headers = new Headers();
-    headers.set("Authorization", `Bearer ${token}`);
-    headers.set("Content-Type", "application/json");
-    headers.set("Accept", "application/json");
-
-    const res = await fetch(`${apiBase}/usuarios/${user.id}`, { 
-      method: "PATCH", 
-      headers: headers,
-      body: JSON.stringify({
-        senha: newPass
-      }),
-    });
-    if (res.ok) {
-      toast.success("Senha alterada com sucesso!");
-      setCurrentPass("");
-      setNewPass("");
-      setNewPass2("");
-    } 
-    else if (res.status === 401 || res.status === 403) {
-      toast.success("Senha alterada com sucesso!", {
-        description: "Como esperado, a sua sessão foi terminada. Por favor, faça login novamente."
+    if (!meetsPolicy) {
+      toast.error("Falha ao alterar senha", {
+        description:
+          "A nova senha não cumpre todos os critérios de segurança (8+ caracteres, maiúscula, minúscula, número e símbolo).",
       });
-
-      // Damos 2 segundos para o utilizador ler o toast e depois fazemos o logout
-      setTimeout(() => {
-        logoutAndRedirect(); 
-      }, 5000);
-    } 
-
-    // Cenário 3: Erro real (400, 500, etc.)
-    else {
-      const errData = await res.json().catch(() => ({}));
-      throw new Error(errData?.error || errData?.message || `Erro ${res.status} ao alterar senha`);
+      return;
     }
 
-  } catch (e: any) {
-    // Este catch agora só apanha erros reais (Cenário 3) ou falhas de rede
-    toast.error("Falha ao alterar senha", { description: e?.message });
-  } finally {
-    setChanging(false);
-  }
-}
+    try {
+      setChanging(true);
+      const token = localStorage.getItem("accessToken") || "";
+      const headers = new Headers();
+      headers.set("Authorization", `Bearer ${token}`);
+      headers.set("Content-Type", "application/json");
+      headers.set("Accept", "application/json");
 
-  /* ---------- RENDER ---------- */
+      const res = await fetch(`${apiBase}/usuarios/${user.id}`, {
+        method: "PATCH",
+        headers: headers,
+        body: JSON.stringify({
+          senha: newPass,
+        }),
+      });
+      if (res.ok) {
+        toast.success("Senha alterada com sucesso!");
+        setCurrentPass("");
+        setNewPass("");
+        setNewPass2("");
+      } else if (res.status === 401 || res.status === 403) {
+        toast.success("Senha alterada com sucesso!", {
+          description: "Como esperado, a sua sessão foi terminada. Por favor, faça login novamente.",
+        });
+
+        setTimeout(() => {
+          logoutAndRedirect();
+        }, 5000);
+      } else {
+        const errData: unknown = await res.json().catch(() => ({}));
+        throw new Error(getResponseErrorMessage(errData) || `Erro ${res.status} ao alterar senha`);
+      }
+    } catch (e: unknown) {
+      toast.error("Falha ao alterar senha", { description: getErrorMessage(e) });
+    } finally {
+      setChanging(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
-      {/* Apenas o trigger mobile da sidebar; sem boas-vindas */}
       <div className="xl:hidden">
         <MobileSidebarTriggerAluno />
       </div>
@@ -208,52 +282,177 @@ async function changePassword(e: React.FormEvent) {
         </div>
       ) : (
         <>
-          {/* Dados do perfil */}
           <form
             onSubmit={saveProfile}
-            className="rounded-xl border border-[var(--border)] bg-card p-5 sm:p-6 grid gap-5"
+            className="rounded-xl border border-[var(--border)] bg-card p-5 sm:p-6 grid gap-6"
           >
-            <div className="flex items-center gap-2 mb-1">
-              <User className="size-4 text-muted-foreground" />
-              <h2 className="text-base font-semibold">Informações pessoais</h2>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Nome completo" required>
-                <input
-                  className="h-10 w-full rounded-lg border border-[var(--border)] bg-input px-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-                  value={nome}
-                  onChange={(e) => setNome(e.target.value)}
-                />
-              </Field>
-
-              <Field label="RA (somente leitura)">
-                <div className="h-10 w-full rounded-lg border border-[var(--border)] bg-muted px-3 grid items-center text-sm">
-                  {user.ra ?? "—"}
+            <section className="grid gap-5">
+              <div className="flex items-start gap-3">
+                <User className="mt-0.5 size-4 text-muted-foreground" />
+                <div>
+                  <h2 className="text-base font-semibold">Informações pessoais</h2>
+                  <p className="text-sm text-muted-foreground">
+                    O nome é editável pelo aluno; RA e e-mail educacional vêm do sistema acadêmico.
+                  </p>
                 </div>
-              </Field>
+              </div>
 
-              <Field label="E-mail pessoal">
-                <div className="relative">
-                  <Mail className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Nome completo" required>
                   <input
-                    type="email"
-                    className="h-10 w-full rounded-lg border border-[var(--border)] bg-input pl-9 pr-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-                    value={emailPessoal}
-                    onChange={(e) => setEmailPessoal(e.target.value)}
-                    placeholder="voce@email.com"
+                    className="h-10 w-full rounded-lg border border-[var(--border)] bg-input px-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                    value={nome}
+                    onChange={(e) => setNome(e.target.value)}
                   />
-                </div>
-              </Field>
+                </Field>
 
-              <Field label="E-mail educacional (somente leitura)">
-                <div className="relative">
-                  <div className="h-10 w-full rounded-lg border border-[var(--border)] bg-muted px-3 grid items-center text-sm">
-                  {user.emailEducacional ?? "—"}
+                <ReadOnlyField label="RA" value={user.ra} />
+
+                <Field label="E-mail pessoal">
+                  <div className="relative">
+                    <Mail className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="email"
+                      className="h-10 w-full rounded-lg border border-[var(--border)] bg-input pl-9 pr-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                      value={emailPessoal}
+                      onChange={(e) => setEmailPessoal(e.target.value)}
+                      placeholder="voce@email.com"
+                    />
+                  </div>
+                </Field>
+
+                <ReadOnlyField label="E-mail educacional" value={user.emailEducacional} />
+              </div>
+            </section>
+
+            <section className="grid gap-5 border-t border-[var(--border)] pt-5">
+              <div className="flex items-start gap-3">
+                <GraduationCap className="mt-0.5 size-4 text-muted-foreground" />
+                <div>
+                  <h2 className="text-base font-semibold">Dados acadêmicos Fatec</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Campos somente leitura sincronizados a partir do sistema acadêmico.
+                  </p>
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                <ReadOnlyField label="Unidade Fatec" value={user.unidadeFatec} />
+                <ReadOnlyField label="Curso" value={user.curso} />
+                <ReadOnlyField label="Eixo tecnológico" value={user.eixoTecnologico} />
+                <ReadOnlyField label="Turno" value={user.turno} />
+                <ReadOnlyField label="Turma" value={user.turma} />
+                <ReadOnlyField label="Semestre atual" value={user.semestreAtual} />
+                <ReadOnlyField label="Matriz curricular" value={user.matrizCurricular} />
+                <ReadOnlyField label="Situação acadêmica" value={user.situacaoAcademica} />
+                <ReadOnlyField label="Ano/semestre de ingresso" value={user.anoSemestreIngresso} />
+                <ReadOnlyField label="Coordenador do curso" value={user.coordenadorCurso} />
+              </div>
+            </section>
+
+            <section className="grid gap-5 border-t border-[var(--border)] pt-5">
+              <div className="flex items-start gap-3">
+                <Phone className="mt-0.5 size-4 text-muted-foreground" />
+                <div>
+                  <h2 className="text-base font-semibold">Contato e atendimento</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Campos editáveis pelo aluno. Dados de acessibilidade devem ser usados apenas para viabilizar atendimento adequado.
+                  </p>
                 </div>
-              </Field>
-            </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Telefone celular">
+                  <input
+                    className="h-10 w-full rounded-lg border border-[var(--border)] bg-input px-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                    value={telefoneCelular}
+                    onChange={(e) => setTelefoneCelular(e.target.value)}
+                    placeholder="(00) 00000-0000"
+                  />
+                </Field>
+
+                <Field label="WhatsApp">
+                  <input
+                    className="h-10 w-full rounded-lg border border-[var(--border)] bg-input px-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                    value={whatsapp}
+                    onChange={(e) => setWhatsapp(e.target.value)}
+                    placeholder="(00) 00000-0000"
+                  />
+                </Field>
+
+                <Field label="Canal preferencial de contato">
+                  <select
+                    className="h-10 w-full rounded-lg border border-[var(--border)] bg-input px-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                    value={canalPreferencialContato}
+                    onChange={(e) => setCanalPreferencialContato(e.target.value)}
+                  >
+                    <option value="">Não informado</option>
+                    {CANAIS_CONTATO.map((canal) => (
+                      <option key={canal} value={canal}>
+                        {canal}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Melhor período para contato">
+                  <select
+                    className="h-10 w-full rounded-lg border border-[var(--border)] bg-input px-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                    value={melhorPeriodoContato}
+                    onChange={(e) => setMelhorPeriodoContato(e.target.value)}
+                  >
+                    <option value="">Não informado</option>
+                    {PERIODOS_CONTATO.map((periodo) => (
+                      <option key={periodo} value={periodo}>
+                        {periodo}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+
+              <div className="rounded-lg border border-[var(--border)] bg-background/60 p-4 grid gap-4">
+                <div className="flex items-start gap-3">
+                  <Accessibility className="mt-0.5 size-4 text-muted-foreground" />
+                  <div className="grid gap-1">
+                    <label className="inline-flex items-center gap-2 text-sm font-medium">
+                      <input
+                        type="checkbox"
+                        className="size-4 rounded border-[var(--border)]"
+                        checked={necessitaAtendimentoAcessivel}
+                        onChange={(e) => setNecessitaAtendimentoAcessivel(e.target.checked)}
+                      />
+                      Necessito de atendimento acessível
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      Opcional e sujeito à regra de privacidade: preencha apenas se desejar registrar necessidades para atendimento.
+                    </p>
+                  </div>
+                </div>
+
+                {necessitaAtendimentoAcessivel && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Field label="Tipo de acessibilidade">
+                      <input
+                        className="h-10 w-full rounded-lg border border-[var(--border)] bg-input px-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                        value={tipoAcessibilidade}
+                        onChange={(e) => setTipoAcessibilidade(e.target.value)}
+                        placeholder="Ex.: Libras, mobilidade, leitor de tela"
+                      />
+                    </Field>
+
+                    <Field label="Observações de atendimento">
+                      <textarea
+                        className="min-h-20 w-full rounded-lg border border-[var(--border)] bg-input px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                        value={observacoesAtendimento}
+                        onChange={(e) => setObservacoesAtendimento(e.target.value)}
+                        placeholder="Informe orientações úteis para a equipe de atendimento"
+                      />
+                    </Field>
+                  </div>
+                )}
+              </div>
+            </section>
 
             <div className="flex items-center justify-end gap-2">
               <button
@@ -270,7 +469,18 @@ async function changePassword(e: React.FormEvent) {
             </div>
           </form>
 
-          {/* Segurança */}
+          <section className="rounded-xl border border-[var(--border)] bg-card p-5 sm:p-6 grid gap-4">
+            <div className="flex items-start gap-3">
+              <Building2 className="mt-0.5 size-4 text-muted-foreground" />
+              <div>
+                <h2 className="text-base font-semibold">Regra de edição dos dados</h2>
+                <p className="text-sm text-muted-foreground">
+                  Dados pessoais de contato e atendimento são editáveis pelo aluno; dados acadêmicos Fatec são somente leitura e devem ser alterados no sistema acadêmico de origem.
+                </p>
+              </div>
+            </div>
+          </section>
+
           <form
             onSubmit={changePassword}
             className="rounded-xl border border-[var(--border)] bg-card p-5 sm:p-6 grid gap-5"
@@ -293,7 +503,7 @@ async function changePassword(e: React.FormEvent) {
                   />
                   <button
                     type="button"
-                    onClick={() => setShowPass(v => !v)}
+                    onClick={() => setShowPass((v) => !v)}
                     className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-[var(--muted)]/60"
                   >
                     {showPass ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -313,7 +523,7 @@ async function changePassword(e: React.FormEvent) {
                   />
                   <button
                     type="button"
-                    onClick={() => setShowPass(v => !v)}
+                    onClick={() => setShowPass((v) => !v)}
                     className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-[var(--muted)]/60"
                   >
                     {showPass ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -333,7 +543,7 @@ async function changePassword(e: React.FormEvent) {
                   />
                   <button
                     type="button"
-                    onClick={() => setShowPass(v => !v)}
+                    onClick={() => setShowPass((v) => !v)}
                     className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-[var(--muted)]/60"
                   >
                     {showPass ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
