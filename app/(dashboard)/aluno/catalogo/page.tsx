@@ -5,61 +5,17 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Search, Layers, BookOpen, Plus, Loader2 } from "lucide-react";
 import MobileSidebarTriggerAluno from "../_components/MobileSidebarTriggerAluno";
-import { cx } from '../../../../utils/cx'
+import { CATALOGO_INSTITUCIONAL, type CatalogResponse, type ServicoCatalogo } from "../../../../utils/catalogo";
+import { cx } from "../../../../utils/cx";
 
-/* ----------------------------- Tipos ----------------------------- */
-type Servico = {
-  id: string;
-  nome: string;
-  descricao?: string | null;
-  ativo: boolean;
-  categoriaId?: string | null;
-};
+type Servico = ServicoCatalogo & { categoriaNome?: string };
 
-type Categoria = {
-  id: string;
-  nome: string;
-  descricao?: string | null;
-  servicos: Servico[];
-};
-
-type CatalogResponse = {
-  categorias: Categoria[];
-};
+function getErrorMessage(err: unknown, fallback: string) {
+  return err instanceof Error ? err.message : fallback;
+}
 
 /* ----------------------------- MOCK (fallback) ----------------------------- */
-const MOCK: CatalogResponse = {
-  categorias: [
-    {
-      id: "cat-secretaria",
-      nome: "Secretaria",
-      descricao: "Atendimentos acadêmicos e documentação",
-      servicos: [
-        { id: "s1", nome: "Revisão de nota", descricao: "Solicite revisão da avaliação", ativo: true },
-        { id: "s2", nome: "Histórico escolar", descricao: "Gere histórico/declarações", ativo: true },
-        { id: "s3", nome: "Aproveitamento de estudos", descricao: "Solicite análise de equivalência curricular", ativo: false },
-      ],
-    },
-    {
-      id: "cat-financeiro",
-      nome: "Financeiro",
-      descricao: "Pagamentos e documentos financeiros",
-      servicos: [
-        { id: "s4", nome: "2ª via de boleto", descricao: "Emissão de boleto atualizado", ativo: true },
-        { id: "s5", nome: "Negociação de débito", descricao: "Abra uma negociação financeira", ativo: true },
-      ],
-    },
-    {
-      id: "cat-ti",
-      nome: "TI Acadêmica",
-      descricao: "Acesso, e-mail e sistemas",
-      servicos: [
-        { id: "s6", nome: "Problemas no e-mail educacional", descricao: "Criação, acesso e ajustes", ativo: true },
-        { id: "s7", nome: "Troca de senha", descricao: "Redefinição de senha institucional", ativo: true },
-      ],
-    },
-  ],
-};
+const MOCK: CatalogResponse = CATALOGO_INSTITUCIONAL;
 
 /* ----------------------------- Componentes ----------------------------- */
 function CategoriaPill({ label, active, onClick }: { label: string; active?: boolean; onClick: () => void }) {
@@ -111,8 +67,8 @@ function ServicoCard({ s }: { s: Servico }) {
       const data = await res.json();
       toast.success("Solicitação acadêmica criada com sucesso!");
       router.push(`/aluno/chamados/${data.id}`);
-    } catch (err: any) {
-      toast.error(err.message || "Falha ao criar solicitação acadêmica");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, "Falha ao criar solicitação acadêmica"));
     } finally {
       setLoading(false);
     }
@@ -173,7 +129,8 @@ export default function CatalogoAlunoPage() {
   useEffect(() => {
     async function fetchCatalog() {
       try {
-        const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/catalogo`;
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+        const url = apiBaseUrl ? `${apiBaseUrl}/catalogo` : "/catalogo";
         const res = await fetch(url, { cache: "no-store" });
         if (!res.ok) throw new Error("fallback");
         const data = (await res.json()) as CatalogResponse;
@@ -190,7 +147,7 @@ export default function CatalogoAlunoPage() {
   }, []);
 
   const flatServicos = useMemo(
-    () => catalog.categorias.flatMap((c) => c.servicos.map((s) => ({ ...s, categoriaId: c.id }))),
+    () => catalog.categorias.flatMap((c) => c.servicos.map((s) => ({ ...s, categoriaId: c.id, categoriaNome: c.nome }))),
     [catalog]
   );
 
@@ -203,7 +160,11 @@ export default function CatalogoAlunoPage() {
     const texto = q.trim().toLowerCase();
     return flatServicos.filter((s) => {
       const byCat = catId === "ALL" || s.categoriaId === catId;
-      const byText = !texto || s.nome.toLowerCase().includes(texto) || (s.descricao ?? "").toLowerCase().includes(texto);
+      const searchable = [s.nome, s.descricao, s.categoriaNome, ...(s.palavrasChave ?? [])]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      const byText = !texto || searchable.includes(texto);
       return byCat && byText;
     });
   }, [flatServicos, q, catId]);
@@ -241,7 +202,7 @@ export default function CatalogoAlunoPage() {
         <div className="relative w-full lg:w-[360px]">
           <Search className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
           <input
-            placeholder="Buscar por nome ou descrição"
+            placeholder="Buscar por nome, descrição, categoria ou CPS/Fatec"
             className="w-full h-10 rounded-lg border border-[var(--border)] bg-input px-9 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
             value={q}
             onChange={(e) => setQ(e.target.value)}
