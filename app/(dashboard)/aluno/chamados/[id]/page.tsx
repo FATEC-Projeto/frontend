@@ -15,9 +15,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch } from "../../../../../utils/api";
+import type { Chamado, Status } from "../../../../../utils/types";
 
 /* ================= Tipos ================= */
-type Status = "ABERTO" | "EM_ATENDIMENTO" | "AGUARDANDO_USUARIO" | "RESOLVIDO" | "ENCERRADO";
 
 const STATUS_LABELS: Record<Status, string> = {
   ABERTO: "Solicitação recebida pela Fatec.",
@@ -25,16 +25,6 @@ const STATUS_LABELS: Record<Status, string> = {
   AGUARDANDO_USUARIO: "Aguardando documento ou resposta do aluno.",
   RESOLVIDO: "Solicitação respondida.",
   ENCERRADO: "Atendimento finalizado.",
-};
-
-type Chamado = {
-  id: string;
-  titulo: string;
-  descricao: string;
-  status: Status;
-  criadoEm: string;
-  protocolo?: string | null;
-  criadoPorId?: string | null;
 };
 
 type Mensagem = {
@@ -184,8 +174,9 @@ function confirmarReabertura() {
       if (!res.ok) throw new Error(`Erro ${res.status}`);
       const data: Chamado = await res.json();
       setChamado(data);
-    } catch (err: any) {
-      toast.error(err.message || "Erro ao carregar solicitação acadêmica.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Erro ao carregar solicitação acadêmica.";
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -207,8 +198,9 @@ function confirmarReabertura() {
       lista.forEach((m) => knownIds.current.add(m.id));
       setMsgs(lista);
       scrollToEnd(false);
-    } catch (err: any) {
-      toast.error(err.message || "Erro ao carregar mensagens.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Erro ao carregar mensagens.";
+      toast.error(message);
     } finally {
       setMsgLoading(false);
     }
@@ -272,8 +264,9 @@ function confirmarReabertura() {
       }
       setMsgText("");
       scrollToEnd();
-    } catch (err: any) {
-      toast.error(err.message || "Erro ao enviar mensagem.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Erro ao enviar mensagem.";
+      toast.error(message);
     } finally {
       setMsgSending(false);
     }
@@ -288,8 +281,9 @@ function confirmarReabertura() {
       if (!res.ok) throw new Error(`Erro ${res.status}`);
       const data = await res.json();
       setAnexos(Array.isArray(data) ? data : []);
-    } catch (err: any) {
-      toast.error(err.message || "Erro ao carregar anexos.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Erro ao carregar anexos.";
+      toast.error(message);
     } finally {
       setLoadingAnexos(false);
     }
@@ -317,8 +311,9 @@ function confirmarReabertura() {
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
       await fetchAnexos(chamado.id);
-    } catch (err: any) {
-      toast.error(err.message || "Falha ao enviar arquivo.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Falha ao enviar arquivo.";
+      toast.error(message);
     } finally {
       setUploading(false);
     }
@@ -339,8 +334,9 @@ function confirmarReabertura() {
           : "Solicitação acadêmica finalizada com sucesso."
       );
       await fetchChamado();
-    } catch (err: any) {
-      toast.error("Erro ao atualizar status", { description: err.message });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Erro desconhecido";
+      toast.error("Erro ao atualizar status", { description: message });
     }
   }
 
@@ -391,7 +387,7 @@ function confirmarReabertura() {
         <div className="space-y-2 text-sm border-t border-b py-4">
           <p>
             <strong>Descrição:</strong>{" "}
-            <span className="whitespace-pre-wrap">{chamado.descricao}</span>
+            <span className="whitespace-pre-wrap">{chamado.descricao || "—"}</span>
           </p>
           <p>
             <strong>Status:</strong> {STATUS_LABELS[chamado.status] ?? chamado.status}

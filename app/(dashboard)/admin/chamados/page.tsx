@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Search, Filter, LayoutList, LayoutGrid, ChevronRight,
-  Tag, User, Building2, Clock, ArrowUpDown
+  Tag, User, Clock, ArrowUpDown
 } from "lucide-react";
 import { apiFetch } from "../../../../utils/api";
 import Link from "next/link";
@@ -13,11 +13,9 @@ import TicketStatusBadge from "../../../components/shared/TicketStatusBadge";
 import PriorityDot from "../../../components/shared/PriorityDot";
 import NivelBadge from "../../../components/shared/NivelBadge";
 import SetorChip from "../../../components/shared/SetorChip";
+import type { Chamado, Nivel, PageResponse, Prioridade, Status } from "../../../../utils/types";
 
 /* ===== Tipos ===== */
-type Status = "ABERTO" | "EM_ATENDIMENTO" | "AGUARDANDO_USUARIO" | "RESOLVIDO" | "ENCERRADO";
-type Prioridade = "BAIXA" | "MEDIA" | "ALTA" | "URGENTE";
-type Nivel = "N1" | "N2" | "N3";
 
 type ChamadoUI = {
   id: string;
@@ -30,28 +28,14 @@ type ChamadoUI = {
   solicitante: string;
   responsavel?: string | null;
   setor?: string | null;
+  curso?: string | null;
+  unidadeFatec?: string | null;
+  processoAcademico?: string | null;
 };
 
-type ApiChamado = {
-  id: string;
-  protocolo?: string | null;
-  titulo: string;
-  descricao?: string | null;
-  nivel: Nivel;
-  status: Status;
-  prioridade: Prioridade;
-  criadoEm: string;
-  criadoPor?: { nome?: string | null } | null;
-  responsavel?: { nome?: string | null } | null;
-  setor?: { nome?: string | null } | null;
-};
+type ApiChamado = Chamado & { nivel: Nivel; prioridade: Prioridade };
 
-type PageResp = {
-  total: number;
-  page: number;
-  pageSize: number;
-  items: ApiChamado[];
-};
+type PageResp = PageResponse<ApiChamado>;
 
 function toUI(x: ApiChamado): ChamadoUI {
   return {
@@ -64,7 +48,10 @@ function toUI(x: ApiChamado): ChamadoUI {
     nivel: x.nivel,
     solicitante: x.criadoPor?.nome || "—",
     responsavel: x.responsavel?.nome || null,
-    setor: x.setor?.nome || null,
+    setor: x.setor?.nome || x.setorAtual || null,
+    curso: x.curso || null,
+    unidadeFatec: x.unidadeFatec || null,
+    processoAcademico: x.processoAcademico || null,
   };
 }
 
@@ -119,8 +106,9 @@ export default function AdminChamadosPage() {
         const data: PageResp = await res.json();
         const items = (data?.items ?? []).map(toUI);
         if (alive) setDadosApi(items);
-      } catch (e: any) {
-        if (alive) setError(e?.message || "Falha ao carregar chamados");
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : "Falha ao carregar chamados";
+        if (alive) setError(message);
       } finally {
         if (alive) setLoading(false);
       }
@@ -147,7 +135,10 @@ export default function AdminChamadosPage() {
         c.titulo.toLowerCase().includes(ql) ||
         (c.protocolo ?? "").toLowerCase().includes(ql) ||
         c.solicitante.toLowerCase().includes(ql) ||
-        (c.responsavel ?? "").toLowerCase().includes(ql);
+        (c.responsavel ?? "").toLowerCase().includes(ql) ||
+        (c.curso ?? "").toLowerCase().includes(ql) ||
+        (c.unidadeFatec ?? "").toLowerCase().includes(ql) ||
+        (c.processoAcademico ?? "").toLowerCase().includes(ql);
       const matchS = status === "ALL" || c.status === status;
       const matchP = prioridade === "ALL" || c.prioridade === prioridade;
       const matchN = nivel === "ALL" || c.nivel === nivel;
@@ -184,7 +175,7 @@ export default function AdminChamadosPage() {
                 <select
                   className="h-10 w-[190px] pl-9 pr-8 rounded-lg border border-[var(--border)] bg-background focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                   value={status}
-                  onChange={(e) => setStatus(e.target.value as any)}
+                  onChange={(e) => setStatus(e.target.value as Status | "ALL")}
                 >
                   <option value="ALL">Todos os status</option>
                   <option value="ABERTO">Aberto</option>
@@ -198,7 +189,7 @@ export default function AdminChamadosPage() {
               <select
                 className="h-10 w-[160px] px-3 rounded-lg border border-[var(--border)] bg-background focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                 value={prioridade}
-                onChange={(e) => setPrioridade(e.target.value as any)}
+                onChange={(e) => setPrioridade(e.target.value as Prioridade | "ALL")}
               >
                 <option value="ALL">Todas as prioridades</option>
                 <option value="BAIXA">Baixa</option>
@@ -210,7 +201,7 @@ export default function AdminChamadosPage() {
               <select
                 className="h-10 w-[120px] px-3 rounded-lg border border-[var(--border)] bg-background focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                 value={nivel}
-                onChange={(e) => setNivel(e.target.value as any)}
+                onChange={(e) => setNivel(e.target.value as Nivel | "ALL")}
               >
                 <option value="ALL">Nível (todos)</option>
                 <option value="N1">N1</option>
@@ -221,7 +212,7 @@ export default function AdminChamadosPage() {
               <select
                 className="h-10 w-[180px] px-3 rounded-lg border border-[var(--border)] bg-background focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                 value={setor}
-                onChange={(e) => setSetor(e.target.value as any)}
+                onChange={(e) => setSetor(e.target.value)}
               >
                 <option value="ALL">Todos os setores</option>
                 {setoresDisponiveis.map((s) => (
@@ -310,6 +301,11 @@ function Lista({ dados, sortDesc, setSortDesc }: {
                 <td className="px-4 py-3 font-medium">{c.protocolo ?? `#${c.id}`}</td>
                 <td className="px-4 py-3 max-w-[380px]">
                   <div className="line-clamp-1">{c.titulo}</div>
+                  {(c.curso || c.unidadeFatec) && (
+                    <div className="mt-1 text-xs text-muted-foreground line-clamp-1">
+                      {[c.curso, c.unidadeFatec].filter(Boolean).join(" · ")}
+                    </div>
+                  )}
                   <div className="md:hidden mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                     <SetorChip nome={c.setor} />
                     <span className="inline-flex items-center gap-1">
@@ -406,6 +402,11 @@ function CardKanban({ c }: { c: ChamadoUI }) {
           <div className="font-medium leading-tight line-clamp-2">
             {c.titulo}
           </div>
+          {(c.curso || c.unidadeFatec) && (
+            <div className="mt-1 text-xs text-muted-foreground line-clamp-1">
+              {[c.curso, c.unidadeFatec].filter(Boolean).join(" · ")}
+            </div>
+          )}
         </div>
         <NivelBadge nivel={c.nivel} />
       </div>

@@ -10,19 +10,13 @@ import {
 } from "lucide-react";
 import { apiFetch } from "../../../../../utils/api";
 import { toast } from "sonner";
+import type { Chamado, Nivel, Prioridade, SetorMin, ServicoMin, Status, UsuarioMin } from "../../../../../utils/types";
 
 import { cx } from '../../../../../utils/cx'
 import TicketStatusBadge from "../../../../components/shared/TicketStatusBadge";
 import LoadingSpinner from "../../../../components/shared/LoadingSpinner";
 
 /* ===== Tipos ===== */
-type Nivel = "N1" | "N2" | "N3";
-type Status = "ABERTO" | "EM_ATENDIMENTO" | "AGUARDANDO_USUARIO" | "RESOLVIDO" | "ENCERRADO";
-type Prioridade = "BAIXA" | "MEDIA" | "ALTA" | "URGENTE";
-
-type UsuarioMin = { id: string; nome?: string | null; emailPessoal?: string | null };
-type SetorMin = { id: string; nome?: string | null };
-type ServicoMin = { id: string; nome?: string | null };
 type ClienteMin = { id: string; nome?: string | null };
 type ContratoMin = { id: string; numero?: string | null };
 
@@ -53,18 +47,12 @@ type AnexoInfo = {
   enviadoPor?: { id: string; nome?: string | null } | null;
 };
 
-type Ticket = {
-  id: string;
-  protocolo?: string | null;
-  titulo: string;
+type Ticket = Chamado & {
   descricao: string;
   nivel: Nivel;
-  status: Status;
   prioridade: Prioridade;
   criadoPorId: string;
-  criadoEm: string;
   atualizadoEm: string;
-  encerradoEm?: string | null;
 
   criadoPor?: UsuarioMin | null;
   responsavel?: UsuarioMin | null;
@@ -76,6 +64,44 @@ type Ticket = {
   historico?: Historico[];
 };
 
+function formatOptional(value: unknown): string {
+  if (Array.isArray(value)) return value.filter(Boolean).join(", ") || "—";
+  if (value === null || value === undefined || value === "") return "—";
+  return String(value);
+}
+
+function formatDateTimeOptional(value?: string | null): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function InfoItem({
+  label,
+  value,
+  multiline = false,
+}: {
+  label: string;
+  value: unknown;
+  multiline?: boolean;
+}) {
+  return (
+    <div className={cx("min-w-0", multiline && "rounded-lg border border-[var(--border)] bg-background p-3")}>
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className={cx("font-medium", multiline ? "mt-1 whitespace-pre-wrap" : "truncate")}>
+        {formatOptional(value)}
+      </div>
+    </div>
+  );
+}
+
 /* ===== Página ===== */
 export default function AdminChamadoPage() {
   const { id } = useParams<{ id: string }>();
@@ -85,8 +111,6 @@ export default function AdminChamadoPage() {
   // dados gerais
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
   // edição
   const [status, setStatus] = useState<Status>("ABERTO");
   const [prioridade, setPrioridade] = useState<Prioridade>("MEDIA");
@@ -111,6 +135,7 @@ export default function AdminChamadoPage() {
     () =>
       [
         "criadoPor",
+        "aluno",
         "responsavel",
         "setor",
         "servico",
@@ -130,9 +155,10 @@ export default function AdminChamadoPage() {
       if (!res.ok) throw new Error("Falha ao buscar anexos");
       const data = await res.json();
       setAnexos(Array.isArray(data) ? data : []);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Erro desconhecido";
       console.error("Erro ao buscar anexos:", err);
-      toast.error("Falha ao carregar anexos.", { description: err.message });
+      toast.error("Falha ao carregar anexos.", { description: message });
     } finally {
       setLoadingAnexos(false);
     }
@@ -142,14 +168,12 @@ export default function AdminChamadoPage() {
     if (!id || !API) return;
     try {
       setLoading(true);
-      setErr(null);
-
       const res = await apiFetch(`${API}/tickets/${id}?include=${encodeURIComponent(include)}`, {
         cache: "no-store",
       });
       if (!res.ok) {
-        const e = await res.json().catch(() => ({}));
-        throw new Error(e?.error || `Erro HTTP ${res.status}`);
+        const e = await res.json().catch((): { error?: string } => ({}));
+        throw new Error(e.error || `Erro HTTP ${res.status}`);
       }
       const data: Ticket = await res.json();
 
@@ -160,11 +184,10 @@ export default function AdminChamadoPage() {
       setStatus(data.status);
       setPrioridade(data.prioridade);
       setNivel(data.nivel);
-      setResponsavelId((data as any).responsavelId ?? data.responsavel?.id ?? "");
+      setResponsavelId(data.responsavelId ?? data.responsavel?.id ?? "");
 
       fetchAnexos(data.id);
-    } catch (e: any) {
-      setErr(e?.message || "Falha ao carregar");
+    } catch {
       setTicket(null);
     } finally {
       setLoading(false);
@@ -240,13 +263,14 @@ export default function AdminChamadoPage() {
         body: JSON.stringify(body),
       });
       if (!res.ok) {
-        const e = await res.json().catch(() => ({}));
-        throw new Error(e?.error || `Erro HTTP ${res.status}`);
+        const e = await res.json().catch((): { error?: string } => ({}));
+        throw new Error(e.error || `Erro HTTP ${res.status}`);
       }
       toast.success("Alterações salvas!");
       await load();
-    } catch (e: any) {
-      toast.error("Falha ao salvar", { description: e?.message });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Erro desconhecido";
+      toast.error("Falha ao salvar", { description: message });
     } finally {
       setSaving(false);
     }
@@ -261,8 +285,8 @@ export default function AdminChamadoPage() {
         body: JSON.stringify({ conteudo: msg.trim() }),
       });
       if (!res.ok) {
-        const e = await res.json().catch(() => ({}));
-        throw new Error(e?.error || `Erro HTTP ${res.status}`);
+        const e = await res.json().catch((): { error?: string } => ({}));
+        throw new Error(e.error || `Erro HTTP ${res.status}`);
       }
       const nova = await res.json();
 
@@ -275,8 +299,9 @@ export default function AdminChamadoPage() {
 
       setMsg("");
       endRef.current?.scrollIntoView({ behavior: "smooth" });
-    } catch (e: any) {
-      toast.error("Falha ao enviar mensagem", { description: e?.message });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Erro desconhecido";
+      toast.error("Falha ao enviar mensagem", { description: message });
     } finally {
       setSending(false);
     }
@@ -304,9 +329,10 @@ export default function AdminChamadoPage() {
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
       await fetchAnexos(ticket.id);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Erro desconhecido";
       console.error("Erro no upload:", err);
-      toast.error("Falha ao enviar arquivo.", { description: err.message });
+      toast.error("Falha ao enviar arquivo.", { description: message });
     } finally {
       setUploading(false);
     }
@@ -351,7 +377,7 @@ export default function AdminChamadoPage() {
             <h1 className="font-grotesk text-xl sm:text-2xl font-semibold tracking-tight line-clamp-2">
               {ticket.titulo}
             </h1>
-            <p className="mt-2 text-sm text-muted-foreground whitespace-pre-wrap">{ticket.descricao}</p>
+            <p className="mt-2 text-sm text-muted-foreground whitespace-pre-wrap">{ticket.descricao || "—"}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2 flex-shrink-0 pt-1">
             <TicketStatusBadge status={ticket.status} />
@@ -394,13 +420,47 @@ export default function AdminChamadoPage() {
             <Clock className="size-4 flex-shrink-0 text-muted-foreground" />
             <span className="text-muted-foreground">Atualizado:</span>
             <span className="font-medium truncate">
-              {new Date(ticket.atualizadoEm).toLocaleString("pt-BR", {
-                day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
-              })}
+              {formatDateTimeOptional(ticket.atualizadoEm)}
             </span>
           </div>
         </div>
       </div>
+
+      <section className="rounded-xl border border-[var(--border)] bg-card p-4 mb-6">
+        <div className="flex items-center gap-2 mb-3">
+          <Building2 className="size-4 text-[var(--brand-red)]" />
+          <h2 className="font-semibold">Dados acadêmicos</h2>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3 text-sm">
+          <InfoItem label="Unidade Fatec" value={ticket.unidadeFatec} />
+          <InfoItem label="Curso" value={ticket.curso} />
+          <InfoItem label="Turno" value={ticket.turno} />
+          <InfoItem label="Turma" value={ticket.turma} />
+          <InfoItem label="Semestre" value={ticket.semestre} />
+          <InfoItem label="Matriz curricular" value={ticket.matrizCurricular} />
+          <InfoItem label="Processo acadêmico" value={ticket.processoAcademico} />
+          <InfoItem label="Categoria acadêmica" value={ticket.categoriaAcademica} />
+          <InfoItem label="Impacto para o aluno" value={ticket.impactoAluno} />
+          <InfoItem label="Prazo relacionado" value={ticket.prazoAcademicoRelacionado} />
+          <InfoItem label="Data limite acadêmica" value={formatDateTimeOptional(ticket.dataLimiteAcademica)} />
+          <InfoItem label="Canal preferencial" value={ticket.canalPreferencialResposta} />
+          <InfoItem label="Setor atual" value={ticket.setorAtual ?? ticket.setor?.nome} />
+          <InfoItem label="Responsável atual" value={ticket.responsavelAtual ?? ticket.responsavel?.nome} />
+          <InfoItem label="Serviço ID" value={ticket.servicoId ?? ticket.servico?.id} />
+          <InfoItem label="Documentos obrigatórios" value={ticket.documentosObrigatorios} />
+          <InfoItem label="Documentos pendentes" value={ticket.documentosPendentes} />
+          <InfoItem label="SLA" value={ticket.slaHoras ? `${ticket.slaHoras}h` : ticket.slaDias ? `${ticket.slaDias} dia(s)` : null} />
+          <InfoItem label="Vencimento SLA" value={formatDateTimeOptional(ticket.vencimentoSla)} />
+        </div>
+
+        {(ticket.motivoEncaminhamento || ticket.observacaoInterna) && (
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+            <InfoItem label="Motivo do encaminhamento" value={ticket.motivoEncaminhamento} multiline />
+            <InfoItem label="Observação interna" value={ticket.observacaoInterna} multiline />
+          </div>
+        )}
+      </section>
 
       {/* layout: chat/anexos à esquerda, gestão/histórico à direita */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">

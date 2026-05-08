@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
   Search,
   AlertTriangle,
-  ChevronRight,
   Paperclip,
   Plus,
   Loader2,
@@ -16,32 +15,9 @@ import MobileSidebarTriggerAluno from "../_components/MobileSidebarTriggerAluno"
 import { apiFetch } from "../../../../utils/api";
 import { cx } from '../../../../utils/cx'
 import TicketStatusBadge from "../../../components/shared/TicketStatusBadge";
+import type { Chamado, PageResponse, Status } from "../../../../utils/types";
 
-/* ---------- Tipos ---------- */
-type Status =
-  | "ABERTO"
-  | "EM_ATENDIMENTO"
-  | "AGUARDANDO_USUARIO"
-  | "RESOLVIDO"
-  | "ENCERRADO";
-
-type Chamado = {
-  id: string;
-  protocolo?: string | null;
-  titulo: string;
-  criadoEm: string;
-  status: Status;
-  setor?: { nome?: string | null } | null;
-  precisaAcaoDoAluno?: boolean | null;
-  mensagensNaoLidas?: number | null;
-};
-
-type PageResp = {
-  total: number;
-  page: number;
-  pageSize: number;
-  items: Chamado[];
-};
+type PageResp = PageResponse<Chamado>;
 
 
 function AcoesChamado({ c }: { c: Chamado }) {
@@ -108,8 +84,9 @@ export default function MeusChamadosPage() {
         }
         const data: PageResp = await res.json();
         if (alive) setDados(data.items ?? []);
-      } catch (err: any) {
-        toast.error("Erro ao carregar solicitações acadêmicas", { description: err?.message });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : undefined;
+        toast.error("Erro ao carregar solicitações acadêmicas", { description: message });
       } finally {
         if (alive) setLoading(false);
       }
@@ -197,7 +174,7 @@ export default function MeusChamadosPage() {
           <select
             className="h-10 w-full sm:w-[200px] px-3 rounded-lg border border-[var(--border)] bg-background focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
             value={status}
-            onChange={(e) => setStatus(e.target.value as any)}
+            onChange={(e) => setStatus(e.target.value as Status | "ALL")}
           >
             <option value="ALL">Todos os status</option>
             <option value="ABERTO">Solicitação recebida pela Fatec.</option>
