@@ -1,73 +1,24 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { Search, Layers, BookOpen, Plus, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { Search, Layers, BookOpen, Plus, Loader2, ArrowRight } from "lucide-react";
 import MobileSidebarTriggerAluno from "../_components/MobileSidebarTriggerAluno";
-import { cx } from '../../../../utils/cx'
+import { CATALOGO_INSTITUCIONAL, type CatalogResponse, type ServicoCatalogo } from "../../../../utils/catalogo";
+import { cx } from "../../../../utils/cx";
 
-/* ----------------------------- Tipos ----------------------------- */
-type Servico = {
-  id: string;
-  nome: string;
-  descricao?: string | null;
-  ativo: boolean;
-  categoriaId?: string | null;
-};
+type Servico = ServicoCatalogo & { categoriaNome?: string };
 
-type Categoria = {
-  id: string;
-  nome: string;
-  descricao?: string | null;
-  servicos: Servico[];
-};
+const MOCK: CatalogResponse = CATALOGO_INSTITUCIONAL;
 
-type CatalogResponse = {
-  categorias: Categoria[];
-};
-
-/* ----------------------------- MOCK (fallback) ----------------------------- */
-const MOCK: CatalogResponse = {
-  categorias: [
-    {
-      id: "cat-secretaria",
-      nome: "Secretaria",
-      descricao: "Atendimentos acadêmicos e documentação",
-      servicos: [
-        { id: "s1", nome: "Revisão de nota", descricao: "Solicite revisão da avaliação", ativo: true },
-        { id: "s2", nome: "Histórico escolar", descricao: "Gere histórico/declarações", ativo: true },
-        { id: "s3", nome: "Aproveitamento de estudos", descricao: "Solicite análise de equivalência curricular", ativo: false },
-      ],
-    },
-    {
-      id: "cat-financeiro",
-      nome: "Financeiro",
-      descricao: "Pagamentos e documentos financeiros",
-      servicos: [
-        { id: "s4", nome: "2ª via de boleto", descricao: "Emissão de boleto atualizado", ativo: true },
-        { id: "s5", nome: "Negociação de débito", descricao: "Abra uma negociação financeira", ativo: true },
-      ],
-    },
-    {
-      id: "cat-ti",
-      nome: "TI Acadêmica",
-      descricao: "Acesso, e-mail e sistemas",
-      servicos: [
-        { id: "s6", nome: "Problemas no e-mail educacional", descricao: "Criação, acesso e ajustes", ativo: true },
-        { id: "s7", nome: "Troca de senha", descricao: "Redefinição de senha institucional", ativo: true },
-      ],
-    },
-  ],
-};
-
-/* ----------------------------- Componentes ----------------------------- */
 function CategoriaPill({ label, active, onClick }: { label: string; active?: boolean; onClick: () => void }) {
   return (
     <button
       className={cx(
         "h-9 px-3 rounded-lg border text-sm transition",
-        active ? "bg-primary text-primary-foreground border-transparent" : "bg-background hover:bg-[var(--muted)] border-[var(--border)]"
+        active
+          ? "bg-primary text-primary-foreground border-transparent"
+          : "bg-background hover:bg-[var(--muted)] border-[var(--border)]",
       )}
       onClick={onClick}
     >
@@ -76,48 +27,7 @@ function CategoriaPill({ label, active, onClick }: { label: string; active?: boo
   );
 }
 
-/* ----------------------------- Card de Serviço ----------------------------- */
 function ServicoCard({ s }: { s: Servico }) {
-  const router = useRouter();
-  const [loading, setLoading] = useState(false);
-
-  async function handleAbrirChamado() {
-    if (!s.ativo) return;
-    try {
-      setLoading(true);
-      const token = localStorage.getItem("accessToken");
-      if (!token) throw new Error("Sessão expirada. Faça login novamente.");
-
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/tickets`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          titulo: s.nome,
-          descricao: s.descricao || "Solicitação aberta via catálogo",
-          servicoId: s.id,
-          nivel: "N1",
-          prioridade: "MEDIA",
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || "Erro ao criar chamado");
-      }
-
-      const data = await res.json();
-      toast.success("Chamado criado com sucesso!");
-      router.push(`/aluno/chamados/${data.id}`);
-    } catch (err: any) {
-      toast.error(err.message || "Falha ao criar chamado");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   return (
     <div className="rounded-xl border border-[var(--border)] bg-card p-4 flex flex-col justify-between">
       <div className="mb-4">
@@ -133,47 +43,39 @@ function ServicoCard({ s }: { s: Servico }) {
           <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{s.descricao}</p>
         )}
       </div>
-
       <div className="flex items-center justify-between">
         <div className="text-xs text-muted-foreground">ID: {s.id}</div>
-        <button
-          disabled={!s.ativo || loading}
-          onClick={handleAbrirChamado}
-          className={cx(
-            "inline-flex items-center gap-1.5 h-9 px-3 rounded-md text-sm transition",
-            s.ativo
-              ? "bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-60"
-              : "bg-[var(--muted)] text-muted-foreground cursor-not-allowed"
-          )}
-        >
-          {loading ? (
-            <>
-              <Loader2 className="size-4 animate-spin" /> Abrindo...
-            </>
-          ) : (
-            <>
-              <Plus className="size-4" /> Abrir chamado
-            </>
-          )}
-        </button>
+        {s.ativo ? (
+          <Link
+            href={`/aluno/catalogo/${s.id}`}
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm transition hover:opacity-90"
+          >
+            <ArrowRight className="size-4" /> Preencher solicitação
+          </Link>
+        ) : (
+          <button
+            disabled
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-[var(--muted)] text-muted-foreground text-sm cursor-not-allowed"
+          >
+            <Plus className="size-4" /> Indisponível
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
-/* ----------------------------- Página Principal ----------------------------- */
 export default function CatalogoAlunoPage() {
   const [loading, setLoading] = useState(true);
   const [catalog, setCatalog] = useState<CatalogResponse>(MOCK);
   const [q, setQ] = useState("");
   const [catId, setCatId] = useState<string | "ALL">("ALL");
 
-
-  /* Buscar catálogo */
   useEffect(() => {
     async function fetchCatalog() {
       try {
-        const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/catalogo`;
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+        const url = apiBaseUrl ? `${apiBaseUrl}/catalogo` : "/catalogo";
         const res = await fetch(url, { cache: "no-store" });
         if (!res.ok) throw new Error("fallback");
         const data = (await res.json()) as CatalogResponse;
@@ -190,57 +92,70 @@ export default function CatalogoAlunoPage() {
   }, []);
 
   const flatServicos = useMemo(
-    () => catalog.categorias.flatMap((c) => c.servicos.map((s) => ({ ...s, categoriaId: c.id }))),
-    [catalog]
+    () =>
+      catalog.categorias.flatMap((c) =>
+        c.servicos.map((s) => ({ ...s, categoriaId: c.id, categoriaNome: c.nome })),
+      ),
+    [catalog],
   );
 
   const categoriasOpts = useMemo(
     () => catalog.categorias.map((c) => ({ id: c.id, nome: c.nome })),
-    [catalog]
+    [catalog],
   );
 
   const filtrados = useMemo(() => {
     const texto = q.trim().toLowerCase();
     return flatServicos.filter((s) => {
       const byCat = catId === "ALL" || s.categoriaId === catId;
-      const byText = !texto || s.nome.toLowerCase().includes(texto) || (s.descricao ?? "").toLowerCase().includes(texto);
-      return byCat && byText;
+      const searchable = [s.nome, s.descricao, s.categoriaNome, ...(s.palavrasChave ?? [])]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return byCat && (!texto || searchable.includes(texto));
     });
   }, [flatServicos, q, catId]);
 
   const kpis = useMemo(() => {
     const total = flatServicos.length;
     const ativos = flatServicos.filter((s) => s.ativo).length;
-    const indisponiveis = total - ativos;
-    return { total, ativos, indisponiveis };
+    return { total, ativos, indisponiveis: total - ativos };
   }, [flatServicos]);
 
-  /* ----------------------------- Render ----------------------------- */
   return (
     <>
-      {/* Topbar */}
       <div className="mb-6 flex items-center justify-between">
         <div>
+          <h1 className="font-grotesk text-2xl font-semibold tracking-tight">
+            Serviços acadêmicos da Fatec
+          </h1>
           <p className="text-xs text-muted-foreground mt-2">
-            Catálogo: {kpis.ativos} serviços disponíveis • {kpis.indisponiveis} indisponíveis
+            Escolha um serviço para iniciar o preenchimento guiado. O ticket só será criado após a
+            revisão final · {kpis.ativos} disponíveis · {kpis.indisponiveis} indisponíveis
           </p>
         </div>
-        <MobileSidebarTriggerAluno />
       </div>
 
-      {/* Filtros */}
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-2">
-          <CategoriaPill label="Todas categorias" active={catId === "ALL"} onClick={() => setCatId("ALL")} />
+          <CategoriaPill
+            label="Todas categorias"
+            active={catId === "ALL"}
+            onClick={() => setCatId("ALL")}
+          />
           {categoriasOpts.map((c) => (
-            <CategoriaPill key={c.id} label={c.nome} active={catId === c.id} onClick={() => setCatId(c.id)} />
+            <CategoriaPill
+              key={c.id}
+              label={c.nome}
+              active={catId === c.id}
+              onClick={() => setCatId(c.id)}
+            />
           ))}
         </div>
-
         <div className="relative w-full lg:w-[360px]">
           <Search className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
           <input
-            placeholder="Buscar por nome ou descrição"
+            placeholder="Buscar por nome, descrição, categoria ou CPS/Fatec"
             className="w-full h-10 rounded-lg border border-[var(--border)] bg-input px-9 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -248,7 +163,6 @@ export default function CatalogoAlunoPage() {
         </div>
       </div>
 
-      {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
         <div className="rounded-xl border border-[var(--border)] bg-card p-4 flex items-center gap-3">
           <Layers className="size-5 text-muted-foreground" />
@@ -273,15 +187,15 @@ export default function CatalogoAlunoPage() {
         </div>
       </div>
 
-      {/* Lista de serviços */}
       <div className="rounded-xl border border-[var(--border)] bg-card p-4">
         {loading ? (
           <div className="flex items-center justify-center py-10 text-muted-foreground gap-2">
-            <Loader2 className="size-4 animate-spin" />
-            Carregando catálogo...
+            <Loader2 className="size-4 animate-spin" /> Carregando catálogo...
           </div>
         ) : filtrados.length === 0 ? (
-          <div className="py-10 text-center text-muted-foreground">Nenhum serviço encontrado com os filtros atuais.</div>
+          <div className="py-10 text-center text-muted-foreground">
+            Nenhum serviço encontrado com os filtros atuais.
+          </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {filtrados.map((s) => (
