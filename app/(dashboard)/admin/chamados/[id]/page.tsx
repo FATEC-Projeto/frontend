@@ -1,22 +1,28 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft, Loader2, Send, User, Building2, Tag, Clock,
   CheckCircle2, RotateCcw, Pencil, Save, MessageSquareText,
-  Paperclip, Download, Upload,
+  Paperclip, Download, Upload, Route,
 } from "lucide-react";
 import { apiFetch } from "../../../../../utils/api";
 import { toast } from "sonner";
-import type { Chamado, Nivel, Prioridade, SetorMin, ServicoMin, Status, UsuarioMin } from "../../../../../utils/types";
 
 import { cx } from '../../../../../utils/cx'
 import TicketStatusBadge from "../../../../components/shared/TicketStatusBadge";
 import LoadingSpinner from "../../../../components/shared/LoadingSpinner";
 
 /* ===== Tipos ===== */
+type Nivel = "N1" | "N2" | "N3";
+type Status = "ABERTO" | "EM_ATENDIMENTO" | "AGUARDANDO_USUARIO" | "RESOLVIDO" | "ENCERRADO";
+type Prioridade = "BAIXA" | "MEDIA" | "ALTA" | "URGENTE";
+
+type UsuarioMin = { id: string; nome?: string | null; emailPessoal?: string | null };
+type SetorMin = { id: string; nome?: string | null };
+type ServicoMin = { id: string; nome?: string | null };
 type ClienteMin = { id: string; nome?: string | null };
 type ContratoMin = { id: string; numero?: string | null };
 
@@ -47,12 +53,26 @@ type AnexoInfo = {
   enviadoPor?: { id: string; nome?: string | null } | null;
 };
 
-type Ticket = Chamado & {
+type Ticket = {
+  id: string;
+  protocolo?: string | null;
+  titulo: string;
   descricao: string;
   nivel: Nivel;
+  status: Status;
   prioridade: Prioridade;
   criadoPorId: string;
+  criadoEm: string;
   atualizadoEm: string;
+  encerradoEm?: string | null;
+  // Catalog wizard fields
+  catalogoServicoId?: string | null;
+  catalogoCategoriaId?: string | null;
+  catalogoCategoriaNome?: string | null;
+  setorProvavel?: string | null;
+  dadosAcademicos?: Record<string, string> | null;
+  camposEspecificos?: Record<string, string> | null;
+  origem?: string | null;
 
   criadoPor?: UsuarioMin | null;
   responsavel?: UsuarioMin | null;
@@ -64,67 +84,35 @@ type Ticket = Chamado & {
   historico?: Historico[];
 };
 
-function formatOptional(value: unknown): string {
-  if (Array.isArray(value)) return value.filter(Boolean).join(", ") || "—";
-  if (value === null || value === undefined || value === "") return "—";
-  return String(value);
+function formatarChave(key: string): string {
+  return key
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/^./, c => c.toUpperCase())
+    .trim();
 }
 
-function formatDateTimeOptional(value?: string | null): string {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function InfoItem({
-  label,
-  value,
-  multiline = false,
-}: {
-  label: string;
-  value: unknown;
-  multiline?: boolean;
-}) {
-  return (
-    <div className={cx("min-w-0", multiline && "rounded-lg border border-[var(--border)] bg-background p-3")}>
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className={cx("font-medium", multiline ? "mt-1 whitespace-pre-wrap" : "truncate")}>
-        {formatOptional(value)}
-      </div>
-    </div>
-  );
-}
+const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 /* ===== Página ===== */
 export default function AdminChamadoPage() {
   const { id } = useParams<{ id: string }>();
-  const API = useMemo(() => process.env.NEXT_PUBLIC_API_BASE_URL, []);
   const [ticket, setTicket] = useState<Ticket | null>(null);
 
-  // dados gerais
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  // edição
+  const [err, setErr] = useState<string | null>(null);
+
   const [status, setStatus] = useState<Status>("ABERTO");
   const [prioridade, setPrioridade] = useState<Prioridade>("MEDIA");
   const [nivel, setNivel] = useState<Nivel>("N1");
   const [responsavelId, setResponsavelId] = useState<string>("");
 
-  // chat
   const [sending, setSending] = useState(false);
   const [msg, setMsg] = useState("");
   const chatRef = useRef<HTMLDivElement | null>(null);
   const knownIds = useRef<Set<string>>(new Set());
   const endRef = useRef<HTMLDivElement>(null);
 
-  // anexos
   const [anexos, setAnexos] = useState<AnexoInfo[]>([]);
   const [loadingAnexos, setLoadingAnexos] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -135,7 +123,6 @@ export default function AdminChamadoPage() {
     () =>
       [
         "criadoPor",
-        "aluno",
         "responsavel",
         "setor",
         "servico",
@@ -147,74 +134,73 @@ export default function AdminChamadoPage() {
     []
   );
 
-  async function fetchAnexos(ticketId: string) {
-    if (!API) return;
+  const fetchAnexos = useCallback(async (ticketId: string) => {
     setLoadingAnexos(true);
     try {
       const res = await apiFetch(`${API}/tickets/${ticketId}/anexos`);
       if (!res.ok) throw new Error("Falha ao buscar anexos");
       const data = await res.json();
       setAnexos(Array.isArray(data) ? data : []);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Erro desconhecido";
-      console.error("Erro ao buscar anexos:", err);
-      toast.error("Falha ao carregar anexos.", { description: message });
+    } catch (err: any) {
+      toast.error("Falha ao carregar anexos.", { description: err.message });
     } finally {
       setLoadingAnexos(false);
     }
-  }
+  }, []);
 
-  async function load() {
-    if (!id || !API) return;
+  const load = useCallback(async () => {
+    if (!id) return;
     try {
       setLoading(true);
+      setErr(null);
+
       const res = await apiFetch(`${API}/tickets/${id}?include=${encodeURIComponent(include)}`, {
         cache: "no-store",
       });
       if (!res.ok) {
-        const e = await res.json().catch((): { error?: string } => ({}));
-        throw new Error(e.error || `Erro HTTP ${res.status}`);
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e?.error || `Erro HTTP ${res.status}`);
       }
       const data: Ticket = await res.json();
 
-      // preencher dedup
       (data.mensagens ?? []).forEach((m) => knownIds.current.add(m.id));
 
       setTicket(data);
       setStatus(data.status);
       setPrioridade(data.prioridade);
       setNivel(data.nivel);
-      setResponsavelId(data.responsavelId ?? data.responsavel?.id ?? "");
+      setResponsavelId((data as any).responsavelId ?? data.responsavel?.id ?? "");
 
       fetchAnexos(data.id);
-    } catch {
+    } catch (e: any) {
+      setErr(e?.message || "Falha ao carregar");
       setTicket(null);
     } finally {
       setLoading(false);
     }
-  }
+  }, [id, include, fetchAnexos]);
 
-  useEffect(() => { load(); }, [id, API]);
+  useEffect(() => { load(); }, [load]);
 
-  // rolar pro fim quando mensagens mudarem
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [ticket?.mensagens?.length]);
 
-  // WebSocket em tempo real (apenas chat)
+  // WebSocket em tempo real — token lido dentro de connect() para ficar fresco
   useEffect(() => {
     if (!id || !API) return;
-    const userId = localStorage.getItem("userId") || "secretaria";
-    const wsUrl = API.replace(/^http/, "ws") + `/ws?userId=${userId}`;
 
     let ws: WebSocket | null = null;
-    let reconnectTimer: NodeJS.Timeout;
+    let attempt = 0;
+    let reconnectTimer: ReturnType<typeof setTimeout>;
 
     function connect() {
+      const token = typeof window !== "undefined" ? (localStorage.getItem("accessToken") ?? "") : "";
+      const wsUrl = API.replace(/^http/, "ws") + `/ws?token=${encodeURIComponent(token)}`;
       ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
-        // handshake simples
+        attempt = 0;
         try { ws?.send(JSON.stringify({ type: "hello", chamadoId: id })); } catch {}
       };
 
@@ -231,13 +217,15 @@ export default function AdminChamadoPage() {
             );
             endRef.current?.scrollIntoView({ behavior: "smooth" });
           }
-        } catch (err) {
-          console.error("WS error:", err);
+        } catch (e) {
+          if (process.env.NODE_ENV === "development") console.warn("WS parse error:", e);
         }
       };
 
       ws.onclose = () => {
-        reconnectTimer = setTimeout(connect, 4000);
+        const delay = Math.min(1_000 * 2 ** attempt, 30_000);
+        attempt++;
+        reconnectTimer = setTimeout(connect, delay);
       };
     }
 
@@ -246,10 +234,10 @@ export default function AdminChamadoPage() {
       clearTimeout(reconnectTimer);
       ws?.close();
     };
-  }, [id, API]);
+  }, [id]);
 
   async function saveEdits(newStatus?: Status) {
-    if (!ticket || !API) return;
+    if (!ticket) return;
     try {
       setSaving(true);
       const body = {
@@ -263,21 +251,20 @@ export default function AdminChamadoPage() {
         body: JSON.stringify(body),
       });
       if (!res.ok) {
-        const e = await res.json().catch((): { error?: string } => ({}));
-        throw new Error(e.error || `Erro HTTP ${res.status}`);
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e?.error || `Erro HTTP ${res.status}`);
       }
       toast.success("Alterações salvas!");
       await load();
-    } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : "Erro desconhecido";
-      toast.error("Falha ao salvar", { description: message });
+    } catch (e: any) {
+      toast.error("Falha ao salvar", { description: e?.message });
     } finally {
       setSaving(false);
     }
   }
 
   async function sendMessage() {
-    if (!ticket || !msg.trim() || !API) return;
+    if (!ticket || !msg.trim()) return;
     setSending(true);
     try {
       const res = await apiFetch(`${API}/tickets/${ticket.id}/mensagens`, {
@@ -285,8 +272,8 @@ export default function AdminChamadoPage() {
         body: JSON.stringify({ conteudo: msg.trim() }),
       });
       if (!res.ok) {
-        const e = await res.json().catch((): { error?: string } => ({}));
-        throw new Error(e.error || `Erro HTTP ${res.status}`);
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e?.error || `Erro HTTP ${res.status}`);
       }
       const nova = await res.json();
 
@@ -299,26 +286,23 @@ export default function AdminChamadoPage() {
 
       setMsg("");
       endRef.current?.scrollIntoView({ behavior: "smooth" });
-    } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : "Erro desconhecido";
-      toast.error("Falha ao enviar mensagem", { description: message });
+    } catch (e: any) {
+      toast.error("Falha ao enviar mensagem", { description: e?.message });
     } finally {
       setSending(false);
     }
   }
 
-  const handleUpload = async () => {
-    if (!selectedFile || !ticket?.id || !API) return;
+  const handleUpload = useCallback(async () => {
+    if (!selectedFile || !ticket?.id) return;
 
     setUploading(true);
     const formData = new FormData();
     formData.append("file", selectedFile);
 
     try {
-      const token = localStorage.getItem("accessToken") || "";
-      const res = await fetch(`${API}/tickets/${ticket.id}/anexos`, {
+      const res = await apiFetch(`${API}/tickets/${ticket.id}/anexos`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
       if (!res.ok) {
@@ -329,14 +313,12 @@ export default function AdminChamadoPage() {
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
       await fetchAnexos(ticket.id);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Erro desconhecido";
-      console.error("Erro no upload:", err);
-      toast.error("Falha ao enviar arquivo.", { description: message });
+    } catch (err: any) {
+      toast.error("Falha ao enviar arquivo.", { description: err.message });
     } finally {
       setUploading(false);
     }
-  };
+  }, [selectedFile, ticket?.id, fetchAnexos]);
 
   if (loading && !ticket) {
     return (
@@ -358,6 +340,16 @@ export default function AdminChamadoPage() {
     .slice()
     .sort((a, b) => +new Date(b.criadoEm) - +new Date(a.criadoEm));
 
+  const camposEspecificosEntries = ticket.camposEspecificos
+    ? Object.entries(ticket.camposEspecificos).filter(([, v]) => v)
+    : [];
+
+  const dadosAcademicosEntries = ticket.dadosAcademicos
+    ? Object.entries(ticket.dadosAcademicos).filter(([, v]) => v)
+    : [];
+
+  const isWizardTicket = ticket.origem === "catalogo_wizard_aluno";
+
   return (
     <div className="px-4 py-2 sm:px-6 lg:px-8">
       <div className="mb-4 flex items-center justify-between">
@@ -377,7 +369,7 @@ export default function AdminChamadoPage() {
             <h1 className="font-grotesk text-xl sm:text-2xl font-semibold tracking-tight line-clamp-2">
               {ticket.titulo}
             </h1>
-            <p className="mt-2 text-sm text-muted-foreground whitespace-pre-wrap">{ticket.descricao || "—"}</p>
+            <p className="mt-2 text-sm text-muted-foreground whitespace-pre-wrap">{ticket.descricao}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2 flex-shrink-0 pt-1">
             <TicketStatusBadge status={ticket.status} />
@@ -420,53 +412,56 @@ export default function AdminChamadoPage() {
             <Clock className="size-4 flex-shrink-0 text-muted-foreground" />
             <span className="text-muted-foreground">Atualizado:</span>
             <span className="font-medium truncate">
-              {formatDateTimeOptional(ticket.atualizadoEm)}
+              {new Date(ticket.atualizadoEm).toLocaleString("pt-BR", {
+                day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
+              })}
             </span>
           </div>
         </div>
       </div>
 
-      <section className="rounded-xl border border-[var(--border)] bg-card p-4 mb-6">
-        <div className="flex items-center gap-2 mb-3">
-          <Building2 className="size-4 text-[var(--brand-red)]" />
-          <h2 className="font-semibold">Dados acadêmicos</h2>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3 text-sm">
-          <InfoItem label="Unidade Fatec" value={ticket.unidadeFatec} />
-          <InfoItem label="Curso" value={ticket.curso} />
-          <InfoItem label="Turno" value={ticket.turno} />
-          <InfoItem label="Turma" value={ticket.turma} />
-          <InfoItem label="Semestre" value={ticket.semestre} />
-          <InfoItem label="Matriz curricular" value={ticket.matrizCurricular} />
-          <InfoItem label="Processo acadêmico" value={ticket.processoAcademico} />
-          <InfoItem label="Categoria acadêmica" value={ticket.categoriaAcademica} />
-          <InfoItem label="Impacto para o aluno" value={ticket.impactoAluno} />
-          <InfoItem label="Prazo relacionado" value={ticket.prazoAcademicoRelacionado} />
-          <InfoItem label="Data limite acadêmica" value={formatDateTimeOptional(ticket.dataLimiteAcademica)} />
-          <InfoItem label="Canal preferencial" value={ticket.canalPreferencialResposta} />
-          <InfoItem label="Setor atual" value={ticket.setorAtual ?? ticket.setor?.nome} />
-          <InfoItem label="Responsável atual" value={ticket.responsavelAtual ?? ticket.responsavel?.nome} />
-          <InfoItem label="Serviço ID" value={ticket.servicoId ?? ticket.servico?.id} />
-          <InfoItem label="Documentos obrigatórios" value={ticket.documentosObrigatorios} />
-          <InfoItem label="Documentos pendentes" value={ticket.documentosPendentes} />
-          <InfoItem label="SLA" value={ticket.slaHoras ? `${ticket.slaHoras}h` : ticket.slaDias ? `${ticket.slaDias} dia(s)` : null} />
-          <InfoItem label="Vencimento SLA" value={formatDateTimeOptional(ticket.vencimentoSla)} />
-        </div>
-
-        {(ticket.motivoEncaminhamento || ticket.observacaoInterna) && (
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-            <InfoItem label="Motivo do encaminhamento" value={ticket.motivoEncaminhamento} multiline />
-            <InfoItem label="Observação interna" value={ticket.observacaoInterna} multiline />
+      {/* Roteamento do Catálogo — visível apenas para chamados do wizard */}
+      {isWizardTicket && (
+        <div className="rounded-xl border border-[var(--border)] bg-card mb-6">
+          <div className="p-3 border-b border-[var(--border)] flex items-center gap-2">
+            <Route className="size-4 text-[var(--brand-red)]" />
+            <div className="font-semibold">Roteamento do Catálogo</div>
+            <span className="ml-auto text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Wizard do aluno</span>
           </div>
-        )}
-      </section>
+          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3 text-sm">
+            {ticket.catalogoCategoriaNome && (
+              <div>
+                <div className="text-xs text-muted-foreground mb-0.5">Processo / Serviço</div>
+                <div className="font-medium">{ticket.catalogoCategoriaNome}</div>
+              </div>
+            )}
+            {ticket.setorProvavel && (
+              <div>
+                <div className="text-xs text-muted-foreground mb-0.5">Setor de destino inicial</div>
+                <div className="font-medium">{ticket.setorProvavel}</div>
+              </div>
+            )}
+            {ticket.catalogoServicoId && (
+              <div>
+                <div className="text-xs text-muted-foreground mb-0.5">ID do serviço (catálogo)</div>
+                <div className="font-mono text-xs bg-muted px-2 py-1 rounded">{ticket.catalogoServicoId}</div>
+              </div>
+            )}
+            {ticket.setor && (
+              <div>
+                <div className="text-xs text-muted-foreground mb-0.5">Setor atribuído (atual)</div>
+                <div className="font-medium text-green-700 dark:text-green-400">{ticket.setor.nome}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* layout: chat/anexos à esquerda, gestão/histórico à direita */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-        {/* ESQUERDA: Chat + Anexos */}
+        {/* ESQUERDA: Chat + Campos específicos + Anexos */}
         <div className="xl:col-span-8 space-y-6">
-          {/* CHAT – visual igual ao do aluno */}
+          {/* CHAT */}
           <section className="rounded-xl border border-[var(--border)] bg-card flex flex-col">
             <div className="p-3 border-b border-[var(--border)] flex items-center gap-2">
               <MessageSquareText className="size-4 text-[var(--brand-red)]" />
@@ -482,7 +477,6 @@ export default function AdminChamadoPage() {
                   Sem mensagens ainda.
                 </div>
               ) : (
-                // Dedup visual extra (defensivo)
                 Array.from(
                   new Map(mensagens.map((m) => [`${m.id}-${m.criadoEm}`, m])).values()
                 ).map((m) => {
@@ -503,7 +497,7 @@ export default function AdminChamadoPage() {
                         style={{ overflowWrap: "break-word", wordBreak: "break-word", overflow: "hidden" }}
                       >
                         <div className="text-xs opacity-80 mb-1">
-                          {isAluno ? nomeAutor : "Você"} ·{" "}
+                          {isAluno ? nomeAutor : "Você"} ·{" "}
                           {new Date(m.criadoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                         </div>
                         <div className="break-words whitespace-pre-wrap leading-relaxed">{m.conteudo}</div>
@@ -520,8 +514,9 @@ export default function AdminChamadoPage() {
                 <textarea
                   value={msg}
                   onChange={(e) => setMsg(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendMessage(); } }}
                   rows={2}
-                  placeholder="Escreva uma mensagem…"
+                  placeholder="Escreva uma mensagem… (Ctrl+Enter para enviar)"
                   className="flex-1 max-h-32 rounded-lg border border-[var(--border)] bg-input px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--ring)] resize-none"
                   disabled={sending}
                 />
@@ -536,6 +531,40 @@ export default function AdminChamadoPage() {
               </div>
             </div>
           </section>
+
+          {/* CAMPOS ESPECÍFICOS DO SERVIÇO */}
+          {camposEspecificosEntries.length > 0 && (
+            <section className="rounded-xl border border-[var(--border)] bg-card p-4">
+              <h2 className="text-base font-semibold mb-3 flex items-center gap-2">
+                <Tag className="size-4" /> Campos específicos do serviço
+              </h2>
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                {camposEspecificosEntries.map(([key, value]) => (
+                  <div key={key}>
+                    <dt className="text-xs text-muted-foreground mb-0.5">{formatarChave(key)}</dt>
+                    <dd className="font-medium">{String(value)}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          )}
+
+          {/* DADOS ACADÊIMICOS */}
+          {dadosAcademicosEntries.length > 0 && (
+            <section className="rounded-xl border border-[var(--border)] bg-card p-4">
+              <h2 className="text-base font-semibold mb-3 flex items-center gap-2">
+                <User className="size-4" /> Dados acadêmicos do aluno
+              </h2>
+              <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3 text-sm">
+                {dadosAcademicosEntries.map(([key, value]) => (
+                  <div key={key}>
+                    <dt className="text-xs text-muted-foreground mb-0.5">{formatarChave(key)}</dt>
+                    <dd className="font-medium">{String(value)}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          )}
 
           {/* ANEXOS */}
           <section className="rounded-xl border border-[var(--border)] bg-card p-4">
@@ -614,12 +643,12 @@ export default function AdminChamadoPage() {
                   {uploading ? "Enviando..." : "Enviar arquivo"}
                 </button>
               )}
-              <p className="text-xs text-muted-foreground mt-2">Limite por arquivo: 10MB (exemplo).</p>
+              <p className="text-xs text-muted-foreground mt-2">Limite por arquivo: 10MB.</p>
             </div>
           </section>
         </div>
 
-        {/* DIREITA: Gestão + Histórico (mantidos) */}
+        {/* DIREITA: Gestão + Histórico */}
         <aside className="xl:col-span-4 space-y-6">
           <div className="rounded-xl border border-[var(--border)] bg-card">
             <div className="p-3 border-b border-[var(--border)] flex items-center gap-2">
