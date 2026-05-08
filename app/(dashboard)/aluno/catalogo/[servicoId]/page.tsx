@@ -54,6 +54,8 @@ const ALLOWED_UPLOAD_TYPES = [
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "text/plain",
 ].join(",");
+const MAX_UPLOAD_SIZE = 10 * 1024 * 1024;
+const ALLOWED_TYPES = new Set(ALLOWED_UPLOAD_TYPES.split(","));
 
 const SETOR_PROVAVEL: Record<string, string> = {
   "secretaria-academica": "Secretaria Acadêmica",
@@ -193,12 +195,10 @@ const CAMPOS_ESPECIFICOS: Record<string, CampoWizard[]> = {
     campo("disciplinas", "Disciplinas envolvidas", "textarea", false),
     campo("justificativa", "Justificativa", "textarea", true),
   ],
-  // Coordenação — formulário unificado
   "coordenacao-duvida-matriz-curricular": camposCoordenacao(),
   "coordenacao-reuniao": camposCoordenacao(),
   "coordenacao-analise-disciplina-equivalencia": camposCoordenacao(),
   "coordenacao-orientacao-tg-tcc-projeto-integrador": camposCoordenacao(),
-  // Estágio — formulário completo
   "estagio-termo-compromisso": camposEstagio(),
   "estagio-termo-aditivo": camposEstagio(),
   "estagio-relatorio": camposEstagio(),
@@ -207,10 +207,8 @@ const CAMPOS_ESPECIFICOS: Record<string, CampoWizard[]> = {
     campo("tipoEstagio", "Tipo de estágio", "select", true, undefined, ["Obrigatório", "Não obrigatório", "Ainda não sei"]),
     campo("duvida", "Dúvida", "textarea", true),
   ],
-  // SIGA — formulário unificado
   "sistemas-problema-acesso-siga": camposSIGA(),
   "sistemas-dados-divergentes-siga": camposSIGA(),
-  // E-mail / Senha — formulário unificado
   "sistemas-email-institucional": camposEmailSenha(),
   "sistemas-redefinicao-senha-institucional": camposEmailSenha(),
 };
@@ -259,9 +257,6 @@ function buildDescricao(params: {
     ...(anexos.length
       ? anexos.map((f) => `- ${f.name} (${Math.ceil(f.size / 1024)} KB)`)
       : ["Nenhum anexo informado."]),
-    "",
-    "[Migração]",
-    "Dados acadêmicos, campos específicos e metadados de anexos também seguem no payload estruturado.",
   ].join("\n");
 }
 
@@ -285,7 +280,7 @@ export default function SolicitacaoCatalogoPage() {
     async function fetchCatalog() {
       try {
         const url = API ? `${API}/catalogo` : "/catalogo";
-        const res = await fetch(url, { cache: "no-store" });
+        const res = await apiFetch(url, { cache: "no-store" });
         if (!res.ok) throw new Error("fallback");
         setCatalog(normalizeCatalog((await res.json()) as CatalogResponse));
       } catch {
@@ -357,9 +352,24 @@ export default function SolicitacaoCatalogoPage() {
 
   function addFiles(files: FileList | null) {
     if (!files) return;
+    const fileArray = Array.from(files);
+    fileArray.filter((f) => f.size > MAX_UPLOAD_SIZE).forEach((f) =>
+      toast.error(`"${f.name}" excede 10 MB e não foi adicionado.`)
+    );
+    fileArray
+      .filter((f) => f.size <= MAX_UPLOAD_SIZE && f.type && !ALLOWED_TYPES.has(f.type))
+      .forEach((f) => toast.error(`Tipo de arquivo não permitido: ${f.name}`));
     setAnexos((prev) => {
       const existing = new Set(prev.map((f) => `${f.name}-${f.size}`));
-      return [...prev, ...Array.from(files).filter((f) => !existing.has(`${f.name}-${f.size}`))];
+      return [
+        ...prev,
+        ...fileArray.filter(
+          (f) =>
+            !existing.has(`${f.name}-${f.size}`) &&
+            f.size <= MAX_UPLOAD_SIZE &&
+            (!f.type || ALLOWED_TYPES.has(f.type))
+        ),
+      ];
     });
   }
 
@@ -384,8 +394,11 @@ export default function SolicitacaoCatalogoPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!servico) return;
-    const error = validateStep(5);
-    if (error) { toast.error(error); return; }
+    // Valida todas as etapas antes de submeter (evita bypass via clique direto na revisão)
+    for (let s = 1; s <= TOTAL_STEPS; s++) {
+      const error = validateStep(s);
+      if (error) { toast.error(error); setStep(s); return; }
+    }
 
     try {
       setSubmitting(true);
@@ -403,7 +416,6 @@ export default function SolicitacaoCatalogoPage() {
         camposEspecificos,
         anexos: anexos.map((f) => ({ nome: f.name, tamanho: f.size, tipo: f.type || "application/octet-stream" })),
         origem: "catalogo_wizard_aluno",
-        planoMigracao: "Manter descrição serializada até o backend persistir dadosAcademicos e camposEspecificos em campos próprios.",
       };
 
       const res = await apiFetch(`${API}/tickets`, { method: "POST", body: JSON.stringify(payload) });

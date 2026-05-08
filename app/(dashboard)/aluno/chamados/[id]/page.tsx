@@ -172,12 +172,7 @@ export default function ChamadoDetalhePage() {
   /* ===== WebSocket — JWT via ?token= + exponential backoff ===== */
   useEffect(() => {
     if (!API || !id) return;
-    const token =
-      typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
-    if (!token) return;
-
     const wsBase = API.replace(/^http/, "ws");
-    const wsUrl = `${wsBase}/ws?token=${encodeURIComponent(token)}`;
 
     let ws: WebSocket | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -186,6 +181,10 @@ export default function ChamadoDetalhePage() {
 
     function connect() {
       if (destroyed) return;
+      // Lê token fresco a cada reconexão (cobre renovações via apiFetch)
+      const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+      if (!token) return;
+      const wsUrl = `${wsBase}/ws?token=${encodeURIComponent(token)}`;
       ws = new WebSocket(wsUrl);
       ws.onopen = () => { attempt = 0; };
       ws.onmessage = (event) => {
@@ -425,7 +424,7 @@ export default function ChamadoDetalhePage() {
     );
 
   const isEncerrado = chamado.status === "ENCERRADO";
-  const groups = groupMensagens(msgs, chamado.criadoPorId);
+  const groups = groupMensagens(msgs, chamado.criadoPorId ?? undefined);
 
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 rounded-xl border border-[var(--border)] bg-card space-y-8">
@@ -551,7 +550,6 @@ export default function ChamadoDetalhePage() {
                       group.isAluno ? "items-end" : "items-start"
                     }`}
                   >
-                    {/* Nome do autor — apenas no primeiro grupo ou quando muda */}
                     <span className="text-[11px] text-muted-foreground px-1 mb-0.5">
                       {group.nomeAutor}
                     </span>
@@ -568,7 +566,6 @@ export default function ChamadoDetalhePage() {
                           }`}
                         >
                           <div className="whitespace-pre-wrap break-words">{m.conteudo}</div>
-                          {/* Timestamp visivel no último da sequência */}
                           {isLast && (
                             <div
                               className="text-[10px] opacity-60 mt-1 text-right"
@@ -598,7 +595,10 @@ export default function ChamadoDetalhePage() {
                 value={msgText}
                 onChange={(e) => setMsgText(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) sendMensagem();
+                  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    sendMensagem();
+                  }
                 }}
                 disabled={msgSending}
               />
@@ -637,7 +637,6 @@ export default function ChamadoDetalhePage() {
           <ul className="space-y-3 mb-4">
             {anexos.map((a) => (
               <li key={a.id} className="border rounded-md bg-background overflow-hidden">
-                {/* Preview inline para imagens */}
                 {a.mimeType.startsWith("image/") && (
                   <img
                     src={`${API}/anexos/${a.id}/download`}
@@ -707,7 +706,7 @@ export default function ChamadoDetalhePage() {
               </button>
             )}
             <p className="text-xs text-muted-foreground mt-2">
-              Máximo 10 MB · PDF, Word, Excel, imagens, TXT · ou arraste o arquivo para aárea de conversa
+              Máximo 10 MB · PDF, Word, Excel, imagens, TXT · ou arraste o arquivo para a área de conversa
             </p>
           </div>
         )}
