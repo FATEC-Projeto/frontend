@@ -20,7 +20,7 @@ import type { Chamado, Status } from "../../../../../utils/types";
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = new Set([
   "image/jpeg", "image/png", "image/gif", "image/webp",
   "application/pdf",
@@ -58,6 +58,45 @@ type AnexoInfo = {
   enviadoPor?: { id: string; nome?: string | null } | null;
 };
 
+type MensagemGroup = {
+  autorId: string | null;
+  isAluno: boolean;
+  nomeAutor: string;
+  msgs: Mensagem[];
+};
+
+/* ================= Helpers ================= */
+
+function relativeTime(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const s = Math.floor(diff / 1_000);
+  if (s < 60) return "agora";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `há ${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `há ${h}h`;
+  const d = Math.floor(h / 24);
+  if (d === 1) return "ontem";
+  if (d < 7) return `há ${d} dias`;
+  return new Date(dateStr).toLocaleDateString("pt-BR");
+}
+
+function groupMensagens(msgs: Mensagem[], criadoPorId?: string): MensagemGroup[] {
+  const groups: MensagemGroup[] = [];
+  for (const m of msgs) {
+    const autorId = m.autorId ?? null;
+    const isAluno = autorId === criadoPorId;
+    const nomeAutor = isAluno ? "Você" : (m.autor?.nome ?? "Secretaria");
+    const last = groups[groups.length - 1];
+    if (last && last.autorId === autorId) {
+      last.msgs.push(m);
+    } else {
+      groups.push({ autorId, isAluno, nomeAutor, msgs: [m] });
+    }
+  }
+  return groups;
+}
+
 /* ================ Página ================ */
 export default function ChamadoDetalhePage() {
   const { id } = useParams<{ id: string }>();
@@ -79,6 +118,8 @@ export default function ChamadoDetalhePage() {
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const [isDragging, setIsDragging] = useState(false);
 
   /* ===== Scroll ===== */
   function scrollToEnd(smooth = true) {
@@ -146,9 +187,7 @@ export default function ChamadoDetalhePage() {
     function connect() {
       if (destroyed) return;
       ws = new WebSocket(wsUrl);
-
       ws.onopen = () => { attempt = 0; };
-
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
@@ -161,10 +200,8 @@ export default function ChamadoDetalhePage() {
           }
         } catch {}
       };
-
       ws.onclose = () => {
         if (destroyed) return;
-        // Backoff: 1s, 2s, 4s, 8s … máximo 30s
         const delay = Math.min(1_000 * 2 ** attempt, 30_000);
         attempt++;
         reconnectTimer = setTimeout(connect, delay);
@@ -221,10 +258,9 @@ export default function ChamadoDetalhePage() {
 
   useEffect(() => { fetchAnexos(); }, [fetchAnexos]);
 
-  /* ===== Upload — usa apiFetch (auto-refresh) + validação ===== */
+  /* ===== Upload via apiFetch + validação ===== */
   const handleUpload = useCallback(async () => {
     if (!selectedFile || !chamado?.id || !API) return;
-
     if (selectedFile.size > MAX_FILE_SIZE_BYTES) {
       toast.error("Arquivo muito grande. Máximo permitido: 10 MB.");
       return;
@@ -233,7 +269,6 @@ export default function ChamadoDetalhePage() {
       toast.error("Tipo de arquivo não permitido.");
       return;
     }
-
     setUploading(true);
     try {
       const formData = new FormData();
@@ -254,7 +289,7 @@ export default function ChamadoDetalhePage() {
     }
   }, [selectedFile, chamado?.id, fetchAnexos]);
 
-  /* ===== Alterar status — retorna boolean, sem toast de sucesso (caller decide) ===== */
+  /* ===== Alterar status ===== */
   const atualizarStatus = useCallback(
     async (novoStatus: Status): Promise<boolean> => {
       if (!chamado?.id || !API) return false;
@@ -276,7 +311,22 @@ export default function ChamadoDetalhePage() {
     [chamado?.id, fetchChamado],
   );
 
-  /* ===== Confirmação encerramento ===== */
+  /* ===== Drag-drop ===== */
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragging(true);
+  }
+  function handleDragLeave(e: React.DragEvent) {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragging(false);
+  }
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) setSelectedFile(file);
+  }
+
+  /* ===== Confirm dialogs ===== */
   function confirmarEncerramento() {
     toast.custom((t) => (
       <div className="bg-card border border-[var(--border)] rounded-xl shadow-lg p-4 w-[360px] animate-in fade-in-50">
@@ -319,7 +369,6 @@ export default function ChamadoDetalhePage() {
     ));
   }
 
-  /* ===== Confirmação reabertura ===== */
   function confirmarReabertura() {
     toast.custom((t) => (
       <div className="bg-card border border-[var(--border)] rounded-xl shadow-lg p-4 w-[360px] animate-in fade-in-50">
@@ -376,6 +425,7 @@ export default function ChamadoDetalhePage() {
     );
 
   const isEncerrado = chamado.status === "ENCERRADO";
+  const groups = groupMensagens(msgs, chamado.criadoPorId);
 
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 rounded-xl border border-[var(--border)] bg-card space-y-8">
@@ -419,7 +469,7 @@ export default function ChamadoDetalhePage() {
 
       {/* Aviso solicitação respondida */}
       {chamado.status === "RESOLVIDO" && (
-        <div className="mt-4 rounded-lg border border-yellow-400/30 bg-yellow-100/20 text-yellow-700 dark:text-yellow-300 dark:bg-yellow-900/20 px-4 py-3 text-sm flex items-start gap-2">
+        <div className="rounded-lg border border-yellow-400/30 bg-yellow-100/20 text-yellow-700 dark:text-yellow-300 dark:bg-yellow-900/20 px-4 py-3 text-sm flex items-start gap-2">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             className="size-4 mt-0.5 shrink-0 text-yellow-500 dark:text-yellow-300"
@@ -444,7 +494,7 @@ export default function ChamadoDetalhePage() {
 
       {/* Botões de ação */}
       {chamado.status === "RESOLVIDO" && (
-        <div className="mt-4 flex gap-3">
+        <div className="flex gap-3">
           <button
             onClick={confirmarEncerramento}
             className="px-4 py-2 rounded-md bg-[#B91C1C] text-white text-sm font-medium hover:bg-[#991B1B] transition"
@@ -461,48 +511,79 @@ export default function ChamadoDetalhePage() {
       )}
 
       {/* Chat */}
-      <section className="rounded-xl border border-[var(--border)] bg-card flex flex-col">
+      <section
+        className="rounded-xl border border-[var(--border)] bg-card flex flex-col"
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
         <div className="p-3 border-b border-[var(--border)] text-xs text-muted-foreground">
           Conversa sobre a solicitação
         </div>
 
-        <div className="flex-1 p-4 space-y-3 overflow-y-auto max-h-[500px] rounded-b-lg scrollbar-thin">
-          {msgLoading ? (
-            <div className="flex items-center gap-2 text-muted-foreground text-sm">
-              <Loader2 className="size-4 animate-spin" />
-              Carregando mensagens...
+        <div
+          className={`flex-1 p-4 space-y-3 overflow-y-auto max-h-[500px] rounded-b-lg scrollbar-thin transition-colors ${
+            isDragging ? "bg-primary/5 border-2 border-dashed border-primary/40" : ""
+          }`}
+        >
+          {isDragging && (
+            <div className="flex items-center justify-center h-full text-primary text-sm font-medium py-8">
+              Solte o arquivo aqui para anexar
             </div>
-          ) : msgs.length === 0 ? (
-            <div className="text-sm text-muted-foreground border rounded-md p-3 bg-background text-center">
-              Nenhuma mensagem por aqui ainda.
-            </div>
-          ) : (
-            msgs.map((m) => {
-              const isAluno = m.autorId === chamado.criadoPorId;
-              return (
-                <div
-                  key={`${m.id}-${m.criadoEm}`}
-                  className={`flex ${isAluno ? "justify-end" : "justify-start"}`}
-                >
+          )}
+
+          {!isDragging && (
+            <>
+              {msgLoading ? (
+                <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                  <Loader2 className="size-4 animate-spin" />
+                  Carregando mensagens...
+                </div>
+              ) : msgs.length === 0 ? (
+                <div className="text-sm text-muted-foreground border rounded-md p-3 bg-background text-center">
+                  Nenhuma mensagem por aqui ainda.
+                </div>
+              ) : (
+                groups.map((group, gi) => (
                   <div
-                    className={`max-w-[75%] px-4 py-2 rounded-2xl shadow-sm leading-relaxed transition-all ${
-                      isAluno
-                        ? "bg-gradient-to-br from-[#F87171] to-[#E74C3C] text-white rounded-br-sm"
-                        : "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100 rounded-bl-sm"
+                    key={`group-${gi}`}
+                    className={`flex flex-col gap-0.5 ${
+                      group.isAluno ? "items-end" : "items-start"
                     }`}
                   >
-                    <div className="text-xs opacity-80 mb-1">
-                      <strong>{isAluno ? "Você" : m.autor?.nome || "Secretaria"}</strong> ·{" "}
-                      {new Date(m.criadoEm).toLocaleTimeString("pt-BR", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </div>
-                    <div className="whitespace-pre-wrap break-words">{m.conteudo}</div>
+                    {/* Nome do autor — apenas no primeiro grupo ou quando muda */}
+                    <span className="text-[11px] text-muted-foreground px-1 mb-0.5">
+                      {group.nomeAutor}
+                    </span>
+
+                    {group.msgs.map((m, mi) => {
+                      const isLast = mi === group.msgs.length - 1;
+                      return (
+                        <div
+                          key={`${m.id}-${m.criadoEm}`}
+                          className={`max-w-[75%] px-4 py-2 shadow-sm leading-relaxed ${
+                            group.isAluno
+                              ? "bg-gradient-to-br from-[#F87171] to-[#E74C3C] text-white rounded-2xl rounded-br-sm"
+                              : "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100 rounded-2xl rounded-bl-sm"
+                          }`}
+                        >
+                          <div className="whitespace-pre-wrap break-words">{m.conteudo}</div>
+                          {/* Timestamp visivel no último da sequência */}
+                          {isLast && (
+                            <div
+                              className="text-[10px] opacity-60 mt-1 text-right"
+                              title={new Date(m.criadoEm).toLocaleString("pt-BR")}
+                            >
+                              {relativeTime(m.criadoEm)}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                </div>
-              );
-            })
+                ))
+              )}
+            </>
           )}
           <div ref={endRef} />
         </div>
@@ -513,7 +594,7 @@ export default function ChamadoDetalhePage() {
             <div className="flex items-end gap-2">
               <textarea
                 className="flex-1 min-h-[90px] rounded-lg border border-[var(--border)] bg-input px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-                placeholder="Escreva sua mensagem para a secretaria/suporte…"
+                placeholder="Escreva sua mensagem… (Ctrl+Enter para enviar)"
                 value={msgText}
                 onChange={(e) => setMsgText(e.target.value)}
                 onKeyDown={(e) => {
@@ -553,29 +634,37 @@ export default function ChamadoDetalhePage() {
             Nenhum anexo encontrado.
           </div>
         ) : (
-          <ul className="space-y-2 mb-4">
+          <ul className="space-y-3 mb-4">
             {anexos.map((a) => (
-              <li
-                key={a.id}
-                className="p-2 border rounded-md bg-background flex items-center justify-between gap-2 text-sm"
-              >
-                <div className="min-w-0">
-                  <span className="font-medium truncate block">{a.nomeArquivo}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {(a.tamanhoBytes / 1024).toFixed(1)} KB ·{" "}
-                    {new Date(a.enviadoEm).toLocaleDateString("pt-BR")}
-                    {a.enviadoPor?.nome ? ` · ${a.enviadoPor.nome}` : ""}
-                  </span>
+              <li key={a.id} className="border rounded-md bg-background overflow-hidden">
+                {/* Preview inline para imagens */}
+                {a.mimeType.startsWith("image/") && (
+                  <img
+                    src={`${API}/anexos/${a.id}/download`}
+                    alt={a.nomeArquivo}
+                    className="w-full max-h-48 object-contain bg-[var(--muted)]"
+                    loading="lazy"
+                  />
+                )}
+                <div className="flex items-center justify-between gap-2 p-2 text-sm">
+                  <div className="min-w-0">
+                    <span className="font-medium truncate block">{a.nomeArquivo}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {(a.tamanhoBytes / 1024).toFixed(1)} KB ·{" "}
+                      {new Date(a.enviadoEm).toLocaleDateString("pt-BR")}
+                      {a.enviadoPor?.nome ? ` · ${a.enviadoPor.nome}` : ""}
+                    </span>
+                  </div>
+                  <a
+                    href={`${API}/anexos/${a.id}/download`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    download
+                    className="inline-flex items-center gap-1 h-8 px-2 rounded-md border hover:bg-[var(--muted)] text-xs shrink-0"
+                  >
+                    <Download className="size-3.5" /> Baixar
+                  </a>
                 </div>
-                <a
-                  href={`${API}/anexos/${a.id}/download`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  download
-                  className="inline-flex items-center gap-1 h-8 px-2 rounded-md border hover:bg-[var(--muted)] text-xs shrink-0"
-                >
-                  <Download className="size-3.5" /> Baixar
-                </a>
               </li>
             ))}
           </ul>
@@ -618,7 +707,7 @@ export default function ChamadoDetalhePage() {
               </button>
             )}
             <p className="text-xs text-muted-foreground mt-2">
-              Máximo 10 MB · PDF, Word, Excel, imagens, TXT
+              Máximo 10 MB · PDF, Word, Excel, imagens, TXT · ou arraste o arquivo para aárea de conversa
             </p>
           </div>
         )}
