@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft, Loader2, Send, User, Building2, Tag, Clock,
   CheckCircle2, RotateCcw, Pencil, Save, MessageSquareText,
-  Paperclip, Download, Upload,
+  Paperclip, Download, Upload, Route,
 } from "lucide-react";
 import { apiFetch } from "../../../../../utils/api";
 import { toast } from "sonner";
@@ -65,6 +65,14 @@ type Ticket = {
   criadoEm: string;
   atualizadoEm: string;
   encerradoEm?: string | null;
+  // Catalog wizard fields
+  catalogoServicoId?: string | null;
+  catalogoCategoriaId?: string | null;
+  catalogoCategoriaNome?: string | null;
+  setorProvavel?: string | null;
+  dadosAcademicos?: Record<string, string> | null;
+  camposEspecificos?: Record<string, string> | null;
+  origem?: string | null;
 
   criadoPor?: UsuarioMin | null;
   responsavel?: UsuarioMin | null;
@@ -76,31 +84,35 @@ type Ticket = {
   historico?: Historico[];
 };
 
+function formatarChave(key: string): string {
+  return key
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/^./, c => c.toUpperCase())
+    .trim();
+}
+
+const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+
 /* ===== Página ===== */
 export default function AdminChamadoPage() {
   const { id } = useParams<{ id: string }>();
-  const API = useMemo(() => process.env.NEXT_PUBLIC_API_BASE_URL, []);
   const [ticket, setTicket] = useState<Ticket | null>(null);
 
-  // dados gerais
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  // edição
   const [status, setStatus] = useState<Status>("ABERTO");
   const [prioridade, setPrioridade] = useState<Prioridade>("MEDIA");
   const [nivel, setNivel] = useState<Nivel>("N1");
   const [responsavelId, setResponsavelId] = useState<string>("");
 
-  // chat
   const [sending, setSending] = useState(false);
   const [msg, setMsg] = useState("");
   const chatRef = useRef<HTMLDivElement | null>(null);
   const knownIds = useRef<Set<string>>(new Set());
   const endRef = useRef<HTMLDivElement>(null);
 
-  // anexos
   const [anexos, setAnexos] = useState<AnexoInfo[]>([]);
   const [loadingAnexos, setLoadingAnexos] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -122,8 +134,7 @@ export default function AdminChamadoPage() {
     []
   );
 
-  async function fetchAnexos(ticketId: string) {
-    if (!API) return;
+  const fetchAnexos = useCallback(async (ticketId: string) => {
     setLoadingAnexos(true);
     try {
       const res = await apiFetch(`${API}/tickets/${ticketId}/anexos`);
@@ -131,15 +142,14 @@ export default function AdminChamadoPage() {
       const data = await res.json();
       setAnexos(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      console.error("Erro ao buscar anexos:", err);
       toast.error("Falha ao carregar anexos.", { description: err.message });
     } finally {
       setLoadingAnexos(false);
     }
-  }
+  }, []);
 
-  async function load() {
-    if (!id || !API) return;
+  const load = useCallback(async () => {
+    if (!id) return;
     try {
       setLoading(true);
       setErr(null);
@@ -153,7 +163,6 @@ export default function AdminChamadoPage() {
       }
       const data: Ticket = await res.json();
 
-      // preencher dedup
       (data.mensagens ?? []).forEach((m) => knownIds.current.add(m.id));
 
       setTicket(data);
@@ -169,29 +178,29 @@ export default function AdminChamadoPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [id, include, fetchAnexos]);
 
-  useEffect(() => { load(); }, [id, API]);
+  useEffect(() => { load(); }, [load]);
 
-  // rolar pro fim quando mensagens mudarem
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [ticket?.mensagens?.length]);
 
-  // WebSocket em tempo real (apenas chat)
+  // WebSocket em tempo real — autenticado por token JWT
   useEffect(() => {
     if (!id || !API) return;
-    const userId = localStorage.getItem("userId") || "secretaria";
-    const wsUrl = API.replace(/^http/, "ws") + `/ws?userId=${userId}`;
+    const token = typeof window !== "undefined" ? (localStorage.getItem("accessToken") ?? "") : "";
+    const wsUrl = API.replace(/^http/, "ws") + `/ws?token=${encodeURIComponent(token)}`;
 
     let ws: WebSocket | null = null;
-    let reconnectTimer: NodeJS.Timeout;
+    let attempt = 0;
+    let reconnectTimer: ReturnType<typeof setTimeout>;
 
     function connect() {
       ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
-        // handshake simples
+        attempt = 0;
         try { ws?.send(JSON.stringify({ type: "hello", chamadoId: id })); } catch {}
       };
 
@@ -208,13 +217,13 @@ export default function AdminChamadoPage() {
             );
             endRef.current?.scrollIntoView({ behavior: "smooth" });
           }
-        } catch (err) {
-          console.error("WS error:", err);
-        }
+        } catch {}
       };
 
       ws.onclose = () => {
-        reconnectTimer = setTimeout(connect, 4000);
+        const delay = Math.min(1_000 * 2 ** attempt, 30_000);
+        attempt++;
+        reconnectTimer = setTimeout(connect, delay);
       };
     }
 
@@ -223,10 +232,10 @@ export default function AdminChamadoPage() {
       clearTimeout(reconnectTimer);
       ws?.close();
     };
-  }, [id, API]);
+  }, [id]);
 
   async function saveEdits(newStatus?: Status) {
-    if (!ticket || !API) return;
+    if (!ticket) return;
     try {
       setSaving(true);
       const body = {
@@ -253,7 +262,7 @@ export default function AdminChamadoPage() {
   }
 
   async function sendMessage() {
-    if (!ticket || !msg.trim() || !API) return;
+    if (!ticket || !msg.trim()) return;
     setSending(true);
     try {
       const res = await apiFetch(`${API}/tickets/${ticket.id}/mensagens`, {
@@ -282,18 +291,16 @@ export default function AdminChamadoPage() {
     }
   }
 
-  const handleUpload = async () => {
-    if (!selectedFile || !ticket?.id || !API) return;
+  const handleUpload = useCallback(async () => {
+    if (!selectedFile || !ticket?.id) return;
 
     setUploading(true);
     const formData = new FormData();
     formData.append("file", selectedFile);
 
     try {
-      const token = localStorage.getItem("accessToken") || "";
-      const res = await fetch(`${API}/tickets/${ticket.id}/anexos`, {
+      const res = await apiFetch(`${API}/tickets/${ticket.id}/anexos`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
       if (!res.ok) {
@@ -305,12 +312,11 @@ export default function AdminChamadoPage() {
       if (fileInputRef.current) fileInputRef.current.value = "";
       await fetchAnexos(ticket.id);
     } catch (err: any) {
-      console.error("Erro no upload:", err);
       toast.error("Falha ao enviar arquivo.", { description: err.message });
     } finally {
       setUploading(false);
     }
-  };
+  }, [selectedFile, ticket?.id, fetchAnexos]);
 
   if (loading && !ticket) {
     return (
@@ -331,6 +337,16 @@ export default function AdminChamadoPage() {
   const historico = (ticket.historico ?? [])
     .slice()
     .sort((a, b) => +new Date(b.criadoEm) - +new Date(a.criadoEm));
+
+  const camposEspecificosEntries = ticket.camposEspecificos
+    ? Object.entries(ticket.camposEspecificos).filter(([, v]) => v)
+    : [];
+
+  const dadosAcademicosEntries = ticket.dadosAcademicos
+    ? Object.entries(ticket.dadosAcademicos).filter(([, v]) => v)
+    : [];
+
+  const isWizardTicket = ticket.origem === "catalogo_wizard_aluno";
 
   return (
     <div className="px-4 py-2 sm:px-6 lg:px-8">
@@ -402,11 +418,48 @@ export default function AdminChamadoPage() {
         </div>
       </div>
 
+      {/* Roteamento do Catálogo — visível apenas para chamados do wizard */}
+      {isWizardTicket && (
+        <div className="rounded-xl border border-[var(--border)] bg-card mb-6">
+          <div className="p-3 border-b border-[var(--border)] flex items-center gap-2">
+            <Route className="size-4 text-[var(--brand-red)]" />
+            <div className="font-semibold">Roteamento do Catálogo</div>
+            <span className="ml-auto text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Wizard do aluno</span>
+          </div>
+          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3 text-sm">
+            {ticket.catalogoCategoriaNome && (
+              <div>
+                <div className="text-xs text-muted-foreground mb-0.5">Processo / Serviço</div>
+                <div className="font-medium">{ticket.catalogoCategoriaNome}</div>
+              </div>
+            )}
+            {ticket.setorProvavel && (
+              <div>
+                <div className="text-xs text-muted-foreground mb-0.5">Setor de destino inicial</div>
+                <div className="font-medium">{ticket.setorProvavel}</div>
+              </div>
+            )}
+            {ticket.catalogoServicoId && (
+              <div>
+                <div className="text-xs text-muted-foreground mb-0.5">ID do serviço (catálogo)</div>
+                <div className="font-mono text-xs bg-muted px-2 py-1 rounded">{ticket.catalogoServicoId}</div>
+              </div>
+            )}
+            {ticket.setor && (
+              <div>
+                <div className="text-xs text-muted-foreground mb-0.5">Setor atribuído (atual)</div>
+                <div className="font-medium text-green-700 dark:text-green-400">{ticket.setor.nome}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* layout: chat/anexos à esquerda, gestão/histórico à direita */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-        {/* ESQUERDA: Chat + Anexos */}
+        {/* ESQUERDA: Chat + Campos específicos + Anexos */}
         <div className="xl:col-span-8 space-y-6">
-          {/* CHAT – visual igual ao do aluno */}
+          {/* CHAT */}
           <section className="rounded-xl border border-[var(--border)] bg-card flex flex-col">
             <div className="p-3 border-b border-[var(--border)] flex items-center gap-2">
               <MessageSquareText className="size-4 text-[var(--brand-red)]" />
@@ -422,7 +475,6 @@ export default function AdminChamadoPage() {
                   Sem mensagens ainda.
                 </div>
               ) : (
-                // Dedup visual extra (defensivo)
                 Array.from(
                   new Map(mensagens.map((m) => [`${m.id}-${m.criadoEm}`, m])).values()
                 ).map((m) => {
@@ -460,8 +512,9 @@ export default function AdminChamadoPage() {
                 <textarea
                   value={msg}
                   onChange={(e) => setMsg(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) sendMessage(); }}
                   rows={2}
-                  placeholder="Escreva uma mensagem…"
+                  placeholder="Escreva uma mensagem… (Ctrl+Enter para enviar)"
                   className="flex-1 max-h-32 rounded-lg border border-[var(--border)] bg-input px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--ring)] resize-none"
                   disabled={sending}
                 />
@@ -476,6 +529,40 @@ export default function AdminChamadoPage() {
               </div>
             </div>
           </section>
+
+          {/* CAMPOS ESPECÍFICOS DO SERVIÇO */}
+          {camposEspecificosEntries.length > 0 && (
+            <section className="rounded-xl border border-[var(--border)] bg-card p-4">
+              <h2 className="text-base font-semibold mb-3 flex items-center gap-2">
+                <Tag className="size-4" /> Campos específicos do serviço
+              </h2>
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                {camposEspecificosEntries.map(([key, value]) => (
+                  <div key={key}>
+                    <dt className="text-xs text-muted-foreground mb-0.5">{formatarChave(key)}</dt>
+                    <dd className="font-medium">{String(value)}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          )}
+
+          {/* DADOS ACADÊMICOS */}
+          {dadosAcademicosEntries.length > 0 && (
+            <section className="rounded-xl border border-[var(--border)] bg-card p-4">
+              <h2 className="text-base font-semibold mb-3 flex items-center gap-2">
+                <User className="size-4" /> Dados acadêmicos do aluno
+              </h2>
+              <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3 text-sm">
+                {dadosAcademicosEntries.map(([key, value]) => (
+                  <div key={key}>
+                    <dt className="text-xs text-muted-foreground mb-0.5">{formatarChave(key)}</dt>
+                    <dd className="font-medium">{String(value)}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          )}
 
           {/* ANEXOS */}
           <section className="rounded-xl border border-[var(--border)] bg-card p-4">
@@ -554,12 +641,12 @@ export default function AdminChamadoPage() {
                   {uploading ? "Enviando..." : "Enviar arquivo"}
                 </button>
               )}
-              <p className="text-xs text-muted-foreground mt-2">Limite por arquivo: 10MB (exemplo).</p>
+              <p className="text-xs text-muted-foreground mt-2">Limite por arquivo: 10MB.</p>
             </div>
           </section>
         </div>
 
-        {/* DIREITA: Gestão + Histórico (mantidos) */}
+        {/* DIREITA: Gestão + Histórico */}
         <aside className="xl:col-span-4 space-y-6">
           <div className="rounded-xl border border-[var(--border)] bg-card">
             <div className="p-3 border-b border-[var(--border)] flex items-center gap-2">
