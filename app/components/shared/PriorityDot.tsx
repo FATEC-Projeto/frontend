@@ -12,7 +12,7 @@ type Props = {
 };
 
 /**
- * Exibe um ponto colorido que indica a prioridade do chamado.
+ * Exibe um ponto colorido que indica a prioridade da solicitação acadêmica.
  */
 export default function PriorityDot({ prioridade, className = "size-2" }: Props) {
   const map: Record<Prioridade, string> = {

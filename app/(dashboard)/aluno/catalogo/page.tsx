@@ -81,7 +81,7 @@ function ServicoCard({ s }: { s: Servico }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
-  async function handleAbrirChamado() {
+  async function handleAbrirSolicitacao() {
     if (!s.ativo) return;
     try {
       setLoading(true);
@@ -105,14 +105,14 @@ function ServicoCard({ s }: { s: Servico }) {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || "Erro ao criar chamado");
+        throw new Error(err.message || "Erro ao criar solicitação acadêmica");
       }
 
       const data = await res.json();
-      toast.success("Chamado criado com sucesso!");
+      toast.success("Solicitação acadêmica criada com sucesso!");
       router.push(`/aluno/chamados/${data.id}`);
     } catch (err: any) {
-      toast.error(err.message || "Falha ao criar chamado");
+      toast.error(err.message || "Falha ao criar solicitação acadêmica");
     } finally {
       setLoading(false);
     }
@@ -138,7 +138,7 @@ function ServicoCard({ s }: { s: Servico }) {
         <div className="text-xs text-muted-foreground">ID: {s.id}</div>
         <button
           disabled={!s.ativo || loading}
-          onClick={handleAbrirChamado}
+          onClick={handleAbrirSolicitacao}
           className={cx(
             "inline-flex items-center gap-1.5 h-9 px-3 rounded-md text-sm transition",
             s.ativo
@@ -152,7 +152,7 @@ function ServicoCard({ s }: { s: Servico }) {
             </>
           ) : (
             <>
-              <Plus className="size-4" /> Abrir chamado
+              <Plus className="size-4" /> Iniciar solicitação
             </>
           )}
         </button>
@@ -221,8 +221,9 @@ export default function CatalogoAlunoPage() {
       {/* Topbar */}
       <div className="mb-6 flex items-center justify-between">
         <div>
+          <h1 className="font-grotesk text-2xl font-semibold tracking-tight">Serviços acadêmicos da Fatec</h1>
           <p className="text-xs text-muted-foreground mt-2">
-            Catálogo: {kpis.ativos} serviços disponíveis • {kpis.indisponiveis} indisponíveis
+            Central de Solicitações Acadêmicas Fatec: {kpis.ativos} disponíveis • {kpis.indisponiveis} indisponíveis
           </p>
         </div>
         <MobileSidebarTriggerAluno />

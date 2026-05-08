@@ -59,7 +59,7 @@ export default function AlunoHomePage() {
           const res = await fetch(`${base}&page=${page}&pageSize=${pageSize}`, {
             headers: { Authorization: `Bearer ${token}` },
           });
-          if (!res.ok) throw new Error("Erro ao buscar chamados");
+          if (!res.ok) throw new Error("Erro ao buscar solicitações acadêmicas");
           const data = await res.json(); // { total, page, pageSize, items }
           if (page === 1) total = data.total ?? 0;
 
@@ -74,7 +74,7 @@ export default function AlunoHomePage() {
         setChamados(all);
       } catch (err) {
         console.error(err);
-        toast.error("Erro ao carregar chamados");
+        toast.error("Erro ao carregar solicitações acadêmicas");
       } finally {
         setLoading(false);
       }
@@ -122,10 +122,10 @@ export default function AlunoHomePage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <KpiCard
           icon={<Ticket className="size-4" />}
-          label="Abertos"
+          label="Recebidas"
           value={kpi.abertos}
           tone="brand-cyan"
-          hint="Chamados em aberto"
+          hint="Solicitações recebidas pela Fatec"
         />
         <KpiCard
           icon={<AlertTriangle className="size-4" />}
@@ -136,27 +136,27 @@ export default function AlunoHomePage() {
         />
         <KpiCard
           icon={<Clock className="size-4" />}
-          label="Em atendimento"
+          label="Em análise"
           value={kpi.emAtendimento}
           tone="brand-teal"
         />
         <KpiCard
           icon={<CheckCircle2 className="size-4" />}
-          label="Resolvidos"
+          label="Respondidas"
           value={kpi.resolvidos}
           tone="success"
         />
       </div>
 
-      {/* Lista de chamados */}
+      {/* Lista de solicitações acadêmicas */}
       <div className="rounded-xl border border-[var(--border)] bg-card overflow-hidden">
         {loading ? (
           <div className="p-8 text-center text-muted-foreground">
-            Carregando chamados...
+            Carregando solicitações acadêmicas...
           </div>
         ) : chamadosVisiveis.length === 0 ? (
           <div className="p-8 text-center text-muted-foreground">
-            Nenhum chamado encontrado.
+            Nenhuma solicitação acadêmica encontrada.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -208,7 +208,7 @@ export default function AlunoHomePage() {
                   onClick={() => setLimite(chamadosAtivos.length)}
                   className="text-sm font-medium text-[var(--brand-red)] hover:underline"
                 >
-                  Ver todos os {chamadosAtivos.length} chamados
+                  Ver todas as {chamadosAtivos.length} solicitações acadêmicas
                 </button>
               </div>
             )}

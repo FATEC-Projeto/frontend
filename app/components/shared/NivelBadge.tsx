@@ -11,7 +11,7 @@ type Props = {
 };
 
 /**
- * Exibe um badge formatado para o Nível do chamado (N1, N2, N3).
+ * Exibe um badge formatado para o Nível da solicitação acadêmica (N1, N2, N3).
  */
 export default function NivelBadge({ nivel }: Props) {
   const map: Record<Nivel, string> = {

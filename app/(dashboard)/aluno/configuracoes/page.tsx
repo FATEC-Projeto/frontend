@@ -166,7 +166,7 @@ export default function ConfiguracoesAlunoPage() {
             <div>
               <div className="font-medium">Notificações por e-mail</div>
               <div className="text-sm text-muted-foreground">
-                Receba alertas sobre atualizações de chamados e mensagens.
+                Receba alertas sobre atualizações de solicitações acadêmicas e mensagens.
               </div>
             </div>
           </div>

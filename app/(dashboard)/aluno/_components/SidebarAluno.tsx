@@ -39,7 +39,7 @@ export default function SidebarAluno({
 
   const items: NavItemProps[] = [
     { href: "/aluno/home", label: "Visão Geral", icon: <LayoutDashboard className="size-4" /> },
-    { href: "/aluno/chamados", label: "Meus chamados", icon: <Ticket className="size-4" />},
+    { href: "/aluno/chamados", label: "Minhas solicitações", icon: <Ticket className="size-4" />},
     { href: "/aluno/catalogo", label: "Catálogo de serviços", icon: <BookOpen className="size-4" /> },
     { href: "/aluno/dados", label: "Meus dados", icon: <User className="size-4" /> },
     { href: "/aluno/notificacoes", label: "Notificações", icon: <Bell className="size-4" /> },
@@ -118,11 +118,11 @@ export default function SidebarAluno({
           <div className="text-xs text-muted-foreground mb-2">Indicadores rápidos</div>
           <ul className="space-y-2 text-sm">
             <li className="flex items-center justify-between">
-              <span>Aguardando você</span>
+              <span>Aguardando resposta</span>
               <span className="font-medium">{aguardandoCount}</span>
             </li>
             <li className="flex items-center justify-between">
-              <span>Meus chamados</span>
+              <span>Minhas solicitações</span>
               <span className="font-medium">{meusChamadosCount}</span>
             </li>
           </ul>

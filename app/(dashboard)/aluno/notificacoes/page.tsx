@@ -205,7 +205,7 @@ await apiFetch(`${apiBase}/notifications/read-all`, {
                           href={`/aluno/chamados/${n.chamadoId}`}
                           className="text-[var(--brand-cyan)] hover:underline"
                         >
-                          Ver chamado →
+                          Ver solicitação →
                         </Link>
                       )}
                       {n.meta?.url && (
