@@ -86,7 +86,7 @@ export async function apiFetch(input: RequestInfo, init: RequestInit = {}) {
       credentials: "include",
     });
 
-    if (retry.status === 401 || retry.status === 403) {
+    if (retry.status === 401) {
       logoutAndRedirect();
       throw new Error("Não autorizado");
     }
@@ -94,10 +94,6 @@ export async function apiFetch(input: RequestInfo, init: RequestInit = {}) {
     return retry;
   }
 
-  if (res.status === 403) {
-    logoutAndRedirect();
-    throw new Error("Acesso negado");
-  }
-
+  // 403 = permissão de recurso negada, não implica sessão inválida
   return res;
 }
