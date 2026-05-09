@@ -30,8 +30,8 @@ export default function AlunoTopbar({
   const [theme, setTheme] = useState<"light" | "dark">("light");
 
   useEffect(() => {
-    const saved = localStorage.getItem("theme") as "light" | "dark" | null;
-    setTheme(saved ?? "light");
+    const saved = localStorage.getItem("theme");
+    setTheme(saved === "light" || saved === "dark" ? saved : "light");
   }, []);
 
   useEffect(() => {
@@ -56,7 +56,7 @@ export default function AlunoTopbar({
           setSaudacao(greetingFallback);
         }
       } catch {
-        setSaudacao(greetingFallback);
+        if (alive) setSaudacao(greetingFallback);
       } finally {
         if (alive) setLoadingUser(false);
       }
