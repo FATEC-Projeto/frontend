@@ -213,7 +213,7 @@ export default function ChamadoDetalhePage() {
       if (reconnectTimer) clearTimeout(reconnectTimer);
       ws?.close();
     };
-  }, [API, id]);
+  }, [id]);
 
   /* ===== Enviar Mensagem ===== */
   const sendMensagem = useCallback(async () => {

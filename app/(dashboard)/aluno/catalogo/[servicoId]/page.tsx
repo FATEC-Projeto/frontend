@@ -357,7 +357,7 @@ export default function SolicitacaoCatalogoPage() {
       toast.error(`"${f.name}" excede 10 MB e não foi adicionado.`)
     );
     fileArray
-      .filter((f) => f.size <= MAX_UPLOAD_SIZE && f.type && !ALLOWED_TYPES.has(f.type))
+      .filter((f) => f.size <= MAX_UPLOAD_SIZE && !!f.type && !ALLOWED_TYPES.has(f.type))
       .forEach((f) => toast.error(`Tipo de arquivo não permitido: ${f.name}`));
     setAnexos((prev) => {
       const existing = new Set(prev.map((f) => `${f.name}-${f.size}`));
@@ -367,7 +367,8 @@ export default function SolicitacaoCatalogoPage() {
           (f) =>
             !existing.has(`${f.name}-${f.size}`) &&
             f.size <= MAX_UPLOAD_SIZE &&
-            (!f.type || ALLOWED_TYPES.has(f.type))
+            !!f.type &&
+            ALLOWED_TYPES.has(f.type)
         ),
       ];
     });
