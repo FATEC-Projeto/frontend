@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { X, Info } from "lucide-react";
+import { apiFetch } from "../../../../utils/api";
 
 type ResultRow = {
   idx: number;
@@ -11,21 +12,23 @@ type ResultRow = {
   nome?: string;
   cursoNome?: string;
   cursoSigla?: string;
+  unidadeFatec?: string;
+  turno?: string;
+  turma?: string;
+  semestreAtual?: string;
+  anoSemestreIngresso?: string;
+  ativo: boolean;
   status: "PENDING" | "OK" | "ERROR";
   errorMsg?: string;
-  note?: string; // ex.: "Já existia"
+  note?: string;
 };
 
 function cx(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
 }
 
-/** Parser simples (CSV com vírgula, sem aspas complexas). */
 function parseCsvSimple(text: string): string[][] {
-  const lines = text
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean);
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   return lines.map((l) => l.split(",").map((p) => p.trim()));
 }
 
@@ -67,12 +70,18 @@ export default function ImportAlunos({
     const mapIdx = (key: string) =>
       header.findIndex((h) => h.toLowerCase() === key.toLowerCase());
 
-    const iRA = mapIdx("ra");
-    const iEdu = mapIdx("emailEducacional");
-    const iPes = mapIdx("emailPessoal");
-    const iNome = mapIdx("nome");
-    const iCursoNome = mapIdx("cursoNome");
-    const iCursoSigla = mapIdx("cursoSigla");
+    const iRA            = mapIdx("ra");
+    const iEdu           = mapIdx("emailEducacional");
+    const iPes           = mapIdx("emailPessoal");
+    const iNome          = mapIdx("nome");
+    const iCursoNome     = mapIdx("cursoNome");
+    const iCursoSigla    = mapIdx("cursoSigla");
+    const iUnidade       = mapIdx("unidadeFatec");
+    const iTurno         = mapIdx("turno");
+    const iTurma         = mapIdx("turma");
+    const iSemestre      = mapIdx("semestreAtual");
+    const iAnoSemestre   = mapIdx("anoSemestreIngresso");
+    const iAtivo         = mapIdx("ativo");
 
     if (iRA < 0 || iEdu < 0) {
       alert("Cabeçalho inválido. É obrigatório conter as colunas: ra, emailEducacional.");
@@ -82,21 +91,29 @@ export default function ImportAlunos({
 
     const seenRA = new Set<string>();
     const parsed: ResultRow[] = data.map((cols, idx) => {
-      const ra = (cols[iRA] || "").trim();
+      const ra               = (cols[iRA]  || "").trim();
       const emailEducacional = (cols[iEdu] || "").trim();
-      const emailPessoal = iPes >= 0 ? (cols[iPes] || "").trim() : "";
-      const nome = iNome >= 0 ? (cols[iNome] || "").trim() : "";
-      const cursoNome = iCursoNome >= 0 ? (cols[iCursoNome] || "").trim() : "";
-      const cursoSigla = iCursoSigla >= 0 ? (cols[iCursoSigla] || "").trim() : "";
+      const emailPessoal     = iPes >= 0         ? (cols[iPes]          || "").trim() : "";
+      const nome             = iNome >= 0        ? (cols[iNome]         || "").trim() : "";
+      const cursoNome        = iCursoNome >= 0   ? (cols[iCursoNome]    || "").trim() : "";
+      const cursoSigla       = iCursoSigla >= 0  ? (cols[iCursoSigla]   || "").trim() : "";
+      const unidadeFatec     = iUnidade >= 0     ? (cols[iUnidade]      || "").trim() : "";
+      const turno            = iTurno >= 0       ? (cols[iTurno]        || "").trim() : "";
+      const turma            = iTurma >= 0       ? (cols[iTurma]        || "").trim() : "";
+      const semestreAtual    = iSemestre >= 0    ? (cols[iSemestre]     || "").trim() : "";
+      const anoSemestreIngresso = iAnoSemestre >= 0 ? (cols[iAnoSemestre] || "").trim() : "";
+
+      const ativoStr = iAtivo >= 0 ? (cols[iAtivo] || "").trim().toLowerCase() : "";
+      const ativo = ativoStr === ""
+        ? true
+        : ativoStr !== "false" && ativoStr !== "0" && ativoStr !== "inativo" && ativoStr !== "não" && ativoStr !== "nao";
 
       const row: ResultRow = {
         idx: idx + 1,
-        ra,
-        emailEducacional,
-        emailPessoal,
-        nome,
-        cursoNome,
-        cursoSigla,
+        ra, emailEducacional, emailPessoal, nome,
+        cursoNome, cursoSigla,
+        unidadeFatec, turno, turma, semestreAtual, anoSemestreIngresso,
+        ativo,
         status: "PENDING",
       };
 
@@ -118,22 +135,9 @@ export default function ImportAlunos({
   }
 
   async function startImport() {
-    if (!rows.length) {
-      alert("Selecione um CSV primeiro.");
-      return;
-    }
+    if (!rows.length) { alert("Selecione um CSV primeiro."); return; }
     setRunning(true);
     setFinished(false);
-
-    const token =
-      (typeof window !== "undefined" && localStorage.getItem("accessToken")) ||
-      "";
-
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
 
     const clone = [...rows];
 
@@ -145,42 +149,37 @@ export default function ImportAlunos({
         continue;
       }
 
-      const ra = r.ra?.trim();
+      const ra  = r.ra?.trim();
       const edu = r.emailEducacional?.trim();
 
       if (!ra || !edu) {
-        clone[i] = {
-          ...r,
-          status: "ERROR",
-          errorMsg: "RA e emailEducacional são obrigatórios.",
-        };
+        clone[i] = { ...r, status: "ERROR", errorMsg: "RA e emailEducacional são obrigatórios." };
         setRows([...clone]);
         continue;
       }
 
-      const nomeFinal =
-        (r.nome?.trim() || "").length >= 2 ? r.nome!.trim() : `Aluno ${ra}`;
+      const nomeFinal = (r.nome?.trim() || "").length >= 2 ? r.nome!.trim() : `Aluno ${ra}`;
 
       const payload: any = {
-        emailPessoal: r.emailPessoal?.trim() || edu,
-        emailEducacional: edu,
+        emailPessoal:        r.emailPessoal?.trim() || edu,
+        emailEducacional:    edu,
         ra,
-        nome: nomeFinal,
-        cursoNome: r.cursoNome || undefined,
-        cursoSigla: r.cursoSigla || undefined,
-        papel: "USUARIO",
-        ativo: true,
-        // ❗ não envia senha nem precisaTrocarSenha
-        // Backend (createUser) detecta aluno via RA e:
-        // - define senha temporária padrão
-        // - marca precisaTrocarSenha = true
-        // - opcional: envia link de primeiro acesso / reset
+        nome:                nomeFinal,
+        cursoNome:           r.cursoNome           || undefined,
+        cursoSigla:          r.cursoSigla          || undefined,
+        unidadeFatec:        r.unidadeFatec        || undefined,
+        turno:               r.turno               || undefined,
+        turma:               r.turma               || undefined,
+        semestreAtual:       r.semestreAtual       || undefined,
+        anoSemestreIngresso: r.anoSemestreIngresso || undefined,
+        papel:               "USUARIO",
+        ativo:               r.ativo,
       };
 
       try {
-        const resp = await fetch(`${API_URL}/usuarios`, {
+        const resp = await apiFetch(`${API_URL}/usuarios`, {
           method: "POST",
-          headers,
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
           body: JSON.stringify(payload),
         });
 
@@ -193,24 +192,14 @@ export default function ImportAlunos({
             /unique/i.test(text) ||
             /P2002/.test(text);
 
-          if (isDuplicate) {
-            clone[i] = { ...r, status: "OK", note: "Já existia" };
-          } else {
-            clone[i] = {
-              ...r,
-              status: "ERROR",
-              errorMsg: text || `HTTP ${resp.status}`,
-            };
-          }
+          clone[i] = isDuplicate
+            ? { ...r, status: "OK", note: "Já existia" }
+            : { ...r, status: "ERROR", errorMsg: text || `HTTP ${resp.status}` };
         } else {
           clone[i] = { ...r, status: "OK" };
         }
       } catch (e: any) {
-        clone[i] = {
-          ...r,
-          status: "ERROR",
-          errorMsg: String(e?.message ?? e),
-        };
+        clone[i] = { ...r, status: "ERROR", errorMsg: String(e?.message ?? e) };
       }
 
       setRows([...clone]);
@@ -227,35 +216,25 @@ export default function ImportAlunos({
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  const canStart = useMemo(
-    () => rows.length > 0 && !running,
-    [rows.length, running]
-  );
+  const canStart = useMemo(() => rows.length > 0 && !running, [rows.length, running]);
 
   return (
     <div className="rounded-xl border border-[var(--border)] bg-card p-4">
-      {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-lg font-semibold">Importar alunos (CSV)</h3>
-        <button
-          onClick={onClose}
-          className="inline-grid place-items-center size-8 rounded-md hover:bg-[var(--muted)]"
-        >
+        <button onClick={onClose} className="inline-grid place-items-center size-8 rounded-md hover:bg-[var(--muted)]">
           <X className="size-4" />
         </button>
       </div>
 
-      {/* Aviso de fluxo */}
       <div className="mb-3 flex items-start gap-2 rounded-lg border border-dashed border-[var(--border)] bg-muted/40 p-3 text-xs text-muted-foreground">
         <Info className="mt-0.5 size-4" />
         <p>
           Cada aluno importado será criado com uma <strong>senha temporária</strong> definida no backend
-          e marcado para <strong>trocar a senha no primeiro acesso</strong>. Se configurado, o sistema
-          pode enviar um e-mail automático com o link de primeiro acesso / redefinição.
+          e marcado para <strong>trocar a senha no primeiro acesso</strong>.
         </p>
       </div>
 
-      {/* Seletor de arquivo */}
       <div className="flex items-center gap-2">
         <button
           onClick={() => fileRef.current?.click()}
@@ -264,21 +243,10 @@ export default function ImportAlunos({
         >
           Selecionar arquivo
         </button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept=".csv"
-          className="hidden"
-          onChange={handleFileChange}
-        />
-        {fileName && (
-          <span className="text-sm text-muted-foreground truncate">
-            Arquivo: {fileName}
-          </span>
-        )}
+        <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleFileChange} />
+        {fileName && <span className="text-sm text-muted-foreground truncate">Arquivo: {fileName}</span>}
       </div>
 
-      {/* Resumo + barra */}
       {!!rows.length && (
         <div className="mt-4 space-y-2">
           <div className="text-sm">
@@ -287,15 +255,11 @@ export default function ImportAlunos({
             <b className="text-[var(--brand-red)]">{err}</b>
           </div>
           <div className="h-2 w-full rounded-full bg-[var(--muted)] overflow-hidden">
-            <div
-              className="h-full bg-primary transition-[width]"
-              style={{ width: `${pct}%` }}
-            />
+            <div className="h-full bg-primary transition-[width]" style={{ width: `${pct}%` }} />
           </div>
         </div>
       )}
 
-      {/* Tabela */}
       {!!rows.length && (
         <div className="mt-4 max-h-64 overflow-auto rounded-lg border border-[var(--border)]">
           <table className="min-w-full text-sm">
@@ -304,9 +268,10 @@ export default function ImportAlunos({
                 <th className="px-3 py-2 text-left">#</th>
                 <th className="px-3 py-2 text-left">RA</th>
                 <th className="px-3 py-2 text-left">E-mail educacional</th>
-                <th className="px-3 py-2 text-left">E-mail pessoal</th>
                 <th className="px-3 py-2 text-left">Nome</th>
                 <th className="px-3 py-2 text-left">Curso</th>
+                <th className="px-3 py-2 text-left">Turno</th>
+                <th className="px-3 py-2 text-left">Ativo</th>
                 <th className="px-3 py-2 text-left">Status</th>
                 <th className="px-3 py-2 text-left">Erro</th>
               </tr>
@@ -317,29 +282,16 @@ export default function ImportAlunos({
                   <td className="px-3 py-2">{r.idx}</td>
                   <td className="px-3 py-2">{r.ra}</td>
                   <td className="px-3 py-2">{r.emailEducacional}</td>
-                  <td className="px-3 py-2">{r.emailPessoal || "—"}</td>
                   <td className="px-3 py-2">{r.nome || `Aluno ${r.ra}`}</td>
+                  <td className="px-3 py-2">{r.cursoSigla || r.cursoNome || "—"}</td>
+                  <td className="px-3 py-2">{r.turno || "—"}</td>
+                  <td className="px-3 py-2">{r.ativo ? "Sim" : "Não"}</td>
                   <td className="px-3 py-2">
-                    {r.cursoSigla || r.cursoNome || "—"}
+                    {r.status === "PENDING" && <span className="text-muted-foreground">Pendente</span>}
+                    {r.status === "OK"      && <span className="text-[var(--success)] font-medium">OK{r.note ? ` (${r.note})` : ""}</span>}
+                    {r.status === "ERROR"   && <span className="text-[var(--brand-red)] font-medium">Erro</span>}
                   </td>
-                  <td className="px-3 py-2">
-                    {r.status === "PENDING" && (
-                      <span className="text-muted-foreground">Pendente</span>
-                    )}
-                    {r.status === "OK" && (
-                      <span className="text-[var(--success)] font-medium">
-                        OK{r.note ? ` (${r.note})` : ""}
-                      </span>
-                    )}
-                    {r.status === "ERROR" && (
-                      <span className="text-[var(--brand-red)] font-medium">
-                        Erro
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-xs text-[var(--brand-red)]">
-                    {r.errorMsg || "—"}
-                  </td>
+                  <td className="px-3 py-2 text-xs text-[var(--brand-red)]">{r.errorMsg || "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -347,7 +299,6 @@ export default function ImportAlunos({
         </div>
       )}
 
-      {/* Footer / ações */}
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <button
           onClick={startImport}
@@ -356,7 +307,7 @@ export default function ImportAlunos({
             "h-9 px-3 rounded-md text-sm",
             canStart
               ? "bg-primary text-primary-foreground hover:brightness-95"
-              : "bg-[var(--muted)] text-muted-foreground cursor-not-allowed"
+              : "bg-[var(--muted)] text-muted-foreground cursor-not-allowed",
           )}
         >
           {running ? "Processando..." : rows.length ? "Processar importação" : "Selecionar CSV"}
@@ -367,7 +318,7 @@ export default function ImportAlunos({
           disabled={running || rows.length === 0}
           className={cx(
             "h-9 px-3 rounded-md border border-[var(--border)] text-sm",
-            running ? "opacity-60 cursor-not-allowed" : "hover:bg-[var(--muted)]"
+            running ? "opacity-60 cursor-not-allowed" : "hover:bg-[var(--muted)]",
           )}
         >
           Reiniciar
@@ -376,21 +327,17 @@ export default function ImportAlunos({
         <div className="ml-auto" />
 
         <button
-          onClick={() => {
-            if (finished) onDone();
-            else onClose();
-          }}
+          onClick={() => { if (finished) onDone(); else onClose(); }}
           className="h-9 px-3 rounded-md border border-[var(--border)] text-sm hover:bg-[var(--muted)]"
         >
           {finished ? "Concluir" : "Fechar"}
         </button>
       </div>
 
-      {/* Info */}
       <div className="mt-3 text-xs text-muted-foreground">
-        Modelo CSV: <code>ra,emailEducacional,emailPessoal,nome,cursoNome,cursoSigla</code>.<br />
+        Modelo CSV: <code>ra,emailEducacional,emailPessoal,nome,cursoNome,cursoSigla,unidadeFatec,turno,turma,semestreAtual,anoSemestreIngresso,ativo</code>.<br />
         <b>Obrigatórios:</b> <code>ra</code>, <code>emailEducacional</code>.<br />
-        A senha temporária é definida automaticamente no backend e será exigida a troca no primeiro acesso.
+        A coluna <code>ativo</code> aceita <code>TRUE</code> / <code>FALSE</code> (padrão: TRUE se omitida).
       </div>
     </div>
   );
