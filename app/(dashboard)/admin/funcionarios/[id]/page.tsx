@@ -44,13 +44,13 @@ type SetorLite = {
 const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 const FUNC_LIST = "/admin/funcionarios";
 
-function extrairPapel(u: UsuarioApi): Funcionario["papel"] {
+function extrairPapel(u: UsuarioApi): Funcionario["papel"] | null {
   if (u.papel && u.papel !== "USUARIO") return u.papel as Funcionario["papel"];
   if (u.papeis && u.papeis.length) {
     const p = u.papeis.find((x) => x !== "USUARIO");
     if (p) return p as Funcionario["papel"];
   }
-  return "BACKOFFICE";
+  return null;
 }
 
 function StatusPill({ ativo }: { ativo: boolean }) {
@@ -98,12 +98,15 @@ export default function FuncionarioDetalhePage() {
         if (!uRes.ok) throw new Error(uRes.status === 404 ? "Funcionário não encontrado." : `Erro ${uRes.status} ao buscar funcionário.`);
 
         const json: UsuarioApi = await uRes.json();
+        const papel = extrairPapel(json);
+        if (!papel) throw new Error("Usuário não possui papel de funcionário.");
+
         const mapped: Funcionario = {
           id: json.id,
           nome: json.nome ?? null,
           emailPessoal: json.emailPessoal ?? null,
           emailEducacional: json.emailEducacional ?? null,
-          papel: extrairPapel(json),
+          papel,
           ativo: Boolean(json.ativo),
           criadoEm: json.criadoEm,
           atualizadoEm: json.atualizadoEm,
@@ -112,19 +115,18 @@ export default function FuncionarioDetalhePage() {
 
         // Busca setores do usuário — rota: GET /admin/usuarios/:id/setores
         const sRes = await apiFetch(`${API_URL}/admin/usuarios/${encodeURIComponent(id)}/setores`, { cache: "no-store" });
-        if (sRes.ok) {
-          const data = await sRes.json();
-          const arr: any[] = Array.isArray(data) ? data : (data.data ?? []);
-          const setoresNorm: SetorLite[] = arr
-            .filter((item) => item?.setor?.id)
-            .map((item) => ({
-              usuarioSetorId: String(item.id),
-              id: String(item.setor.id),
-              nome: String(item.setor.nome),
-              papelNoSetor: item?.papel?.nome ?? null,
-            }));
-          if (alive) setSetores(setoresNorm);
-        }
+        if (!sRes.ok) throw new Error(`Erro ${sRes.status} ao buscar setores do funcionário.`);
+        const sData = await sRes.json();
+        const arr: any[] = Array.isArray(sData) ? sData : (sData.data ?? []);
+        const setoresNorm: SetorLite[] = arr
+          .filter((item) => item?.setor?.id)
+          .map((item) => ({
+            usuarioSetorId: String(item.id),
+            id: String(item.setor.id),
+            nome: String(item.setor.nome),
+            papelNoSetor: item?.papel?.nome ?? null,
+          }));
+        if (alive) setSetores(setoresNorm);
       } catch (e: unknown) {
         if (alive) setError(e instanceof Error ? e.message : "Falha ao carregar funcionário.");
       } finally {
@@ -169,7 +171,6 @@ export default function FuncionarioDetalhePage() {
         setorId: novoSetorId.trim(),
         ...(novoPapelId.trim() ? { papelId: novoPapelId.trim() } : {}),
       };
-      // Rota real: POST /admin/usuarios/:usuarioId/setores
       const res = await apiFetch(`${API_URL}/admin/usuarios/${encodeURIComponent(func.id)}/setores`, {
         method: "POST",
         body: JSON.stringify(body),
@@ -194,7 +195,6 @@ export default function FuncionarioDetalhePage() {
 
   async function onRemoverSetor(usuarioSetorId: string) {
     try {
-      // Rota real: DELETE /admin/usuarios-setores/:usuarioSetorId
       const res = await apiFetch(`${API_URL}/admin/usuarios-setores/${encodeURIComponent(usuarioSetorId)}`, { method: "DELETE" });
       if (!res.ok && res.status !== 204) throw new Error("Falha ao remover do setor.");
       setSetores((prev) => prev.filter((s) => s.usuarioSetorId !== usuarioSetorId));
