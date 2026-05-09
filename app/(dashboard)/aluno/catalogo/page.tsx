@@ -10,17 +10,16 @@ import { apiFetch } from "../../../../utils/api";
 
 type Servico = ServicoCatalogo & { categoriaNome?: string };
 
-
-/* ----------------------------- MOCK (fallback) ----------------------------- */
 const MOCK: CatalogResponse = CATALOGO_INSTITUCIONAL;
 
-/* ----------------------------- Componentes ----------------------------- */
 function CategoriaPill({ label, active, onClick }: { label: string; active?: boolean; onClick: () => void }) {
   return (
     <button
       className={cx(
         "h-9 px-3 rounded-lg border text-sm transition",
-        active ? "bg-primary text-primary-foreground border-transparent" : "bg-background hover:bg-[var(--muted)] border-[var(--border)]"
+        active
+          ? "bg-primary text-primary-foreground border-transparent"
+          : "bg-background hover:bg-[var(--muted)] border-[var(--border)]",
       )}
       onClick={onClick}
     >
@@ -29,7 +28,6 @@ function CategoriaPill({ label, active, onClick }: { label: string; active?: boo
   );
 }
 
-/* ----------------------------- Card de Serviço ----------------------------- */
 function ServicoCard({ s }: { s: Servico }) {
   return (
     <div className="rounded-xl border border-[var(--border)] bg-card p-4 flex flex-col justify-between">
@@ -46,7 +44,6 @@ function ServicoCard({ s }: { s: Servico }) {
           <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{s.descricao}</p>
         )}
       </div>
-
       <div className="flex items-center justify-between">
         <div className="text-xs text-muted-foreground">ID: {s.id}</div>
         {s.ativo ? (
@@ -69,15 +66,12 @@ function ServicoCard({ s }: { s: Servico }) {
   );
 }
 
-/* ----------------------------- Página Principal ----------------------------- */
 export default function CatalogoAlunoPage() {
   const [loading, setLoading] = useState(true);
   const [catalog, setCatalog] = useState<CatalogResponse>(MOCK);
   const [q, setQ] = useState("");
   const [catId, setCatId] = useState<string | "ALL">("ALL");
 
-
-  /* Buscar catálogo */
   useEffect(() => {
     async function fetchCatalog() {
       try {
@@ -99,13 +93,16 @@ export default function CatalogoAlunoPage() {
   }, []);
 
   const flatServicos = useMemo(
-    () => catalog.categorias.flatMap((c) => c.servicos.map((s) => ({ ...s, categoriaId: c.id, categoriaNome: c.nome }))),
-    [catalog]
+    () =>
+      catalog.categorias.flatMap((c) =>
+        c.servicos.map((s) => ({ ...s, categoriaId: c.id, categoriaNome: c.nome })),
+      ),
+    [catalog],
   );
 
   const categoriasOpts = useMemo(
     () => catalog.categorias.map((c) => ({ id: c.id, nome: c.nome })),
-    [catalog]
+    [catalog],
   );
 
   const filtrados = useMemo(() => {
@@ -116,41 +113,46 @@ export default function CatalogoAlunoPage() {
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
-      const byText = !texto || searchable.includes(texto);
-      return byCat && byText;
+      return byCat && (!texto || searchable.includes(texto));
     });
   }, [flatServicos, q, catId]);
 
   const kpis = useMemo(() => {
     const total = flatServicos.length;
     const ativos = flatServicos.filter((s) => s.ativo).length;
-    const indisponiveis = total - ativos;
-    return { total, ativos, indisponiveis };
+    return { total, ativos, indisponiveis: total - ativos };
   }, [flatServicos]);
 
-  /* ----------------------------- Render ----------------------------- */
   return (
     <>
-      {/* Topbar */}
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="font-grotesk text-2xl font-semibold tracking-tight">Serviços acadêmicos da Fatec</h1>
+          <h1 className="font-grotesk text-2xl font-semibold tracking-tight">
+            Serviços acadêmicos da Fatec
+          </h1>
           <p className="text-xs text-muted-foreground mt-2">
-            Escolha um serviço para iniciar o preenchimento guiado. O ticket só será criado após a revisão final: {kpis.ativos} disponíveis • {kpis.indisponiveis} indisponíveis
+            Escolha um serviço para iniciar o preenchimento guiado. O ticket só será criado após a
+            revisão final · {kpis.ativos} disponíveis · {kpis.indisponiveis} indisponíveis
           </p>
         </div>
-        <MobileSidebarTriggerAluno />
       </div>
 
-      {/* Filtros */}
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-2">
-          <CategoriaPill label="Todas categorias" active={catId === "ALL"} onClick={() => setCatId("ALL")} />
+          <CategoriaPill
+            label="Todas categorias"
+            active={catId === "ALL"}
+            onClick={() => setCatId("ALL")}
+          />
           {categoriasOpts.map((c) => (
-            <CategoriaPill key={c.id} label={c.nome} active={catId === c.id} onClick={() => setCatId(c.id)} />
+            <CategoriaPill
+              key={c.id}
+              label={c.nome}
+              active={catId === c.id}
+              onClick={() => setCatId(c.id)}
+            />
           ))}
         </div>
-
         <div className="relative w-full lg:w-[360px]">
           <Search className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
           <input
@@ -162,7 +164,6 @@ export default function CatalogoAlunoPage() {
         </div>
       </div>
 
-      {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
         <div className="rounded-xl border border-[var(--border)] bg-card p-4 flex items-center gap-3">
           <Layers className="size-5 text-muted-foreground" />
@@ -187,15 +188,15 @@ export default function CatalogoAlunoPage() {
         </div>
       </div>
 
-      {/* Lista de serviços */}
       <div className="rounded-xl border border-[var(--border)] bg-card p-4">
         {loading ? (
           <div className="flex items-center justify-center py-10 text-muted-foreground gap-2">
-            <Loader2 className="size-4 animate-spin" />
-            Carregando catálogo...
+            <Loader2 className="size-4 animate-spin" /> Carregando catálogo...
           </div>
         ) : filtrados.length === 0 ? (
-          <div className="py-10 text-center text-muted-foreground">Nenhum serviço encontrado com os filtros atuais.</div>
+          <div className="py-10 text-center text-muted-foreground">
+            Nenhum serviço encontrado com os filtros atuais.
+          </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {filtrados.map((s) => (

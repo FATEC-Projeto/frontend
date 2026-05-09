@@ -23,7 +23,6 @@ import {
 } from "../../../../../utils/catalogo";
 import { cx } from "../../../../../utils/cx";
 import { apiFetch } from "../../../../../utils/api";
-import { CAMPOS_ESPECIFICOS, SETOR_PROVAVEL, DOCUMENTOS_NECESSARIOS } from "../_forms";
 
 type ServicoComCategoria = ServicoCatalogo & { categoriaNome: string };
 type DadosAcademicos = {
@@ -34,6 +33,7 @@ type DadosAcademicos = {
   turma: string;
   ra: string;
 };
+type CampoWizard = FormularioCampo & { placeholder?: string };
 type TicketResponse = { id?: string | number; ticket?: { id?: string | number } };
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
@@ -56,6 +56,162 @@ const ALLOWED_UPLOAD_TYPES = [
 ].join(",");
 const MAX_UPLOAD_SIZE = 10 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(ALLOWED_UPLOAD_TYPES.split(","));
+
+const SETOR_PROVAVEL: Record<string, string> = {
+  "secretaria-academica": "Secretaria Acadêmica",
+  "coordenacao-curso": "Coordenação de Curso",
+  estagio: "Setor de Estágio",
+  "sistemas-institucionais-siga": "Secretaria Acadêmica / Suporte SIGA",
+  biblioteca: "Biblioteca",
+  "diretoria-administrativo": "Diretoria / Administrativo",
+  "apoio-academico": "Apoio Acadêmico",
+};
+
+const DOCUMENTOS_NECESSARIOS: Record<string, string[]> = {
+  "secretaria-declaracao-matricula": ["Documento de identificação ou comprovante de RA"],
+  "secretaria-historico-escolar": ["Documento de identificação ou comprovante de RA"],
+  "secretaria-aproveitamento-estudos": ["Histórico escolar", "Ementas ou programas das disciplinas cursadas"],
+  "secretaria-revisao-nota": ["Evidência da divergência de nota/menção, quando houver"],
+  "secretaria-correcao-dados-siga": ["Documento comprobatório da alteração", "Documento de identificação"],
+  "secretaria-rematricula-fora-prazo": ["Comprovante de matrícula/rematrícula ou justificativa documentada"],
+  "secretaria-trancamento-destrancamento": ["Documento de identificação ou requerimento"],
+  "coordenacao-analise-disciplina-equivalencia": ["Histórico escolar", "Ementas ou programas das disciplinas"],
+  "sistemas-problema-acesso-siga": ["Print ou mensagem de erro, quando houver"],
+  "sistemas-dados-divergentes-siga": ["Print da divergência no SIGA"],
+  "sistemas-email-institucional": ["Print do erro ou mensagem recebida, quando disponível"],
+  "sistemas-redefinicao-senha-institucional": ["Print do erro, se houver"],
+  "estagio-termo-compromisso": ["Termo de compromisso assinado", "Plano de atividades"],
+  "estagio-termo-aditivo": ["Termo aditivo assinado"],
+  "estagio-relatorio": ["Relatório de estágio assinado", "Avaliação do supervisor, quando aplicável"],
+  "estagio-rescisao": ["Documento de rescisão ou encerramento, quando disponível"],
+};
+
+function campo(
+  id: string,
+  label: string,
+  tipo: CampoWizard["tipo"],
+  obrigatorio: boolean,
+  placeholder?: string,
+  opcoes?: string[],
+): CampoWizard {
+  return { id, label, tipo, obrigatorio, placeholder, opcoes };
+}
+
+function camposEstagio(): CampoWizard[] {
+  return [
+    campo("empresa", "Empresa / Concedente", "texto", true, "Razão social da empresa"),
+    campo("cnpj", "CNPJ da empresa", "texto", false, "00.000.000/0000-00"),
+    campo("supervisor", "Supervisor responsável", "texto", false, "Nome completo do supervisor"),
+    campo("emailEmpresa", "E-mail da empresa / supervisor", "texto", false, "supervisor@empresa.com.br"),
+    campo("tipoEstagio", "Tipo de estágio", "select", true, undefined, ["Obrigatório", "Não obrigatório"]),
+    campo("dataInicio", "Data de início", "texto", true, "DD/MM/AAAA"),
+    campo("dataTermino", "Data de término (previsto)", "texto", false, "DD/MM/AAAA"),
+    campo("cargaHorariaSemanal", "Carga horária semanal", "texto", false, "Ex.: 30h"),
+    campo("tipoDocumento", "Tipo de documento solicitado", "select", true, undefined, [
+      "Termo de compromisso",
+      "Termo aditivo",
+      "Relatório de estágio",
+      "Rescisão",
+    ]),
+  ];
+}
+
+function camposCoordenacao(): CampoWizard[] {
+  return [
+    campo("curso", "Curso", "texto", false, "Ex.: Análise e Desenvolvimento de Sistemas"),
+    campo("disciplina", "Disciplina relacionada", "texto", false, "Deixe em branco se não aplicável"),
+    campo("professor", "Professor relacionado", "texto", false, "Nome do professor, se aplicável"),
+    campo("tipoDemanda", "Tipo de demanda", "select", true, undefined, [
+      "Dúvida sobre matriz curricular",
+      "Dependência de disciplina",
+      "Equivalência de disciplina",
+      "Solicitação de reunião",
+      "Orientação TG/TCC / Projeto integrador",
+      "Horário de aula",
+      "Outro",
+    ]),
+    campo("justificativa", "Justificativa / Descrição", "textarea", true, "Descreva sua necessidade com detalhes"),
+  ];
+}
+
+function camposSIGA(): CampoWizard[] {
+  return [
+    campo("tipoProblema", "Tipo de problema", "select", true, undefined, [
+      "Erro ao fazer login",
+      "Senha incorreta / bloqueio de conta",
+      "Dados incorretos ou desatualizados",
+      "Acesso negado a funcionalidade",
+      "Tela com erro ou travamento",
+      "Funcionalidade indisponível",
+      "Outro",
+    ]),
+    campo("telaFuncionalidade", "Tela ou funcionalidade afetada", "texto", false, "Ex.: Histórico escolar, Matrícula"),
+    campo("mensagemErro", "Mensagem de erro exibida (se houver)", "textarea", false, "Cole aqui o texto do erro"),
+  ];
+}
+
+function camposEmailSenha(): CampoWizard[] {
+  return [
+    campo("emailInstitucional", "E-mail institucional", "texto", true, "aluno@fatec.sp.gov.br"),
+    campo("tipoProblema", "Tipo de problema", "select", true, undefined, [
+      "Não consigo acessar o e-mail",
+      "Esqueci a senha",
+      "Conta bloqueada",
+      "E-mail institucional não foi criado",
+      "Problema de sincronização",
+      "Recebo e-mails mas não consigo enviar",
+      "Outro",
+    ]),
+    campo("tentativaRealizada", "O que já tentou fazer?", "textarea", false, "Descreva as tentativas de resolução já realizadas"),
+  ];
+}
+
+const CAMPOS_ESPECIFICOS: Record<string, CampoWizard[]> = {
+  "secretaria-declaracao-matricula": [
+    campo("finalidade", "Finalidade da declaração", "textarea", true, "Ex.: estágio, benefício estudantil, comprovação de vínculo"),
+  ],
+  "secretaria-historico-escolar": [
+    campo("semestreReferencia", "Semestre de referência", "texto", true),
+    campo("formatoDesejado", "Formato desejado", "select", true, undefined, ["Digital", "Impresso", "Digital e impresso"]),
+  ],
+  "secretaria-aproveitamento-estudos": [
+    campo("instituicaoOrigem", "Instituição de origem", "texto", true),
+    campo("disciplinasOrigem", "Disciplinas cursadas na origem", "textarea", true),
+    campo("disciplinasPretendidas", "Disciplinas pretendidas para aproveitamento", "textarea", true),
+    campo("justificativa", "Justificativa", "textarea", true),
+  ],
+  "secretaria-revisao-nota": [
+    campo("disciplina", "Disciplina", "texto", true),
+    campo("professor", "Professor responsável", "texto", false),
+    campo("avaliacao", "Avaliação/atividade relacionada", "texto", true),
+    campo("justificativa", "Justificativa da revisão", "textarea", true),
+  ],
+  "secretaria-correcao-dados-siga": [
+    campo("dadoAlterar", "Dado a alterar", "texto", true),
+    campo("valorAtual", "Valor atual/incorreto", "texto", false),
+    campo("novoValor", "Novo valor correto", "texto", true),
+  ],
+  "secretaria-rematricula-fora-prazo": [
+    campo("disciplinas", "Disciplinas envolvidas", "textarea", false),
+    campo("justificativa", "Justificativa", "textarea", true),
+  ],
+  "coordenacao-duvida-matriz-curricular": camposCoordenacao(),
+  "coordenacao-reuniao": camposCoordenacao(),
+  "coordenacao-analise-disciplina-equivalencia": camposCoordenacao(),
+  "coordenacao-orientacao-tg-tcc-projeto-integrador": camposCoordenacao(),
+  "estagio-termo-compromisso": camposEstagio(),
+  "estagio-termo-aditivo": camposEstagio(),
+  "estagio-relatorio": camposEstagio(),
+  "estagio-rescisao": camposEstagio(),
+  "estagio-duvida-obrigatorio-nao-obrigatorio": [
+    campo("tipoEstagio", "Tipo de estágio", "select", true, undefined, ["Obrigatório", "Não obrigatório", "Ainda não sei"]),
+    campo("duvida", "Dúvida", "textarea", true),
+  ],
+  "sistemas-problema-acesso-siga": camposSIGA(),
+  "sistemas-dados-divergentes-siga": camposSIGA(),
+  "sistemas-email-institucional": camposEmailSenha(),
+  "sistemas-redefinicao-senha-institucional": camposEmailSenha(),
+};
 
 function normalizeCatalog(data: CatalogResponse): CatalogResponse {
   return { categorias: (data.categorias ?? []).map((c) => ({ ...c, servicos: c.servicos ?? [] })) };
@@ -158,13 +314,11 @@ export default function SolicitacaoCatalogoPage() {
   const setorProvavel = servico
     ? SETOR_PROVAVEL[servico.categoriaId] ?? servico.categoriaNome
     : "Setor responsável";
-  const campos = useMemo<FormularioCampo[]>(() => {
+  const campos = useMemo<CampoWizard[]>(() => {
     if (!servico) return [];
     if (servico.formulario?.disponivel && servico.formulario.campos?.length)
       return servico.formulario.campos;
-    return CAMPOS_ESPECIFICOS[servico.id] ?? [
-      { id: "descricao", label: "Descreva sua solicitação", tipo: "textarea", obrigatorio: true },
-    ];
+    return CAMPOS_ESPECIFICOS[servico.id] ?? [campo("descricao", "Descreva sua solicitação", "textarea", true)];
   }, [servico]);
   const documentosNecessarios = servico ? (DOCUMENTOS_NECESSARIOS[servico.id] ?? []) : [];
 
@@ -180,9 +334,7 @@ export default function SolicitacaoCatalogoPage() {
       if (missing) return "Preencha todos os dados acadêmicos básicos.";
     }
     if (currentStep === 3) {
-      const missing = campos.find(
-        (f) => f.obrigatorio && f.tipo !== "checkbox" && !camposEspecificos[f.id]?.trim()
-      );
+      const missing = campos.find((f) => f.obrigatorio && !camposEspecificos[f.id]?.trim());
       if (missing) return `Preencha o campo obrigatório: ${missing.label}.`;
     }
     if (currentStep === 4 && documentosNecessarios.length > 0 && anexos.length === 0)
@@ -205,7 +357,7 @@ export default function SolicitacaoCatalogoPage() {
       toast.error(`"${f.name}" excede 10 MB e não foi adicionado.`)
     );
     fileArray
-      .filter((f) => f.size <= MAX_UPLOAD_SIZE && !!f.type && !ALLOWED_TYPES.has(f.type))
+      .filter((f) => f.size <= MAX_UPLOAD_SIZE && f.type && !ALLOWED_TYPES.has(f.type))
       .forEach((f) => toast.error(`Tipo de arquivo não permitido: ${f.name}`));
     setAnexos((prev) => {
       const existing = new Set(prev.map((f) => `${f.name}-${f.size}`));
@@ -215,8 +367,7 @@ export default function SolicitacaoCatalogoPage() {
           (f) =>
             !existing.has(`${f.name}-${f.size}`) &&
             f.size <= MAX_UPLOAD_SIZE &&
-            !!f.type &&
-            ALLOWED_TYPES.has(f.type)
+            (!f.type || ALLOWED_TYPES.has(f.type))
         ),
       ];
     });
@@ -243,6 +394,7 @@ export default function SolicitacaoCatalogoPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!servico) return;
+    // Valida todas as etapas antes de submeter (evita bypass via clique direto na revisão)
     for (let s = 1; s <= TOTAL_STEPS; s++) {
       const error = validateStep(s);
       if (error) { toast.error(error); setStep(s); return; }
@@ -502,20 +654,7 @@ function SelectInput({ label, value, onChange, options, required }: { label: str
   );
 }
 
-function CampoEspecifico({ campo, value, onChange }: { campo: FormularioCampo; value: string; onChange: (v: string) => void }) {
-  if (campo.tipo === "checkbox") {
-    return (
-      <label className="flex items-center gap-3 rounded-lg border border-[var(--border)] p-3 text-sm cursor-pointer">
-        <input
-          type="checkbox"
-          checked={value === "Sim"}
-          onChange={(e) => onChange(e.target.checked ? "Sim" : "")}
-          className="size-4 shrink-0"
-        />
-        <span>{campo.label}</span>
-      </label>
-    );
-  }
+function CampoEspecifico({ campo, value, onChange }: { campo: CampoWizard; value: string; onChange: (v: string) => void }) {
   if (campo.tipo === "select")
     return <SelectInput label={campo.label} value={value} onChange={onChange} options={campo.opcoes ?? []} required={campo.obrigatorio} />;
   if (campo.tipo === "textarea") {

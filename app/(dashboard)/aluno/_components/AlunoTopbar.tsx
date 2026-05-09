@@ -30,8 +30,8 @@ export default function AlunoTopbar({
   const [theme, setTheme] = useState<"light" | "dark">("light");
 
   useEffect(() => {
-    const saved = localStorage.getItem("theme");
-    setTheme(saved === "light" || saved === "dark" ? saved : "light");
+    const saved = localStorage.getItem("theme") as "light" | "dark" | null;
+    setTheme(saved ?? "light");
   }, []);
 
   useEffect(() => {

@@ -15,6 +15,7 @@ async function getJwtPayload(token: string) {
   try {
     if (!process.env.JWT_ACCESS_SECRET) return null
     const secret = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET)
+    if (!process.env.JWT_ACCESS_SECRET) return null
     const { payload } = await jwtVerify(token, secret, {
       issuer: process.env.JWT_ISSUER || 'helpdesk',
       audience: process.env.JWT_AUDIENCE || 'helpdesk-app',
