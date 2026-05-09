@@ -56,7 +56,7 @@ export default function AlunoTopbar({
           setSaudacao(greetingFallback);
         }
       } catch {
-        setSaudacao(greetingFallback);
+        if (alive) setSaudacao(greetingFallback);
       } finally {
         if (alive) setLoadingUser(false);
       }

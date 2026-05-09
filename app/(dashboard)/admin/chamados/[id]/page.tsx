@@ -506,7 +506,7 @@ export default function AdminChamadoPage() {
                         style={{ overflowWrap: "break-word", wordBreak: "break-word", overflow: "hidden" }}
                       >
                         <div className="text-xs opacity-80 mb-1">
-                          {isAluno ? nomeAutor : "Você"} ·{" "}
+                          {isAluno ? nomeAutor : "Você"} ·{" "}
                           {new Date(m.criadoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                         </div>
                         <div className="break-words whitespace-pre-wrap leading-relaxed">{m.conteudo}</div>

@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
   Search,
   AlertTriangle,
-  ChevronRight,
   Paperclip,
   Plus,
   Loader2,
@@ -16,32 +15,9 @@ import MobileSidebarTriggerAluno from "../_components/MobileSidebarTriggerAluno"
 import { apiFetch } from "../../../../utils/api";
 import { cx } from '../../../../utils/cx'
 import TicketStatusBadge from "../../../components/shared/TicketStatusBadge";
+import type { Chamado, PageResponse, Status } from "../../../../utils/types";
 
-/* ---------- Tipos ---------- */
-type Status =
-  | "ABERTO"
-  | "EM_ATENDIMENTO"
-  | "AGUARDANDO_USUARIO"
-  | "RESOLVIDO"
-  | "ENCERRADO";
-
-type Chamado = {
-  id: string;
-  protocolo?: string | null;
-  titulo: string;
-  criadoEm: string;
-  status: Status;
-  setor?: { nome?: string | null } | null;
-  precisaAcaoDoAluno?: boolean | null;
-  mensagensNaoLidas?: number | null;
-};
-
-type PageResp = {
-  total: number;
-  page: number;
-  pageSize: number;
-  items: Chamado[];
-};
+type PageResp = PageResponse<Chamado>;
 
 
 function AcoesChamado({ c }: { c: Chamado }) {
@@ -50,7 +26,7 @@ function AcoesChamado({ c }: { c: Chamado }) {
 
   return (
     <div className="flex gap-2 justify-end">
-      {/* Link sempre visível: permite consultar o chamado mesmo encerrado */}
+      {/* Link sempre visível: permite consultar a solicitação acadêmica mesmo encerrada */}
       <Link
         href={`/aluno/chamados/${c.id}`}
         className={cx(base, "text-[var(--brand-teal)] border-[var(--brand-teal)]/40")}
@@ -108,8 +84,9 @@ export default function MeusChamadosPage() {
         }
         const data: PageResp = await res.json();
         if (alive) setDados(data.items ?? []);
-      } catch (err: any) {
-        toast.error("Erro ao carregar chamados", { description: err?.message });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : undefined;
+        toast.error("Erro ao carregar solicitações acadêmicas", { description: message });
       } finally {
         if (alive) setLoading(false);
       }
@@ -141,7 +118,8 @@ export default function MeusChamadosPage() {
       {/* Topbar mínima (sem saudação; cabeçalho global está no layout) */}
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <p className="text-muted-foreground">Acompanhe e gerencie seus chamados.</p>
+          <h1 className="font-grotesk text-2xl font-semibold tracking-tight">Minhas solicitações acadêmicas</h1>
+          <p className="text-muted-foreground">Acompanhe suas solicitações acadêmicas junto à Fatec.</p>
         </div>
         <MobileSidebarTriggerAluno />
       </div>
@@ -153,7 +131,7 @@ export default function MeusChamadosPage() {
             <div className="flex items-start gap-3">
               <AlertTriangle className="size-5 text-[var(--warning)] mt-0.5" />
               <div>
-                <div className="font-medium">Você tem {aguardandoCount} chamado(s) aguardando sua ação.</div>
+                <div className="font-medium">Você tem {aguardandoCount} solicitação(ões) acadêmica(s) aguardando sua ação.</div>
                 <div className="text-sm text-muted-foreground">
                   Envie documentos, responda mensagens ou conclua a tarefa.
                 </div>
@@ -164,7 +142,7 @@ export default function MeusChamadosPage() {
               className="inline-flex items-center h-9 px-3 rounded-md border border-[var(--warning)]/40 text-[var(--warning)] hover:bg-[var(--warning)]/10"
               onClick={() => setStatus("AGUARDANDO_USUARIO")}
             >
-              Filtrar por “Aguardando você”
+              Filtrar solicitações aguardando você
             </button>
           </div>
         </div>
@@ -177,7 +155,7 @@ export default function MeusChamadosPage() {
             href="/aluno/catalogo"
             className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground hover:opacity-90"
           >
-            <Plus className="size-4" /> Abrir novo chamado
+            <Plus className="size-4" /> Abrir solicitação acadêmica
           </Link>
         </div>
 
@@ -196,14 +174,14 @@ export default function MeusChamadosPage() {
           <select
             className="h-10 w-full sm:w-[200px] px-3 rounded-lg border border-[var(--border)] bg-background focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
             value={status}
-            onChange={(e) => setStatus(e.target.value as any)}
+            onChange={(e) => setStatus(e.target.value as Status | "ALL")}
           >
             <option value="ALL">Todos os status</option>
-            <option value="ABERTO">Aberto</option>
-            <option value="EM_ATENDIMENTO">Em atendimento</option>
-            <option value="AGUARDANDO_USUARIO">Aguardando você</option>
-            <option value="RESOLVIDO">Resolvido</option>
-            <option value="ENCERRADO">Encerrado</option>
+            <option value="ABERTO">Solicitação recebida pela Fatec.</option>
+            <option value="EM_ATENDIMENTO">Em análise pelo setor responsável.</option>
+            <option value="AGUARDANDO_USUARIO">Aguardando documento ou resposta do aluno.</option>
+            <option value="RESOLVIDO">Solicitação respondida.</option>
+            <option value="ENCERRADO">Atendimento finalizado.</option>
           </select>
         </div>
       </div>
@@ -217,7 +195,7 @@ export default function MeusChamadosPage() {
           </div>
         ) : filtrados.length === 0 ? (
           <div className="p-8 text-center text-muted-foreground">
-            Nenhum chamado encontrado com os filtros atuais.
+            Nenhuma solicitação acadêmica encontrada com os filtros atuais.
           </div>
         ) : (
           <>
