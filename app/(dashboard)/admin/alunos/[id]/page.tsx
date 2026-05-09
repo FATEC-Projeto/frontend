@@ -6,14 +6,16 @@ import Link from "next/link";
 import {
   ArrowLeft, Mail, User, Badge, Shield, CheckCircle2, XCircle,
   Pencil, Trash2, KeyRound, AlertTriangle, Search, Filter,
-  ChevronRight, Loader2, Check, X, Ticket, Clock
+  ChevronRight, Loader2, Check, X, Ticket, Clock,
+  Phone, MessageCircle, GraduationCap, Building2, BookOpen,
 } from "lucide-react";
 
 import { cx } from '../../../../../utils/cx'
 import TicketStatusBadge from "../../../../components/shared/TicketStatusBadge";
 import KpiCard from "../../../../components/shared/KpiCard";
+import FormAlunoEdit from "../../_components/FormAlunoEdit";
 
-/* ===================== Tipos (alinhados ao Prisma) ===================== */
+/* ===================== Tipos ===================== */
 type Papel = "USUARIO" | "BACKOFFICE" | "TECNICO" | "ADMINISTRADOR";
 type StatusChamado = "ABERTO" | "EM_ATENDIMENTO" | "AGUARDANDO_USUARIO" | "RESOLVIDO" | "ENCERRADO";
 type Prioridade = "BAIXA" | "MEDIA" | "ALTA" | "URGENTE";
@@ -27,36 +29,87 @@ type Usuario = {
   ra: string | null;
   papel: Papel;
   ativo: boolean;
-  criadoEm: string;      // ISO
-  atualizadoEm: string;  // ISO
+  criadoEm: string;
+  atualizadoEm: string;
+  // Curso
+  cursoNome: string | null;
+  cursoSigla: string | null;
+  curso: string | null;
+  eixoTecnologico: string | null;
+  matrizCurricular: string | null;
+  // Dados acadêmicos
+  unidadeFatec: string | null;
+  turno: string | null;
+  turma: string | null;
+  semestreAtual: string | null;
+  anoSemestreIngresso: string | null;
+  situacaoAcademica: string | null;
+  coordenadorCurso: string | null;
+  // Contato
+  telefoneCelular: string | null;
+  whatsapp: string | null;
+  canalPreferencialContato: string | null;
+  melhorPeriodoContato: string | null;
+  // Acessibilidade
+  necessitaAtendimentoAcessivel: boolean | null;
+  tipoAcessibilidade: string | null;
+  observacoesAtendimento: string | null;
 };
 
 type Chamado = {
   id: string;
   protocolo?: string | null;
   titulo: string;
-  criadoEm: string; // ISO
+  criadoEm: string;
   status: StatusChamado;
   prioridade: Prioridade;
   nivel: Nivel;
-  setor?: string | null; // mapeado no backend (setor.nome)
+  setor?: string | null;
 };
 
-/* ===================== ENV ===================== */
 const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
-
 function Pill({ children }: { children: React.ReactNode }) {
-  return <span className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-background px-2 py-0.5 text-xs">{children}</span>;
+  return (
+    <span className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-background px-2 py-0.5 text-xs">
+      {children}
+    </span>
+  );
 }
 
 function Dot({ tone = "ok" as "ok" | "muted" }) {
-  return <span className={cx("inline-block size-2 rounded-full", tone === "ok" ? "bg-[var(--success)]" : "bg-[var(--muted-foreground)]")} />;
+  return (
+    <span
+      className={cx(
+        "inline-block size-2 rounded-full",
+        tone === "ok" ? "bg-[var(--success)]" : "bg-[var(--muted-foreground)]",
+      )}
+    />
+  );
 }
 
-function toast(msg: string) {
-  alert(msg);
+function InfoRow({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div className="flex flex-col">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-sm mt-0.5">{value || <span className="text-muted-foreground/60">—</span>}</span>
+    </div>
+  );
 }
+
+function SectionCard({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-[var(--border)] bg-card p-4">
+      <div className="flex items-center gap-2 mb-4">
+        {icon && <span className="text-muted-foreground">{icon}</span>}
+        <h3 className="font-medium text-sm">{title}</h3>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function toast(msg: string) { alert(msg); }
 
 /* ===================== Página ===================== */
 export default function PageAlunoDetalhe() {
@@ -75,6 +128,7 @@ export default function PageAlunoDetalhe() {
 
   const [delOpen, setDelOpen] = useState(false);
   const [delConfirmText, setDelConfirmText] = useState("");
+  const [editOpen, setEditOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -82,10 +136,8 @@ export default function PageAlunoDetalhe() {
       try {
         setLoading(true);
         const token =
-          (typeof window !== "undefined" && localStorage.getItem("accessToken")) ||
-          "";
+          (typeof window !== "undefined" && localStorage.getItem("accessToken")) || "";
 
-        // GET usuário
         const uRes = await fetch(`${API_URL}/usuarios/${id}`, {
           headers: { Authorization: token ? `Bearer ${token}` : "" },
           cache: "no-store",
@@ -93,32 +145,18 @@ export default function PageAlunoDetalhe() {
         if (!uRes.ok) throw new Error("Falha ao buscar usuário");
         const u: Usuario = await uRes.json();
 
-        // GET tickets do usuário (criadoPorId)
         const cRes = await fetch(`${API_URL}/tickets?criadoPorId=${u.id}`, {
           headers: { Authorization: token ? `Bearer ${token}` : "" },
           cache: "no-store",
         });
         if (!cRes.ok) throw new Error("Falha ao buscar tickets");
-        let json = await cRes.json();
-            let cs: Chamado[] = [];
+        const json = await cRes.json();
+        let cs: Chamado[] = [];
+        if (Array.isArray(json)) cs = json;
+        else if (Array.isArray(json.data)) cs = json.data;
+        else if (Array.isArray(json.tickets)) cs = json.tickets;
 
-            // Detecta formato retornado automaticamente
-            if (Array.isArray(json)) {
-            cs = json;
-            } else if (Array.isArray(json.data)) {
-            cs = json.data;
-            } else if (Array.isArray(json.tickets)) {
-            cs = json.tickets;
-            } else {
-            console.warn("Formato inesperado de /tickets:", json);
-            cs = [];
-            }
-
-
-        if (active) {
-          setAluno(u);
-          setChamados(cs);
-        }
+        if (active) { setAluno(u); setChamados(cs); }
       } catch (e) {
         console.error(e);
         if (active) toast("Erro ao carregar dados do usuário.");
@@ -127,17 +165,12 @@ export default function PageAlunoDetalhe() {
       }
     }
     if (id) load();
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [id]);
 
   const filtrados = useMemo(() => {
     return chamados.filter((c) => {
-      const mQ =
-        !q ||
-        c.titulo.toLowerCase().includes(q.toLowerCase()) ||
-        c.protocolo?.toLowerCase().includes(q.toLowerCase());
+      const mQ = !q || c.titulo.toLowerCase().includes(q.toLowerCase()) || c.protocolo?.toLowerCase().includes(q.toLowerCase());
       const mS = status === "ALL" || c.status === status;
       const mP = prioridade === "ALL" || c.prioridade === prioridade;
       const mN = nivel === "ALL" || c.nivel === nivel;
@@ -145,34 +178,27 @@ export default function PageAlunoDetalhe() {
     });
   }, [chamados, q, status, prioridade, nivel]);
 
-    async function onExcluirUsuario() {
-      if (!aluno) return;
-
-      if (delConfirmText !== (aluno.emailEducacional ?? aluno.emailPessoal)) {
-        toast("Digite exatamente o e-mail do usuário para confirmar.");
-        return;
-      }
-
-      try {
-        const res = await apiFetch(`${API_URL}/usuarios/${aluno.id}`, {
-          method: "DELETE",
-        });
-
-        if (!res.ok) throw new Error("Erro ao excluir");
-
-        toast("Usuário excluído com sucesso.");
-        router.push("/admin/alunos");
-      } catch (e) {
-        console.error(e);
-        toast("Não foi possível excluir o usuário.");
-      } finally {
-        setDelOpen(false);
-        setDelConfirmText("");
-      }
+  async function onExcluirUsuario() {
+    if (!aluno) return;
+    if (delConfirmText !== (aluno.emailEducacional ?? aluno.emailPessoal)) {
+      toast("Digite exatamente o e-mail do usuário para confirmar.");
+      return;
     }
+    try {
+      const res = await apiFetch(`${API_URL}/usuarios/${aluno.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Erro ao excluir");
+      toast("Usuário excluído com sucesso.");
+      router.push("/admin/alunos");
+    } catch (e) {
+      console.error(e);
+      toast("Não foi possível excluir o usuário.");
+    } finally {
+      setDelOpen(false);
+      setDelConfirmText("");
+    }
+  }
 
   function onResetSenha() {
-    // aqui você pode chamar seu endpoint de reset e disparar email via Resend
     toast("Reset de senha enviado (stub).");
   }
 
@@ -192,10 +218,7 @@ export default function PageAlunoDetalhe() {
         <div className="rounded-xl border border-[var(--border)] bg-card p-6 text-center">
           <div className="text-lg font-semibold mb-1">Usuário não encontrado</div>
           <div className="text-sm text-muted-foreground">Verifique o ID na URL.</div>
-          <Link
-            href="/admin/alunos"
-            className="inline-flex items-center gap-2 mt-4 h-9 px-3 rounded-md border hover:bg-[var(--muted)] text-sm"
-          >
+          <Link href="/admin/alunos" className="inline-flex items-center gap-2 mt-4 h-9 px-3 rounded-md border hover:bg-[var(--muted)] text-sm">
             <ArrowLeft className="size-4" /> Voltar
           </Link>
         </div>
@@ -204,11 +227,11 @@ export default function PageAlunoDetalhe() {
   }
 
   const counts = {
-    abertos: chamados.filter((c) => c.status === "ABERTO").length,
-    andamento: chamados.filter((c) => c.status === "EM_ATENDIMENTO").length,
-    aguard: chamados.filter((c) => c.status === "AGUARDANDO_USUARIO").length,
+    abertos:    chamados.filter((c) => c.status === "ABERTO").length,
+    andamento:  chamados.filter((c) => c.status === "EM_ATENDIMENTO").length,
+    aguard:     chamados.filter((c) => c.status === "AGUARDANDO_USUARIO").length,
     resolvidos: chamados.filter((c) => c.status === "RESOLVIDO" || c.status === "ENCERRADO").length,
-    total: chamados.length,
+    total:      chamados.length,
   };
 
   return (
@@ -216,20 +239,16 @@ export default function PageAlunoDetalhe() {
       {/* Breadcrumb + voltar */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Link
-            href="/admin/alunos"
-            className="inline-flex items-center gap-2 h-9 px-3 rounded-md border hover:bg-[var(--muted)] text-sm"
-          >
+          <Link href="/admin/alunos" className="inline-flex items-center gap-2 h-9 px-3 rounded-md border hover:bg-[var(--muted)] text-sm">
             <ArrowLeft className="size-4" /> Alunos
           </Link>
           <span className="text-muted-foreground">/</span>
           <span className="font-medium truncate max-w-[60vw]">{aluno.nome ?? "—"}</span>
         </div>
-
         <div className="flex items-center gap-2">
           <button
             className="inline-flex items-center gap-2 h-9 px-3 rounded-md border hover:bg-[var(--muted)] text-sm"
-            onClick={() => toast("Abrir editor (stub).")}
+            onClick={() => setEditOpen(true)}
           >
             <Pencil className="size-4" /> Editar
           </button>
@@ -258,26 +277,13 @@ export default function PageAlunoDetalhe() {
             <div>
               <div className="text-lg font-semibold">{aluno.nome ?? "—"}</div>
               <div className="flex flex-wrap gap-2 mt-1 text-sm">
-                <Pill>
-                  <Mail className="size-3" /> {aluno.emailEducacional ?? aluno.emailPessoal}
-                </Pill>
-                <Pill>
-                  <Badge className="size-3" /> RA: {aluno.ra ?? "—"}
-                </Pill>
-                <Pill>
-                  <Shield className="size-3" /> {aluno.papel}
-                </Pill>
-                <Pill>
-                  {aluno.ativo ? (
-                    <>
-                      <Dot /> Ativo
-                    </>
-                  ) : (
-                    <>
-                      <Dot tone="muted" /> Inativo
-                    </>
-                  )}
-                </Pill>
+                <Pill><Mail className="size-3" /> {aluno.emailEducacional ?? aluno.emailPessoal}</Pill>
+                {aluno.emailPessoal && aluno.emailEducacional && (
+                  <Pill><Mail className="size-3" /> {aluno.emailPessoal}</Pill>
+                )}
+                <Pill><Badge className="size-3" /> RA: {aluno.ra ?? "—"}</Pill>
+                <Pill><Shield className="size-3" /> {aluno.papel}</Pill>
+                <Pill>{aluno.ativo ? <><Dot /> Ativo</> : <><Dot tone="muted" /> Inativo</>}</Pill>
               </div>
             </div>
           </div>
@@ -286,6 +292,60 @@ export default function PageAlunoDetalhe() {
             {new Date(aluno.atualizadoEm).toLocaleDateString("pt-BR")}
           </div>
         </div>
+      </div>
+
+      {/* Cards de informações adicionais */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Dados Acadêmicos */}
+        <SectionCard title="Dados Acadêmicos" icon={<GraduationCap className="size-4" />}>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+            <InfoRow label="Unidade Fatec" value={aluno.unidadeFatec} />
+            <InfoRow label="Turno" value={aluno.turno} />
+            <InfoRow label="Curso" value={aluno.cursoNome ?? aluno.curso} />
+            <InfoRow label="Sigla" value={aluno.cursoSigla} />
+            <InfoRow label="Eixo tecnológico" value={aluno.eixoTecnologico} />
+            <InfoRow label="Turma" value={aluno.turma} />
+            <InfoRow label="Semestre atual" value={aluno.semestreAtual} />
+            <InfoRow label="Ingresso" value={aluno.anoSemestreIngresso} />
+            <InfoRow label="Situação acadêmica" value={aluno.situacaoAcademica} />
+            <InfoRow label="Matriz curricular" value={aluno.matrizCurricular} />
+            <div className="col-span-2">
+              <InfoRow label="Coordenador do curso" value={aluno.coordenadorCurso} />
+            </div>
+          </div>
+        </SectionCard>
+
+        {/* Contato & Acessibilidade */}
+        <SectionCard title="Contato & Acessibilidade" icon={<Phone className="size-4" />}>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+            <InfoRow label="Telefone celular" value={aluno.telefoneCelular} />
+            <InfoRow label="WhatsApp" value={aluno.whatsapp} />
+            <InfoRow label="Canal preferencial" value={aluno.canalPreferencialContato} />
+            <InfoRow label="Melhor período" value={aluno.melhorPeriodoContato} />
+            <div className="col-span-2">
+              <InfoRow
+                label="Atendimento acessível"
+                value={
+                  aluno.necessitaAtendimentoAcessivel === null
+                    ? undefined
+                    : aluno.necessitaAtendimentoAcessivel
+                    ? "Sim"
+                    : "Não"
+                }
+              />
+            </div>
+            {aluno.necessitaAtendimentoAcessivel && (
+              <>
+                <div className="col-span-2">
+                  <InfoRow label="Tipo de acessibilidade" value={aluno.tipoAcessibilidade} />
+                </div>
+                <div className="col-span-2">
+                  <InfoRow label="Observações" value={aluno.observacoesAtendimento} />
+                </div>
+              </>
+            )}
+          </div>
+        </SectionCard>
       </div>
 
       {/* KPIs */}
@@ -309,7 +369,6 @@ export default function PageAlunoDetalhe() {
               onChange={(e) => setQ(e.target.value)}
             />
           </div>
-
           <div className="flex gap-2 w-full sm:w-auto">
             <div className="relative">
               <Filter className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -326,7 +385,6 @@ export default function PageAlunoDetalhe() {
                 <option value="ENCERRADO">Encerrado</option>
               </select>
             </div>
-
             <select
               className="h-10 w-[160px] rounded-lg border border-[var(--border)] bg-background px-3"
               value={prioridade}
@@ -338,7 +396,6 @@ export default function PageAlunoDetalhe() {
               <option value="ALTA">Alta</option>
               <option value="URGENTE">Urgente</option>
             </select>
-
             <select
               className="h-10 w-[130px] rounded-lg border border-[var(--border)] bg-background px-3"
               value={nivel}
@@ -370,27 +427,16 @@ export default function PageAlunoDetalhe() {
               {filtrados.map((c) => (
                 <tr key={c.id} className="border-t border-[var(--border)]">
                   <td className="px-4 py-3 font-medium">{c.protocolo ?? `#${c.id}`}</td>
-                  <td className="px-4 py-3 max-w-[360px]">
-                    <div className="line-clamp-1">{c.titulo}</div>
-                  </td>
+                  <td className="px-4 py-3 max-w-[360px]"><div className="line-clamp-1">{c.titulo}</div></td>
                   <td className="px-4 py-3 hidden md:table-cell">{c.setor ?? "—"}</td>
                   <td className="px-4 py-3 hidden lg:table-cell">{c.nivel}</td>
-                  <td className="px-4 py-3">
-                    <TicketStatusBadge status={c.status} />
-                  </td>
+                  <td className="px-4 py-3"><TicketStatusBadge status={c.status} /></td>
                   <td className="px-4 py-3 hidden lg:table-cell">{c.prioridade}</td>
                   <td className="px-4 py-3 hidden lg:table-cell">
-                    {new Date(c.criadoEm).toLocaleDateString("pt-BR", {
-                      day: "2-digit",
-                      month: "2-digit",
-                      year: "numeric",
-                    })}
+                    {new Date(c.criadoEm).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <Link
-                      href={`/admin/chamados/${c.id}`}
-                      className="inline-flex items-center h-9 px-3 rounded-md hover:bg-[var(--muted)]"
-                    >
+                    <Link href={`/admin/chamados/${c.id}`} className="inline-flex items-center h-9 px-3 rounded-md hover:bg-[var(--muted)]">
                       Detalhes <ChevronRight className="size-4 ml-1" />
                     </Link>
                   </td>
@@ -407,6 +453,18 @@ export default function PageAlunoDetalhe() {
           </table>
         </div>
       </div>
+
+      {/* Modal de edição */}
+      {editOpen && aluno && (
+        <FormAlunoEdit
+          aluno={aluno}
+          onClose={() => setEditOpen(false)}
+          onSaved={(updated) => {
+            setAluno((prev) => prev ? { ...prev, ...updated } : prev);
+            setEditOpen(false);
+          }}
+        />
+      )}
 
       {/* Dialog de exclusão */}
       {delOpen && (
@@ -444,7 +502,7 @@ export default function PageAlunoDetalhe() {
                   "inline-flex items-center gap-2 h-9 px-3 rounded-md text-sm",
                   delConfirmText === (aluno.emailEducacional ?? aluno.emailPessoal)
                     ? "bg-red-600 text-white hover:brightness-95"
-                    : "bg-red-600/50 text-white/80 cursor-not-allowed"
+                    : "bg-red-600/50 text-white/80 cursor-not-allowed",
                 )}
                 onClick={onExcluirUsuario}
                 disabled={delConfirmText !== (aluno.emailEducacional ?? aluno.emailPessoal)}
@@ -458,4 +516,3 @@ export default function PageAlunoDetalhe() {
     </div>
   );
 }
-
