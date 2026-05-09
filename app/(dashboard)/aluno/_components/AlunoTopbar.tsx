@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Bell, Loader2, Moon, Sun, User } from "lucide-react";
 import { apiFetch } from "../../../../utils/api";
 
 type Props = {
-  notificationsHref?: string; // default: /aluno/notificacoes
-  profileHref?: string;       // default: /aluno/dados
-  greetingFallback?: string;  // default: "Olá 👋"
-  pollMs?: number;            // default: 60000
+  notificationsHref?: string;
+  profileHref?: string;
+  greetingFallback?: string;
+  pollMs?: number;
 };
 
 export default function AlunoTopbar({
@@ -27,13 +27,14 @@ export default function AlunoTopbar({
   const [loadingUnread, setLoadingUnread] = useState(true);
 
   // ===== Dark mode =====
-  const [theme, setTheme] = useState<"light" | "dark">(() => {
-    if (typeof window === "undefined") return "light";
-    return (localStorage.getItem("theme") as "light" | "dark") || "light";
-  });
+  const [theme, setTheme] = useState<"light" | "dark">("light");
 
   useEffect(() => {
-    if (typeof document === "undefined") return;
+    const saved = localStorage.getItem("theme");
+    setTheme(saved === "light" || saved === "dark" ? saved : "light");
+  }, []);
+
+  useEffect(() => {
     const root = document.documentElement;
     if (theme === "dark") root.classList.add("dark");
     else root.classList.remove("dark");
@@ -55,52 +56,39 @@ export default function AlunoTopbar({
           setSaudacao(greetingFallback);
         }
       } catch {
-        setSaudacao(greetingFallback);
+        if (alive) setSaudacao(greetingFallback);
       } finally {
         if (alive) setLoadingUser(false);
       }
     })();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, [apiBase, greetingFallback]);
 
   // ===== Unread notifications (poll) =====
-  const fetchUnread = useMemo(
-    () => async () => {
-      try {
-        setLoadingUnread(true);
-        // pedir só o total (pageSize=1)
-        const res = await apiFetch(
-          `${apiBase}/notifications?apenasNaoLidas=1&page=1&pageSize=1`,
-          { cache: "no-store" }
-        );
-        const data = await res.json();
-        setUnread(Number(data?.total ?? 0));
-      } catch {
-        setUnread(0);
-      } finally {
-        setLoadingUnread(false);
-      }
-    },
-    [apiBase]
-  );
+  const fetchUnread = useCallback(async () => {
+    try {
+      setLoadingUnread(true);
+      const res = await apiFetch(
+        `${apiBase}/notifications?apenasNaoLidas=1&page=1&pageSize=1`,
+        { cache: "no-store" },
+      );
+      const data = await res.json();
+      setUnread(Number(data?.total ?? 0));
+    } catch {
+      setUnread(0);
+    } finally {
+      setLoadingUnread(false);
+    }
+  }, [apiBase]);
 
   useEffect(() => {
-    let timer: any;
     fetchUnread();
-    timer = setInterval(fetchUnread, pollMs);
+    const timer: ReturnType<typeof setInterval> = setInterval(fetchUnread, pollMs);
     return () => clearInterval(timer);
   }, [fetchUnread, pollMs]);
 
   const badgeText =
-    unread === null
-      ? ""
-      : unread > 99
-      ? "99+"
-      : unread > 0
-      ? String(unread)
-      : "";
+    unread === null ? "" : unread > 99 ? "99+" : unread > 0 ? String(unread) : "";
 
   return (
     <div className="mb-2 flex items-center justify-between">
@@ -138,7 +126,6 @@ export default function AlunoTopbar({
           title="Notificações"
         >
           <Bell className="size-4" />
-          {/* badge */}
           {loadingUnread ? (
             <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-primary-foreground text-[10px] grid place-items-center">
               <Loader2 className="size-3 animate-spin" />

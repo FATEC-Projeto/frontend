@@ -6,6 +6,7 @@ import { Search, Layers, BookOpen, Plus, Loader2, ArrowRight } from "lucide-reac
 import MobileSidebarTriggerAluno from "../_components/MobileSidebarTriggerAluno";
 import { CATALOGO_INSTITUCIONAL, type CatalogResponse, type ServicoCatalogo } from "../../../../utils/catalogo";
 import { cx } from "../../../../utils/cx";
+import { apiFetch } from "../../../../utils/api";
 
 type Servico = ServicoCatalogo & { categoriaNome?: string };
 
@@ -82,7 +83,7 @@ export default function CatalogoAlunoPage() {
       try {
         const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
         const url = apiBaseUrl ? `${apiBaseUrl}/catalogo` : "/catalogo";
-        const res = await fetch(url, { cache: "no-store" });
+        const res = await apiFetch(url, { cache: "no-store" });
         if (!res.ok) throw new Error("fallback");
         const data = (await res.json()) as CatalogResponse;
         setCatalog({
