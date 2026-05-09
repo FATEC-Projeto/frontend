@@ -93,6 +93,9 @@ function formatarChave(key: string): string {
 }
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+if (process.env.NODE_ENV === "development" && !API) {
+  console.warn("[AdminChamadoPage] NEXT_PUBLIC_API_BASE_URL não está configurada.");
+}
 
 /* ===== Página ===== */
 export default function AdminChamadoPage() {
@@ -143,8 +146,8 @@ export default function AdminChamadoPage() {
       const data = await res.json();
       setAnexos(Array.isArray(data) ? data : []);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      toast.error("Falha ao carregar anexos.", { description: msg });
+      const errMsg = err instanceof Error ? err.message : String(err);
+      toast.error("Falha ao carregar anexos.", { description: errMsg });
     } finally {
       setLoadingAnexos(false);
     }
@@ -198,6 +201,7 @@ export default function AdminChamadoPage() {
 
     function connect() {
       const token = typeof window !== "undefined" ? (localStorage.getItem("accessToken") ?? "") : "";
+      if (!token) return;
       const wsUrl = API.replace(/^http/, "ws") + `/ws?token=${encodeURIComponent(token)}`;
       ws = new WebSocket(wsUrl);
 
@@ -259,8 +263,8 @@ export default function AdminChamadoPage() {
       toast.success("Alterações salvas!");
       await load();
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      toast.error("Falha ao salvar", { description: msg });
+      const errMsg = e instanceof Error ? e.message : String(e);
+      toast.error("Falha ao salvar", { description: errMsg });
     } finally {
       setSaving(false);
     }
@@ -290,8 +294,8 @@ export default function AdminChamadoPage() {
       setMsg("");
       endRef.current?.scrollIntoView({ behavior: "smooth" });
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      toast.error("Falha ao enviar mensagem", { description: msg });
+      const errMsg = e instanceof Error ? e.message : String(e);
+      toast.error("Falha ao enviar mensagem", { description: errMsg });
     } finally {
       setSending(false);
     }
@@ -318,8 +322,8 @@ export default function AdminChamadoPage() {
       if (fileInputRef.current) fileInputRef.current.value = "";
       await fetchAnexos(ticket.id);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      toast.error("Falha ao enviar arquivo.", { description: msg });
+      const errMsg = err instanceof Error ? err.message : String(err);
+      toast.error("Falha ao enviar arquivo.", { description: errMsg });
     } finally {
       setUploading(false);
     }
@@ -502,7 +506,7 @@ export default function AdminChamadoPage() {
                         style={{ overflowWrap: "break-word", wordBreak: "break-word", overflow: "hidden" }}
                       >
                         <div className="text-xs opacity-80 mb-1">
-                          {isAluno ? nomeAutor : "Você"} ·{" "}
+                          {isAluno ? nomeAutor : "Você"} ·{" "}
                           {new Date(m.criadoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                         </div>
                         <div className="break-words whitespace-pre-wrap leading-relaxed">{m.conteudo}</div>
