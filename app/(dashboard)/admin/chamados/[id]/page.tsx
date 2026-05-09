@@ -65,6 +65,7 @@ type Ticket = {
   criadoEm: string;
   atualizadoEm: string;
   encerradoEm?: string | null;
+  responsavelId?: string | null;
   // Catalog wizard fields
   catalogoServicoId?: string | null;
   catalogoCategoriaId?: string | null;
@@ -141,8 +142,9 @@ export default function AdminChamadoPage() {
       if (!res.ok) throw new Error("Falha ao buscar anexos");
       const data = await res.json();
       setAnexos(Array.isArray(data) ? data : []);
-    } catch (err: any) {
-      toast.error("Falha ao carregar anexos.", { description: err.message });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error("Falha ao carregar anexos.", { description: msg });
     } finally {
       setLoadingAnexos(false);
     }
@@ -169,11 +171,11 @@ export default function AdminChamadoPage() {
       setStatus(data.status);
       setPrioridade(data.prioridade);
       setNivel(data.nivel);
-      setResponsavelId((data as any).responsavelId ?? data.responsavel?.id ?? "");
+      setResponsavelId(data.responsavelId ?? data.responsavel?.id ?? "");
 
       fetchAnexos(data.id);
-    } catch (e: any) {
-      setErr(e?.message || "Falha ao carregar");
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Falha ao carregar");
       setTicket(null);
     } finally {
       setLoading(false);
@@ -256,8 +258,9 @@ export default function AdminChamadoPage() {
       }
       toast.success("Alterações salvas!");
       await load();
-    } catch (e: any) {
-      toast.error("Falha ao salvar", { description: e?.message });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error("Falha ao salvar", { description: msg });
     } finally {
       setSaving(false);
     }
@@ -286,8 +289,9 @@ export default function AdminChamadoPage() {
 
       setMsg("");
       endRef.current?.scrollIntoView({ behavior: "smooth" });
-    } catch (e: any) {
-      toast.error("Falha ao enviar mensagem", { description: e?.message });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error("Falha ao enviar mensagem", { description: msg });
     } finally {
       setSending(false);
     }
@@ -313,8 +317,9 @@ export default function AdminChamadoPage() {
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
       await fetchAnexos(ticket.id);
-    } catch (err: any) {
-      toast.error("Falha ao enviar arquivo.", { description: err.message });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error("Falha ao enviar arquivo.", { description: msg });
     } finally {
       setUploading(false);
     }
