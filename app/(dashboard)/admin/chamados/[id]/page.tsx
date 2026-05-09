@@ -65,6 +65,7 @@ type Ticket = {
   criadoEm: string;
   atualizadoEm: string;
   encerradoEm?: string | null;
+  responsavelId?: string | null;
   // Catalog wizard fields
   catalogoServicoId?: string | null;
   catalogoCategoriaId?: string | null;
@@ -92,6 +93,9 @@ function formatarChave(key: string): string {
 }
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+if (process.env.NODE_ENV === "development" && !process.env.NEXT_PUBLIC_API_BASE_URL) {
+  console.warn("[AdminChamadoPage] NEXT_PUBLIC_API_BASE_URL não está definida — chamadas de API e WS falharão.");
+}
 
 /* ===== Página ===== */
 export default function AdminChamadoPage() {
@@ -141,8 +145,9 @@ export default function AdminChamadoPage() {
       if (!res.ok) throw new Error("Falha ao buscar anexos");
       const data = await res.json();
       setAnexos(Array.isArray(data) ? data : []);
-    } catch (err: any) {
-      toast.error("Falha ao carregar anexos.", { description: err.message });
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      toast.error("Falha ao carregar anexos.", { description: errMsg });
     } finally {
       setLoadingAnexos(false);
     }
@@ -169,11 +174,11 @@ export default function AdminChamadoPage() {
       setStatus(data.status);
       setPrioridade(data.prioridade);
       setNivel(data.nivel);
-      setResponsavelId((data as any).responsavelId ?? data.responsavel?.id ?? "");
+      setResponsavelId(data.responsavelId ?? data.responsavel?.id ?? "");
 
       fetchAnexos(data.id);
-    } catch (e: any) {
-      setErr(e?.message || "Falha ao carregar");
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Falha ao carregar");
       setTicket(null);
     } finally {
       setLoading(false);
@@ -186,17 +191,18 @@ export default function AdminChamadoPage() {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [ticket?.mensagens?.length]);
 
-  // WebSocket em tempo real — autenticado por token JWT
+  // WebSocket em tempo real — token lido dentro de connect() para ficar fresco
   useEffect(() => {
     if (!id || !API) return;
-    const token = typeof window !== "undefined" ? (localStorage.getItem("accessToken") ?? "") : "";
-    const wsUrl = API.replace(/^http/, "ws") + `/ws?token=${encodeURIComponent(token)}`;
 
     let ws: WebSocket | null = null;
     let attempt = 0;
     let reconnectTimer: ReturnType<typeof setTimeout>;
 
     function connect() {
+      const token = typeof window !== "undefined" ? (localStorage.getItem("accessToken") ?? "") : "";
+      if (!token) return;
+      const wsUrl = API.replace(/^http/, "ws") + `/ws?token=${encodeURIComponent(token)}`;
       ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
@@ -217,7 +223,9 @@ export default function AdminChamadoPage() {
             );
             endRef.current?.scrollIntoView({ behavior: "smooth" });
           }
-        } catch {}
+        } catch (e) {
+          if (process.env.NODE_ENV === "development") console.warn("WS parse error:", e);
+        }
       };
 
       ws.onclose = () => {
@@ -254,8 +262,9 @@ export default function AdminChamadoPage() {
       }
       toast.success("Alterações salvas!");
       await load();
-    } catch (e: any) {
-      toast.error("Falha ao salvar", { description: e?.message });
+    } catch (e: unknown) {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      toast.error("Falha ao salvar", { description: errMsg });
     } finally {
       setSaving(false);
     }
@@ -284,8 +293,9 @@ export default function AdminChamadoPage() {
 
       setMsg("");
       endRef.current?.scrollIntoView({ behavior: "smooth" });
-    } catch (e: any) {
-      toast.error("Falha ao enviar mensagem", { description: e?.message });
+    } catch (e: unknown) {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      toast.error("Falha ao enviar mensagem", { description: errMsg });
     } finally {
       setSending(false);
     }
@@ -311,8 +321,9 @@ export default function AdminChamadoPage() {
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
       await fetchAnexos(ticket.id);
-    } catch (err: any) {
-      toast.error("Falha ao enviar arquivo.", { description: err.message });
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      toast.error("Falha ao enviar arquivo.", { description: errMsg });
     } finally {
       setUploading(false);
     }
@@ -512,7 +523,7 @@ export default function AdminChamadoPage() {
                 <textarea
                   value={msg}
                   onChange={(e) => setMsg(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) sendMessage(); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendMessage(); } }}
                   rows={2}
                   placeholder="Escreva uma mensagem… (Ctrl+Enter para enviar)"
                   className="flex-1 max-h-32 rounded-lg border border-[var(--border)] bg-input px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--ring)] resize-none"
@@ -547,7 +558,7 @@ export default function AdminChamadoPage() {
             </section>
           )}
 
-          {/* DADOS ACADÊMICOS */}
+          {/* DADOS ACADÊIMICOS */}
           {dadosAcademicosEntries.length > 0 && (
             <section className="rounded-xl border border-[var(--border)] bg-card p-4">
               <h2 className="text-base font-semibold mb-3 flex items-center gap-2">
