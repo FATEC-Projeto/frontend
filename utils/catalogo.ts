@@ -1,10 +1,11 @@
 export type FormularioCampo = {
   id: string;
   label: string;
-  tipo: "texto" | "textarea" | "select" | "arquivo" | "data";
+  tipo: "texto" | "textarea" | "select" | "arquivo" | "data" | "checkbox";
   obrigatorio: boolean;
   opcoes?: string[];
   ajuda?: string;
+  placeholder?: string;
 };
 
 export type FormularioMetadata = {
