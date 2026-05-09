@@ -11,22 +11,45 @@ type ResultRow = {
   nome?: string;
   cursoNome?: string;
   cursoSigla?: string;
+  unidadeFatec?: string;
+  turno?: string;
+  turma?: string;
+  semestreAtual?: string;
+  anoSemestreIngresso?: string;
   status: "PENDING" | "OK" | "ERROR";
   errorMsg?: string;
-  note?: string; // ex.: "Já existia"
+  note?: string;
 };
 
 function cx(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
 }
 
-/** Parser simples (CSV com vírgula, sem aspas complexas). */
-function parseCsvSimple(text: string): string[][] {
-  const lines = text
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean);
-  return lines.map((l) => l.split(",").map((p) => p.trim()));
+/**
+ * CSV parser simples com suporte a campos entre aspas.
+ * Lida com vírgulas dentro de aspas duplas e aspas escapadas (""").
+ */
+function parseCsv(text: string): string[][] {
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  return lines.map((line) => {
+    const cols: string[] = [];
+    let cur = "";
+    let inQuote = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (inQuote) {
+        if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+        else if (ch === '"') { inQuote = false; }
+        else { cur += ch; }
+      } else {
+        if (ch === '"') { inQuote = true; }
+        else if (ch === ',') { cols.push(cur.trim()); cur = ""; }
+        else { cur += ch; }
+      }
+    }
+    cols.push(cur.trim());
+    return cols;
+  });
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
@@ -45,10 +68,10 @@ export default function ImportAlunos({
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const total = rows.length;
-  const ok = rows.filter((r) => r.status === "OK").length;
-  const err = rows.filter((r) => r.status === "ERROR").length;
-  const done = ok + err;
-  const pct = total ? Math.round((done * 100) / total) : 0;
+  const ok    = rows.filter((r) => r.status === "OK").length;
+  const err   = rows.filter((r) => r.status === "ERROR").length;
+  const done  = ok + err;
+  const pct   = total ? Math.round((done * 100) / total) : 0;
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -56,7 +79,7 @@ export default function ImportAlunos({
     setFileName(file.name);
 
     const text = await file.text();
-    const raw = parseCsvSimple(text);
+    const raw  = parseCsv(text);
     if (raw.length <= 1) {
       alert("CSV vazio ou apenas header.");
       e.target.value = "";
@@ -64,46 +87,55 @@ export default function ImportAlunos({
     }
 
     const [header, ...data] = raw;
-    const mapIdx = (key: string) =>
-      header.findIndex((h) => h.toLowerCase() === key.toLowerCase());
+    const col = (key: string) =>
+      header.findIndex((h) => h.toLowerCase().trim() === key.toLowerCase());
 
-    const iRA = mapIdx("ra");
-    const iEdu = mapIdx("emailEducacional");
-    const iPes = mapIdx("emailPessoal");
-    const iNome = mapIdx("nome");
-    const iCursoNome = mapIdx("cursoNome");
-    const iCursoSigla = mapIdx("cursoSigla");
+    const iRA      = col("ra");
+    const iEdu     = col("emaileducacional");
+    const iPes     = col("emailpessoal");
+    const iNome    = col("nome");
+    const iCursoN  = col("cursonome");
+    const iCursoS  = col("cursosigla");
+    const iUnidade = col("unidadefatec");
+    const iTurno   = col("turno");
+    const iTurma   = col("turma");
+    const iSemest  = col("semestreatual");
+    const iIngress = col("anossemestreingresso") >= 0 ? col("anossemestreingresso") : col("anosemestreingresso");
 
     if (iRA < 0 || iEdu < 0) {
-      alert("Cabeçalho inválido. É obrigatório conter as colunas: ra, emailEducacional.");
+      alert("Cabeçalho inválido. Colunas obrigatórias: ra, emailEducacional.");
       e.target.value = "";
       return;
     }
 
     const seenRA = new Set<string>();
     const parsed: ResultRow[] = data.map((cols, idx) => {
-      const ra = (cols[iRA] || "").trim();
-      const emailEducacional = (cols[iEdu] || "").trim();
-      const emailPessoal = iPes >= 0 ? (cols[iPes] || "").trim() : "";
-      const nome = iNome >= 0 ? (cols[iNome] || "").trim() : "";
-      const cursoNome = iCursoNome >= 0 ? (cols[iCursoNome] || "").trim() : "";
-      const cursoSigla = iCursoSigla >= 0 ? (cols[iCursoSigla] || "").trim() : "";
+      const get = (i: number) => (i >= 0 ? (cols[i] ?? "").trim() : "");
+
+      const ra                = get(iRA);
+      const emailEducacional  = get(iEdu);
+      const emailPessoal      = get(iPes);
+      const nome              = get(iNome);
+      const cursoNome         = get(iCursoN);
+      const cursoSigla        = get(iCursoS);
+      const unidadeFatec      = get(iUnidade);
+      const turno             = get(iTurno);
+      const turma             = get(iTurma);
+      const semestreAtual     = get(iSemest);
+      const anoSemestreIngresso = get(iIngress);
 
       const row: ResultRow = {
         idx: idx + 1,
-        ra,
-        emailEducacional,
-        emailPessoal,
-        nome,
-        cursoNome,
-        cursoSigla,
+        ra, emailEducacional, emailPessoal,
+        nome, cursoNome, cursoSigla,
+        unidadeFatec, turno, turma, semestreAtual, anoSemestreIngresso,
         status: "PENDING",
       };
 
-      const key = ra.toLowerCase();
-      if (key) {
+      if (ra) {
+        const key = ra.toLowerCase();
         if (seenRA.has(key)) {
-          row.status = "ERROR";
+          row.status   = "ERROR";
           row.errorMsg = "RA duplicado no arquivo";
         } else {
           seenRA.add(key);
@@ -118,16 +150,12 @@ export default function ImportAlunos({
   }
 
   async function startImport() {
-    if (!rows.length) {
-      alert("Selecione um CSV primeiro.");
-      return;
-    }
+    if (!rows.length) { alert("Selecione um CSV primeiro."); return; }
     setRunning(true);
     setFinished(false);
 
     const token =
-      (typeof window !== "undefined" && localStorage.getItem("accessToken")) ||
-      "";
+      (typeof window !== "undefined" && localStorage.getItem("accessToken")) || "";
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -145,15 +173,11 @@ export default function ImportAlunos({
         continue;
       }
 
-      const ra = r.ra?.trim();
+      const ra  = r.ra?.trim();
       const edu = r.emailEducacional?.trim();
 
       if (!ra || !edu) {
-        clone[i] = {
-          ...r,
-          status: "ERROR",
-          errorMsg: "RA e emailEducacional são obrigatórios.",
-        };
+        clone[i] = { ...r, status: "ERROR", errorMsg: "RA e emailEducacional são obrigatórios." };
         setRows([...clone]);
         continue;
       }
@@ -161,21 +185,22 @@ export default function ImportAlunos({
       const nomeFinal =
         (r.nome?.trim() || "").length >= 2 ? r.nome!.trim() : `Aluno ${ra}`;
 
-      const payload: any = {
-        emailPessoal: r.emailPessoal?.trim() || edu,
+      const payload: Record<string, any> = {
+        emailPessoal:    r.emailPessoal?.trim() || edu,
         emailEducacional: edu,
         ra,
         nome: nomeFinal,
-        cursoNome: r.cursoNome || undefined,
-        cursoSigla: r.cursoSigla || undefined,
         papel: "USUARIO",
         ativo: true,
-        // ❗ não envia senha nem precisaTrocarSenha
-        // Backend (createUser) detecta aluno via RA e:
-        // - define senha temporária padrão
-        // - marca precisaTrocarSenha = true
-        // - opcional: envia link de primeiro acesso / reset
       };
+
+      if (r.cursoNome?.trim())         payload.cursoNome           = r.cursoNome.trim();
+      if (r.cursoSigla?.trim())        payload.cursoSigla          = r.cursoSigla.trim();
+      if (r.unidadeFatec?.trim())      payload.unidadeFatec        = r.unidadeFatec.trim();
+      if (r.turno?.trim())             payload.turno               = r.turno.trim();
+      if (r.turma?.trim())             payload.turma               = r.turma.trim();
+      if (r.semestreAtual?.trim())     payload.semestreAtual       = r.semestreAtual.trim();
+      if (r.anoSemestreIngresso?.trim()) payload.anoSemestreIngresso = r.anoSemestreIngresso.trim();
 
       try {
         const resp = await fetch(`${API_URL}/usuarios`, {
@@ -193,24 +218,14 @@ export default function ImportAlunos({
             /unique/i.test(text) ||
             /P2002/.test(text);
 
-          if (isDuplicate) {
-            clone[i] = { ...r, status: "OK", note: "Já existia" };
-          } else {
-            clone[i] = {
-              ...r,
-              status: "ERROR",
-              errorMsg: text || `HTTP ${resp.status}`,
-            };
-          }
+          clone[i] = isDuplicate
+            ? { ...r, status: "OK", note: "Já existia" }
+            : { ...r, status: "ERROR", errorMsg: text || `HTTP ${resp.status}` };
         } else {
           clone[i] = { ...r, status: "OK" };
         }
       } catch (e: any) {
-        clone[i] = {
-          ...r,
-          status: "ERROR",
-          errorMsg: String(e?.message ?? e),
-        };
+        clone[i] = { ...r, status: "ERROR", errorMsg: String(e?.message ?? e) };
       }
 
       setRows([...clone]);
@@ -227,10 +242,7 @@ export default function ImportAlunos({
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  const canStart = useMemo(
-    () => rows.length > 0 && !running,
-    [rows.length, running]
-  );
+  const canStart = useMemo(() => rows.length > 0 && !running, [rows.length, running]);
 
   return (
     <div className="rounded-xl border border-[var(--border)] bg-card p-4">
@@ -247,11 +259,10 @@ export default function ImportAlunos({
 
       {/* Aviso de fluxo */}
       <div className="mb-3 flex items-start gap-2 rounded-lg border border-dashed border-[var(--border)] bg-muted/40 p-3 text-xs text-muted-foreground">
-        <Info className="mt-0.5 size-4" />
+        <Info className="mt-0.5 size-4 shrink-0" />
         <p>
           Cada aluno importado será criado com uma <strong>senha temporária</strong> definida no backend
-          e marcado para <strong>trocar a senha no primeiro acesso</strong>. Se configurado, o sistema
-          pode enviar um e-mail automático com o link de primeiro acesso / redefinição.
+          e marcado para <strong>trocar a senha no primeiro acesso</strong>.
         </p>
       </div>
 
@@ -264,17 +275,9 @@ export default function ImportAlunos({
         >
           Selecionar arquivo
         </button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept=".csv"
-          className="hidden"
-          onChange={handleFileChange}
-        />
+        <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleFileChange} />
         {fileName && (
-          <span className="text-sm text-muted-foreground truncate">
-            Arquivo: {fileName}
-          </span>
+          <span className="text-sm text-muted-foreground truncate">Arquivo: {fileName}</span>
         )}
       </div>
 
@@ -287,19 +290,16 @@ export default function ImportAlunos({
             <b className="text-[var(--brand-red)]">{err}</b>
           </div>
           <div className="h-2 w-full rounded-full bg-[var(--muted)] overflow-hidden">
-            <div
-              className="h-full bg-primary transition-[width]"
-              style={{ width: `${pct}%` }}
-            />
+            <div className="h-full bg-primary transition-[width]" style={{ width: `${pct}%` }} />
           </div>
         </div>
       )}
 
-      {/* Tabela */}
+      {/* Tabela de preview */}
       {!!rows.length && (
         <div className="mt-4 max-h-64 overflow-auto rounded-lg border border-[var(--border)]">
           <table className="min-w-full text-sm">
-            <thead className="bg-[var(--muted)]">
+            <thead className="bg-[var(--muted)] sticky top-0">
               <tr>
                 <th className="px-3 py-2 text-left">#</th>
                 <th className="px-3 py-2 text-left">RA</th>
@@ -307,6 +307,11 @@ export default function ImportAlunos({
                 <th className="px-3 py-2 text-left">E-mail pessoal</th>
                 <th className="px-3 py-2 text-left">Nome</th>
                 <th className="px-3 py-2 text-left">Curso</th>
+                <th className="px-3 py-2 text-left">Unidade</th>
+                <th className="px-3 py-2 text-left">Turno</th>
+                <th className="px-3 py-2 text-left">Turma</th>
+                <th className="px-3 py-2 text-left">Semestre</th>
+                <th className="px-3 py-2 text-left">Ingresso</th>
                 <th className="px-3 py-2 text-left">Status</th>
                 <th className="px-3 py-2 text-left">Erro</th>
               </tr>
@@ -319,27 +324,18 @@ export default function ImportAlunos({
                   <td className="px-3 py-2">{r.emailEducacional}</td>
                   <td className="px-3 py-2">{r.emailPessoal || "—"}</td>
                   <td className="px-3 py-2">{r.nome || `Aluno ${r.ra}`}</td>
+                  <td className="px-3 py-2">{r.cursoSigla || r.cursoNome || "—"}</td>
+                  <td className="px-3 py-2">{r.unidadeFatec || "—"}</td>
+                  <td className="px-3 py-2">{r.turno || "—"}</td>
+                  <td className="px-3 py-2">{r.turma || "—"}</td>
+                  <td className="px-3 py-2">{r.semestreAtual || "—"}</td>
+                  <td className="px-3 py-2">{r.anoSemestreIngresso || "—"}</td>
                   <td className="px-3 py-2">
-                    {r.cursoSigla || r.cursoNome || "—"}
+                    {r.status === "PENDING" && <span className="text-muted-foreground">Pendente</span>}
+                    {r.status === "OK"      && <span className="text-[var(--success)] font-medium">OK{r.note ? ` (${r.note})` : ""}</span>}
+                    {r.status === "ERROR"   && <span className="text-[var(--brand-red)] font-medium">Erro</span>}
                   </td>
-                  <td className="px-3 py-2">
-                    {r.status === "PENDING" && (
-                      <span className="text-muted-foreground">Pendente</span>
-                    )}
-                    {r.status === "OK" && (
-                      <span className="text-[var(--success)] font-medium">
-                        OK{r.note ? ` (${r.note})` : ""}
-                      </span>
-                    )}
-                    {r.status === "ERROR" && (
-                      <span className="text-[var(--brand-red)] font-medium">
-                        Erro
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-xs text-[var(--brand-red)]">
-                    {r.errorMsg || "—"}
-                  </td>
+                  <td className="px-3 py-2 text-xs text-[var(--brand-red)]">{r.errorMsg || "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -356,7 +352,7 @@ export default function ImportAlunos({
             "h-9 px-3 rounded-md text-sm",
             canStart
               ? "bg-primary text-primary-foreground hover:brightness-95"
-              : "bg-[var(--muted)] text-muted-foreground cursor-not-allowed"
+              : "bg-[var(--muted)] text-muted-foreground cursor-not-allowed",
           )}
         >
           {running ? "Processando..." : rows.length ? "Processar importação" : "Selecionar CSV"}
@@ -367,7 +363,7 @@ export default function ImportAlunos({
           disabled={running || rows.length === 0}
           className={cx(
             "h-9 px-3 rounded-md border border-[var(--border)] text-sm",
-            running ? "opacity-60 cursor-not-allowed" : "hover:bg-[var(--muted)]"
+            running ? "opacity-60 cursor-not-allowed" : "hover:bg-[var(--muted)]",
           )}
         >
           Reiniciar
@@ -376,21 +372,27 @@ export default function ImportAlunos({
         <div className="ml-auto" />
 
         <button
-          onClick={() => {
-            if (finished) onDone();
-            else onClose();
-          }}
+          onClick={() => { if (finished) onDone(); else onClose(); }}
           className="h-9 px-3 rounded-md border border-[var(--border)] text-sm hover:bg-[var(--muted)]"
         >
           {finished ? "Concluir" : "Fechar"}
         </button>
       </div>
 
-      {/* Info */}
-      <div className="mt-3 text-xs text-muted-foreground">
-        Modelo CSV: <code>ra,emailEducacional,emailPessoal,nome,cursoNome,cursoSigla</code>.<br />
-        <b>Obrigatórios:</b> <code>ra</code>, <code>emailEducacional</code>.<br />
-        A senha temporária é definida automaticamente no backend e será exigida a troca no primeiro acesso.
+      {/* Info de formato */}
+      <div className="mt-3 text-xs text-muted-foreground space-y-1">
+        <p>
+          <b>Obrigatórios:</b> <code>ra</code>, <code>emailEducacional</code>
+        </p>
+        <p>
+          <b>Opcionais:</b>{" "}
+          <code>emailPessoal</code>, <code>nome</code>, <code>cursoNome</code>, <code>cursoSigla</code>,{" "}
+          <code>unidadeFatec</code>, <code>turno</code>, <code>turma</code>,{" "}
+          <code>semestreAtual</code>, <code>anoSemestreIngresso</code>, <code>ativo</code>
+        </p>
+        <p className="text-muted-foreground/70">
+          Use <strong>Modelo CSV</strong> para baixar o arquivo com todos os campos pré-formatados.
+        </p>
       </div>
     </div>
   );
