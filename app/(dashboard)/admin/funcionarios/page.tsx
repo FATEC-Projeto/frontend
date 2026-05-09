@@ -9,7 +9,6 @@ import {
 import { apiFetch } from "../../../../utils/api";
 import { cx } from '../../../../utils/cx';
 
-/* ========= Tipos ========= */
 type Papel = "BACKOFFICE" | "TECNICO" | "ADMINISTRADOR" | "USUARIO";
 type StatusAtivo = "ATIVO" | "INATIVO";
 
@@ -53,8 +52,7 @@ function StatusBadge({ status }: { status: StatusAtivo }) {
 }
 
 function normalizarSetores(s?: UsuarioApi["setores"]): string[] {
-  if (!s) return [];
-  if (!Array.isArray(s) || s.length === 0) return [];
+  if (!s || !Array.isArray(s) || s.length === 0) return [];
   if (typeof s[0] === "string") return s as string[];
   return (s as Array<{ nome: string }>).map((x) => x?.nome).filter(Boolean) as string[];
 }
@@ -116,14 +114,10 @@ export default function AdminFuncionariosPage() {
       const usuarios: UsuarioApi[] = Array.isArray(json)
         ? json
         : (json.items ?? json.data ?? []);
-      const totalCount: number = Array.isArray(json)
-        ? usuarios.length
-        : (typeof json.total === "number" ? json.total : usuarios.length);
 
-      // filtra funcionários (não-alunos) no client
       const mapped = usuarios.map(mapRow).filter((x): x is FuncionarioRow => !!x);
       setRows(mapped);
-      setTotal(totalCount);
+      setTotal(mapped.length);
     } catch (e: unknown) {
       setRows([]);
       setTotal(0);
@@ -251,7 +245,7 @@ export default function AdminFuncionariosPage() {
             <thead className="bg-[var(--muted)] text-foreground/90">
               <tr>
                 <th className="text-left font-medium px-4 py-3">Nome</th>
-                <th className="text-left font-medium px-4 py-3 hidden lg:table-cell">E-mail pessoal</th>
+                <th className="text-left font-medium px-4 py-3 hidden lg:table-cell">E-mail institucional</th>
                 <th className="text-left font-medium px-4 py-3 hidden xl:table-cell">Papéis / Setores</th>
                 <th className="text-left font-medium px-4 py-3">Status</th>
                 <th className="text-left font-medium px-4 py-3 hidden lg:table-cell">Criado em</th>
@@ -269,9 +263,9 @@ export default function AdminFuncionariosPage() {
                       <UserIcon className="size-4 text-muted-foreground" />
                       <span className="font-medium">{f.nome || "—"}</span>
                     </div>
-                    <div className="lg:hidden text-xs text-muted-foreground mt-0.5">{f.emailPessoal || "—"}</div>
+                    <div className="lg:hidden text-xs text-muted-foreground mt-0.5">{f.emailEducacional || f.emailPessoal || "—"}</div>
                   </td>
-                  <td className="px-4 py-3 hidden lg:table-cell">{f.emailPessoal || "—"}</td>
+                  <td className="px-4 py-3 hidden lg:table-cell">{f.emailEducacional || f.emailPessoal || "—"}</td>
                   <td className="px-4 py-3 hidden xl:table-cell">
                     <div className="flex flex-wrap gap-1.5">
                       <span className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-background px-2 py-0.5 text-xs">

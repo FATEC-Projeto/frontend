@@ -226,18 +226,19 @@ export default function SolicitacaoCatalogoPage() {
     setAnexos((prev) => prev.filter((_, i) => i !== index));
   }
 
-  async function uploadAnexos(ticketId: string | number) {
-    if (!API || anexos.length === 0) return;
-    for (const file of anexos) {
-      const formData = new FormData();
-      formData.append("file", file);
-      try {
+  async function uploadAnexos(ticketId: string | number): Promise<string[]> {
+    if (!API || anexos.length === 0) return [];
+    const results = await Promise.allSettled(
+      anexos.map(async (file) => {
+        const formData = new FormData();
+        formData.append("file", file);
         const res = await apiFetch(`${API}/tickets/${ticketId}/anexos`, { method: "POST", body: formData });
         if (!res.ok) throw new Error(`Erro HTTP ${res.status}`);
-      } catch {
-        toast.error(`Falha ao enviar o anexo "${file.name}". Os outros foram enviados.`);
-      }
-    }
+      })
+    );
+    return results
+      .map((r, i) => (r.status === "rejected" ? (anexos[i]?.name ?? `Arquivo ${i + 1}`) : null))
+      .filter((n): n is string => n !== null);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -276,8 +277,14 @@ export default function SolicitacaoCatalogoPage() {
       const ticketId = data.id ?? data.ticket?.id;
       if (!ticketId) throw new Error("Solicitação criada, mas o backend não retornou o ID do ticket.");
 
-      await uploadAnexos(ticketId);
-      toast.success("Solicitação acadêmica criada com sucesso!");
+      const failedAnexos = await uploadAnexos(ticketId);
+      if (failedAnexos.length > 0) {
+        toast.warning(
+          `Solicitação criada, mas ${failedAnexos.length} anexo(s) não puderam ser enviados: ${failedAnexos.join(", ")}`
+        );
+      } else {
+        toast.success("Solicitação acadêmica criada com sucesso!");
+      }
       router.push(`/aluno/chamados/${ticketId}`);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Falha ao criar solicitação acadêmica");
@@ -506,12 +513,7 @@ function CampoEspecifico({ campo, value, onChange }: { campo: FormularioCampo; v
   if (campo.tipo === "checkbox") {
     return (
       <label className="flex items-center gap-3 rounded-lg border border-[var(--border)] p-3 text-sm cursor-pointer">
-        <input
-          type="checkbox"
-          checked={value === "Sim"}
-          onChange={(e) => onChange(e.target.checked ? "Sim" : "")}
-          className="size-4 shrink-0"
-        />
+        <input type="checkbox" checked={value === "Sim"} onChange={(e) => onChange(e.target.checked ? "Sim" : "")} className="size-4 shrink-0" />
         <span>{campo.label}</span>
       </label>
     );

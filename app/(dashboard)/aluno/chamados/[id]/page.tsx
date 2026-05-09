@@ -16,8 +16,6 @@ import { toast } from "sonner";
 import { apiFetch } from "../../../../../utils/api";
 import type { Chamado, Status } from "../../../../../utils/types";
 
-/* ================= Constantes ================= */
-
 const API = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
@@ -38,8 +36,6 @@ const STATUS_LABELS: Record<Status, string> = {
   RESOLVIDO: "Solicitação respondida.",
   ENCERRADO: "Atendimento finalizado.",
 };
-
-/* ================= Tipos ================= */
 
 type Mensagem = {
   id: string;
@@ -64,8 +60,6 @@ type MensagemGroup = {
   nomeAutor: string;
   msgs: Mensagem[];
 };
-
-/* ================= Helpers ================= */
 
 function relativeTime(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -97,7 +91,6 @@ function groupMensagens(msgs: Mensagem[], criadoPorId?: string): MensagemGroup[]
   return groups;
 }
 
-/* ================ Página ================ */
 export default function ChamadoDetalhePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -121,7 +114,6 @@ export default function ChamadoDetalhePage() {
 
   const [isDragging, setIsDragging] = useState(false);
 
-  /* ===== Scroll ===== */
   function scrollToEnd(smooth = true) {
     setTimeout(
       () => endRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" }),
@@ -129,7 +121,6 @@ export default function ChamadoDetalhePage() {
     );
   }
 
-  /* ===== Fetch Chamado ===== */
   const fetchChamado = useCallback(async () => {
     if (!API || !id) return;
     setLoading(true);
@@ -146,14 +137,11 @@ export default function ChamadoDetalhePage() {
 
   useEffect(() => { fetchChamado(); }, [fetchChamado]);
 
-  /* ===== Fetch Mensagens ===== */
   const fetchMensagens = useCallback(async () => {
     if (!API || !id) return;
     setMsgLoading(true);
     try {
-      const res = await apiFetch(
-        `${API}/tickets/${id}/mensagens?page=1&pageSize=100&orderDir=asc`,
-      );
+      const res = await apiFetch(`${API}/tickets/${id}/mensagens?page=1&pageSize=100&orderDir=asc`);
       if (!res.ok) throw new Error(`Erro ${res.status}`);
       const data = await res.json();
       const lista: Mensagem[] = data.mensagens || data.items || [];
@@ -169,7 +157,6 @@ export default function ChamadoDetalhePage() {
 
   useEffect(() => { fetchMensagens(); }, [fetchMensagens]);
 
-  /* ===== WebSocket — JWT via ?token= + exponential backoff ===== */
   useEffect(() => {
     if (!API || !id) return;
     const wsBase = API.replace(/^http/, "ws");
@@ -181,7 +168,6 @@ export default function ChamadoDetalhePage() {
 
     function connect() {
       if (destroyed) return;
-      // Lê token fresco a cada reconexão (cobre renovações via apiFetch)
       const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
       if (!token) return;
       const wsUrl = `${wsBase}/ws?token=${encodeURIComponent(token)}`;
@@ -215,7 +201,6 @@ export default function ChamadoDetalhePage() {
     };
   }, [id]);
 
-  /* ===== Enviar Mensagem ===== */
   const sendMensagem = useCallback(async () => {
     if (!msgText.trim() || !chamado?.id || !API) return;
     setMsgSending(true);
@@ -239,7 +224,6 @@ export default function ChamadoDetalhePage() {
     }
   }, [msgText, chamado?.id]);
 
-  /* ===== Fetch Anexos ===== */
   const fetchAnexos = useCallback(async () => {
     if (!API || !id) return;
     setLoadingAnexos(true);
@@ -257,7 +241,6 @@ export default function ChamadoDetalhePage() {
 
   useEffect(() => { fetchAnexos(); }, [fetchAnexos]);
 
-  /* ===== Upload via apiFetch + validação ===== */
   const handleUpload = useCallback(async () => {
     if (!selectedFile || !chamado?.id || !API) return;
     if (selectedFile.size > MAX_FILE_SIZE_BYTES) {
@@ -288,7 +271,6 @@ export default function ChamadoDetalhePage() {
     }
   }, [selectedFile, chamado?.id, fetchAnexos]);
 
-  /* ===== Alterar status ===== */
   const atualizarStatus = useCallback(
     async (novoStatus: Status): Promise<boolean> => {
       if (!chamado?.id || !API) return false;
@@ -310,7 +292,6 @@ export default function ChamadoDetalhePage() {
     [chamado?.id, fetchChamado],
   );
 
-  /* ===== Drag-drop ===== */
   function handleDragOver(e: React.DragEvent) {
     e.preventDefault();
     setIsDragging(true);
@@ -322,10 +303,18 @@ export default function ChamadoDetalhePage() {
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files?.[0];
-    if (file) setSelectedFile(file);
+    if (!file) return;
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      toast.error("Arquivo muito grande. Máximo permitido: 10 MB.");
+      return;
+    }
+    if (!ALLOWED_MIME_TYPES.has(file.type)) {
+      toast.error("Tipo de arquivo não permitido.");
+      return;
+    }
+    setSelectedFile(file);
   }
 
-  /* ===== Confirm dialogs ===== */
   function confirmarEncerramento() {
     toast.custom((t) => (
       <div className="bg-card border border-[var(--border)] rounded-xl shadow-lg p-4 w-[360px] animate-in fade-in-50">
@@ -334,33 +323,20 @@ export default function ChamadoDetalhePage() {
             <AlertTriangle className="size-5" />
           </div>
           <div className="flex-1">
-            <h3 className="text-sm font-semibold text-foreground">
-              Deseja finalizar esta solicitação acadêmica?
-            </h3>
+            <h3 className="text-sm font-semibold text-foreground">Deseja finalizar esta solicitação acadêmica?</h3>
             <p className="text-sm text-muted-foreground mt-1 leading-snug">
-              Após finalizar, ficará <b>apenas para consulta</b> e{" "}
-              <b>não poderá ser reaberta</b>.
+              Após finalizar, ficará <b>apenas para consulta</b> e <b>não poderá ser reaberta</b>.
             </p>
             <div className="mt-3 flex justify-end gap-2">
-              <button
-                onClick={() => toast.dismiss(t)}
-                className="px-3 py-1.5 rounded-md text-sm border border-[var(--border)] hover:bg-muted transition"
-              >
-                Cancelar
-              </button>
+              <button onClick={() => toast.dismiss(t)} className="px-3 py-1.5 rounded-md text-sm border border-[var(--border)] hover:bg-muted transition">Cancelar</button>
               <button
                 onClick={async () => {
                   toast.dismiss(t);
                   const ok = await atualizarStatus("ENCERRADO");
-                  if (ok)
-                    toast.success("Solicitação finalizada.", {
-                      description: "Disponível apenas para consulta no histórico.",
-                    });
+                  if (ok) toast.success("Solicitação finalizada.", { description: "Disponível apenas para consulta no histórico." });
                 }}
                 className="px-3 py-1.5 rounded-md text-sm bg-[#B91C1C] text-white hover:bg-[#991B1B] transition"
-              >
-                Confirmar
-              </button>
+              >Confirmar</button>
             </div>
           </div>
         </div>
@@ -378,29 +354,18 @@ export default function ChamadoDetalhePage() {
           <div className="flex-1">
             <h3 className="text-sm font-semibold text-foreground">Reabrir solicitação?</h3>
             <p className="text-sm text-muted-foreground mt-1 leading-snug">
-              Voltará para <b>"Em análise pelo setor responsável"</b> e poderá ser
-              atualizada novamente.
+              Voltará para <b>"Em análise pelo setor responsável"</b> e poderá ser atualizada novamente.
             </p>
             <div className="mt-3 flex justify-end gap-2">
-              <button
-                onClick={() => toast.dismiss(t)}
-                className="px-3 py-1.5 rounded-md text-sm border border-[var(--border)] hover:bg-muted transition"
-              >
-                Cancelar
-              </button>
+              <button onClick={() => toast.dismiss(t)} className="px-3 py-1.5 rounded-md text-sm border border-[var(--border)] hover:bg-muted transition">Cancelar</button>
               <button
                 onClick={async () => {
                   toast.dismiss(t);
                   const ok = await atualizarStatus("EM_ATENDIMENTO");
-                  if (ok)
-                    toast.success("Solicitação reaberta.", {
-                      description: "Em análise pelo setor responsável.",
-                    });
+                  if (ok) toast.success("Solicitação reaberta.", { description: "Em análise pelo setor responsável." });
                 }}
                 className="px-3 py-1.5 rounded-md text-sm bg-blue-600 text-white hover:bg-blue-700 transition"
-              >
-                Confirmar
-              </button>
+              >Confirmar</button>
             </div>
           </div>
         </div>
@@ -408,7 +373,6 @@ export default function ChamadoDetalhePage() {
     ));
   }
 
-  /* ===== Render ===== */
   if (loading && !chamado)
     return (
       <div className="flex items-center justify-center py-16 text-muted-foreground gap-2">
@@ -417,95 +381,46 @@ export default function ChamadoDetalhePage() {
     );
 
   if (!chamado)
-    return (
-      <div className="text-center py-16 text-muted-foreground">
-        Solicitação acadêmica não encontrada.
-      </div>
-    );
+    return <div className="text-center py-16 text-muted-foreground">Solicitação acadêmica não encontrada.</div>;
 
   const isEncerrado = chamado.status === "ENCERRADO";
   const groups = groupMensagens(msgs, chamado.criadoPorId ?? undefined);
 
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 rounded-xl border border-[var(--border)] bg-card space-y-8">
-      {/* Topbar */}
       <div className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="inline-flex items-center gap-2 h-9 px-3 rounded-md border bg-background hover:bg-muted text-sm"
-        >
+        <button type="button" onClick={() => router.back()} className="inline-flex items-center gap-2 h-9 px-3 rounded-md border bg-background hover:bg-muted text-sm">
           <ChevronLeft className="size-4" /> Voltar
         </button>
-        <Link
-          href="/aluno/chamados"
-          className="inline-flex items-center gap-2 h-9 px-3 rounded-md border bg-background hover:bg-muted text-sm"
-        >
-          Minhas solicitações
-        </Link>
+        <Link href="/aluno/chamados" className="inline-flex items-center gap-2 h-9 px-3 rounded-md border bg-background hover:bg-muted text-sm">Minhas solicitações</Link>
       </div>
 
-      {/* Cabeçalho */}
       <div>
         <h1 className="text-xl sm:text-2xl font-bold mb-1">{chamado.titulo}</h1>
-        <p className="text-sm text-muted-foreground mb-4">
-          Protocolo: {chamado.protocolo ?? `#${chamado.id}`}
-        </p>
+        <p className="text-sm text-muted-foreground mb-4">Protocolo: {chamado.protocolo ?? `#${chamado.id}`}</p>
         <div className="space-y-2 text-sm border-t border-b py-4">
-          <p>
-            <strong>Descrição:</strong>{" "}
-            <span className="whitespace-pre-wrap">{chamado.descricao || "—"}</span>
-          </p>
-          <p>
-            <strong>Status:</strong> {STATUS_LABELS[chamado.status] ?? chamado.status}
-          </p>
-          <p>
-            <strong>Criado em:</strong>{" "}
-            {new Date(chamado.criadoEm).toLocaleString("pt-BR")}
-          </p>
+          <p><strong>Descrição:</strong> <span className="whitespace-pre-wrap">{chamado.descricao || "—"}</span></p>
+          <p><strong>Status:</strong> {STATUS_LABELS[chamado.status] ?? chamado.status}</p>
+          <p><strong>Criado em:</strong> {new Date(chamado.criadoEm).toLocaleString("pt-BR")}</p>
         </div>
       </div>
 
-      {/* Aviso solicitação respondida */}
       {chamado.status === "RESOLVIDO" && (
         <div className="rounded-lg border border-yellow-400/30 bg-yellow-100/20 text-yellow-700 dark:text-yellow-300 dark:bg-yellow-900/20 px-4 py-3 text-sm flex items-start gap-2">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="size-4 mt-0.5 shrink-0 text-yellow-500 dark:text-yellow-300"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 9v2m0 4h.01M4.93 4.93a10 10 0 1114.14 14.14A10 10 0 014.93 4.93z"
-            />
+          <svg xmlns="http://www.w3.org/2000/svg" className="size-4 mt-0.5 shrink-0 text-yellow-500 dark:text-yellow-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M4.93 4.93a10 10 0 1114.14 14.14A10 10 0 014.93 4.93z" />
           </svg>
           <div>
-            Esta solicitação foi marcada como <b>respondida.</b> <br />
-            Você pode <b>reabrir</b> se o problema não foi solucionado ou{" "}
-            <b>encerrar</b> definitivamente se estiver tudo certo.
+            Esta solicitação foi marcada como <b>respondida.</b><br />
+            Você pode <b>reabrir</b> se o problema não foi solucionado ou <b>encerrar</b> definitivamente se estiver tudo certo.
           </div>
         </div>
       )}
 
-      {/* Botões de ação */}
       {chamado.status === "RESOLVIDO" && (
         <div className="flex gap-3">
-          <button
-            onClick={confirmarEncerramento}
-            className="px-4 py-2 rounded-md bg-[#B91C1C] text-white text-sm font-medium hover:bg-[#991B1B] transition"
-          >
-            Finalizar atendimento
-          </button>
-          <button
-            onClick={confirmarReabertura}
-            className="px-4 py-2 rounded-md bg-[#374151] text-white text-sm font-medium hover:bg-[#111827] transition"
-          >
-            Reabrir solicitação
-          </button>
+          <button onClick={confirmarEncerramento} className="px-4 py-2 rounded-md bg-[#B91C1C] text-white text-sm font-medium hover:bg-[#991B1B] transition">Finalizar atendimento</button>
+          <button onClick={confirmarReabertura} className="px-4 py-2 rounded-md bg-[#374151] text-white text-sm font-medium hover:bg-[#111827] transition">Reabrir solicitação</button>
         </div>
       )}
 
@@ -516,44 +431,25 @@ export default function ChamadoDetalhePage() {
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        <div className="p-3 border-b border-[var(--border)] text-xs text-muted-foreground">
-          Conversa sobre a solicitação
-        </div>
+        <div className="p-3 border-b border-[var(--border)] text-xs text-muted-foreground">Conversa sobre a solicitação</div>
 
-        <div
-          className={`flex-1 p-4 space-y-3 overflow-y-auto max-h-[500px] rounded-b-lg scrollbar-thin transition-colors ${
-            isDragging ? "bg-primary/5 border-2 border-dashed border-primary/40" : ""
-          }`}
-        >
+        <div className={`flex-1 p-4 space-y-3 overflow-y-auto max-h-[500px] rounded-b-lg scrollbar-thin transition-colors ${
+          isDragging ? "bg-primary/5 border-2 border-dashed border-primary/40" : ""
+        }`}>
           {isDragging && (
-            <div className="flex items-center justify-center h-full text-primary text-sm font-medium py-8">
-              Solte o arquivo aqui para anexar
-            </div>
+            <div className="flex items-center justify-center h-full text-primary text-sm font-medium py-8">Solte o arquivo aqui para anexar</div>
           )}
 
           {!isDragging && (
             <>
               {msgLoading ? (
-                <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                  <Loader2 className="size-4 animate-spin" />
-                  Carregando mensagens...
-                </div>
+                <div className="flex items-center gap-2 text-muted-foreground text-sm"><Loader2 className="size-4 animate-spin" />Carregando mensagens...</div>
               ) : msgs.length === 0 ? (
-                <div className="text-sm text-muted-foreground border rounded-md p-3 bg-background text-center">
-                  Nenhuma mensagem por aqui ainda.
-                </div>
+                <div className="text-sm text-muted-foreground border rounded-md p-3 bg-background text-center">Nenhuma mensagem por aqui ainda.</div>
               ) : (
                 groups.map((group, gi) => (
-                  <div
-                    key={`group-${gi}`}
-                    className={`flex flex-col gap-0.5 ${
-                      group.isAluno ? "items-end" : "items-start"
-                    }`}
-                  >
-                    <span className="text-[11px] text-muted-foreground px-1 mb-0.5">
-                      {group.nomeAutor}
-                    </span>
-
+                  <div key={`group-${gi}`} className={`flex flex-col gap-0.5 ${group.isAluno ? "items-end" : "items-start"}`}>
+                    <span className="text-[11px] text-muted-foreground px-1 mb-0.5">{group.nomeAutor}</span>
                     {group.msgs.map((m, mi) => {
                       const isLast = mi === group.msgs.length - 1;
                       return (
@@ -567,10 +463,7 @@ export default function ChamadoDetalhePage() {
                         >
                           <div className="whitespace-pre-wrap break-words">{m.conteudo}</div>
                           {isLast && (
-                            <div
-                              className="text-[10px] opacity-60 mt-1 text-right"
-                              title={new Date(m.criadoEm).toLocaleString("pt-BR")}
-                            >
+                            <div className="text-[10px] opacity-60 mt-1 text-right" title={new Date(m.criadoEm).toLocaleString("pt-BR")}>
                               {relativeTime(m.criadoEm)}
                             </div>
                           )}
@@ -585,7 +478,6 @@ export default function ChamadoDetalhePage() {
           <div ref={endRef} />
         </div>
 
-        {/* Composer */}
         {!isEncerrado ? (
           <div className="p-3 border-t border-[var(--border)]">
             <div className="flex items-end gap-2">
@@ -595,10 +487,7 @@ export default function ChamadoDetalhePage() {
                 value={msgText}
                 onChange={(e) => setMsgText(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-                    e.preventDefault();
-                    sendMensagem();
-                  }
+                  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendMensagem(); }
                 }}
                 disabled={msgSending}
               />
@@ -626,13 +515,9 @@ export default function ChamadoDetalhePage() {
         </h2>
 
         {loadingAnexos ? (
-          <div className="text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin inline mr-1" /> Carregando anexos...
-          </div>
+          <div className="text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin inline mr-1" /> Carregando anexos...</div>
         ) : anexos.length === 0 ? (
-          <div className="text-sm text-muted-foreground border rounded-md p-3 bg-background">
-            Nenhum anexo encontrado.
-          </div>
+          <div className="text-sm text-muted-foreground border rounded-md p-3 bg-background">Nenhum anexo encontrado.</div>
         ) : (
           <ul className="space-y-3 mb-4">
             {anexos.map((a) => (
@@ -643,6 +528,7 @@ export default function ChamadoDetalhePage() {
                     alt={a.nomeArquivo}
                     className="w-full max-h-48 object-contain bg-[var(--muted)]"
                     loading="lazy"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
                   />
                 )}
                 <div className="flex items-center justify-between gap-2 p-2 text-sm">
@@ -669,7 +555,6 @@ export default function ChamadoDetalhePage() {
           </ul>
         )}
 
-        {/* Upload */}
         {!isEncerrado && (
           <div className="mt-4 pt-4 border-t">
             <h3 className="text-base font-medium mb-2">Adicionar anexo</h3>

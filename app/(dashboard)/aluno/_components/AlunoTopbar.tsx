@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Bell, Loader2, Moon, Sun, User } from "lucide-react";
 import { apiFetch } from "../../../../utils/api";
@@ -26,13 +26,14 @@ export default function AlunoTopbar({
   const [unread, setUnread] = useState<number | null>(null);
   const [loadingUnread, setLoadingUnread] = useState(true);
 
-  // ===== Dark mode =====
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const isFetchingRef = useRef(false);
 
-  useEffect(() => {
+  // ===== Dark mode (lazy init avoids theme flash) =====
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    if (typeof window === "undefined") return "light";
     const saved = localStorage.getItem("theme");
-    setTheme(saved === "light" || saved === "dark" ? saved : "light");
-  }, []);
+    return saved === "dark" ? "dark" : "light";
+  });
 
   useEffect(() => {
     const root = document.documentElement;
@@ -66,6 +67,8 @@ export default function AlunoTopbar({
 
   // ===== Unread notifications (poll) =====
   const fetchUnread = useCallback(async () => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
     try {
       setLoadingUnread(true);
       const res = await apiFetch(
@@ -78,6 +81,7 @@ export default function AlunoTopbar({
       setUnread(0);
     } finally {
       setLoadingUnread(false);
+      isFetchingRef.current = false;
     }
   }, [apiBase]);
 
@@ -108,7 +112,6 @@ export default function AlunoTopbar({
       </div>
 
       <div className="flex items-center gap-2">
-        {/* Dark mode toggle */}
         <button
           aria-label="Alternar tema"
           onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
@@ -118,7 +121,6 @@ export default function AlunoTopbar({
           {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
         </button>
 
-        {/* Notifications */}
         <Link
           href={notificationsHref}
           className="relative inline-flex items-center justify-center h-9 w-9 rounded-lg border border-[var(--border)] bg-background hover:bg-[var(--muted)]"
@@ -137,7 +139,6 @@ export default function AlunoTopbar({
           ) : null}
         </Link>
 
-        {/* Profile */}
         <Link
           href={profileHref}
           className="inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-[var(--border)] bg-background hover:bg-[var(--muted)]"
