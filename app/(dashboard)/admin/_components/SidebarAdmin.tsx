@@ -11,12 +11,13 @@ import {
   Settings,
   MessageSquareText,
   Building2,
-  Bell,
   LogOut,
-  //MessageCircleMore, // 💬 ícone de mensagens(Removido da sidebar)
 } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Cookies from 'js-cookie';
+import { apiFetch } from '../../../../utils/api';
+
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 type NavItemProps = {
   href: string;
@@ -33,7 +34,7 @@ export default function SidebarAdmin({
   chamadosAbertosCount = 0,
   notificacoesCount = 0,
   pendenciasCount = 0,
-  mensagensCount = 0, // ✅ novo badge opcional
+  mensagensCount = 0,
   onClose,
 }: {
   chamadosAbertosCount?: number;
@@ -45,19 +46,36 @@ export default function SidebarAdmin({
   const pathname = usePathname();
   const router = useRouter();
 
+  const [slaMedioDias, setSlaMedioDias] = useState<number | null>(null);
+  const [pctResolvidos, setPctResolvidos] = useState<number | null>(null);
+  const [chamadosAbertosReal, setChamadosAbertosReal] = useState<number | null>(null);
+
+  useEffect(() => {
+    apiFetch(`${API_BASE}/tickets/stats`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data) return;
+        setSlaMedioDias(data.slaMedioDias ?? null);
+        setPctResolvidos(data.pctResolvidos ?? null);
+        setChamadosAbertosReal(data.porStatus?.ABERTO ?? null);
+      })
+      .catch(() => {});
+  }, []);
+
+  const chamadosBadge = chamadosAbertosReal ?? chamadosAbertosCount;
+
   const items: NavItemProps[] = useMemo(
     () => [
       { href: "/admin/home", label: "Visão Geral", icon: <LayoutDashboard className="size-4" /> },
-      { href: "/admin/chamados", label: "Todos os Chamados", icon: <Ticket className="size-4" />, badge: chamadosAbertosCount },
+      { href: "/admin/chamados", label: "Todos os Chamados", icon: <Ticket className="size-4" />, badge: chamadosBadge || undefined },
       { href: "/admin/alunos", label: "Gerenciar Alunos", icon: <Users className="size-4" />, badge: pendenciasCount || undefined },
       { href: "/admin/funcionarios", label: "Gerenciar Funcionários", icon: <UserPlus className="size-4" /> },
-      //{ href: "/admin/mensagens", label: "Mensagens", icon: <MessageCircleMore className="size-4" />, badge: mensagensCount || undefined }, // 💬 nova rota
-      { href: "/admin/comunicacoes", label: "Comunicações", icon: <MessageSquareText className="size-4" />, badge: notificacoesCount },
+      { href: "/admin/comunicacoes", label: "Comunicações", icon: <MessageSquareText className="size-4" />, badge: notificacoesCount || undefined },
       { href: "/admin/relatorios", label: "Relatórios", icon: <FileChartColumn className="size-4" /> },
       { href: "/admin/setores", label: "Setores", icon: <Building2 className="size-4" /> },
       { href: "/admin/configuracoes", label: "Configurações", icon: <Settings className="size-4" /> },
     ],
-    [chamadosAbertosCount, notificacoesCount, pendenciasCount]
+    [chamadosBadge, notificacoesCount, pendenciasCount]
   );
 
   function isActive(href: string) {
@@ -67,18 +85,14 @@ export default function SidebarAdmin({
 
   function handleLogout() {
     try {
-      // Limpa os cookies que o middleware lê
       Cookies.remove("accessToken");
       Cookies.remove("refreshToken");
-
-      // Limpa o localStorage
       localStorage.removeItem("accessToken");
       localStorage.removeItem("refreshToken");
       localStorage.removeItem("userId");
     } catch (e) {
       console.error("Erro ao fazer logout:", e);
     }
-    // Redireciona para o login DEPOIS de limpar
     router.push("/login");
     onClose?.();
   }
@@ -136,11 +150,15 @@ export default function SidebarAdmin({
           <ul className="space-y-2 text-sm">
             <li className="flex items-center justify-between">
               <span>SLA médio (dias)</span>
-              <span className="font-medium">1,7</span>
+              <span className="font-medium">
+                {slaMedioDias != null ? slaMedioDias.toFixed(1) : "—"}
+              </span>
             </li>
             <li className="flex items-center justify-between">
               <span>% resolvidos</span>
-              <span className="font-medium">82%</span>
+              <span className="font-medium">
+                {pctResolvidos != null ? `${pctResolvidos}%` : "—"}
+              </span>
             </li>
             <li className="flex items-center justify-between">
               <span>Pendências</span>
@@ -148,8 +166,8 @@ export default function SidebarAdmin({
             </li>
           </ul>
         </div>
-      
-        {/* Sair (fixo no rodapé do sidebar) */}
+
+        {/* Sair */}
         <div className="mt-auto pt-3">
           <button
             type="button"
