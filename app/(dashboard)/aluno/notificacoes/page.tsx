@@ -18,7 +18,6 @@ import { cx } from '../../../../utils/cx';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
-/* ---------- Tipos ---------- */
 type Tipo =
   | "CHAMADO_CRIADO"
   | "CHAMADO_ATRIBUIDO"
@@ -66,7 +65,6 @@ function TipoIcon({ tipo }: { tipo: Tipo }) {
   }
 }
 
-/* ---------- Página ---------- */
 export default function NotificacoesAlunoPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -196,18 +194,12 @@ export default function NotificacoesAlunoPage() {
                     <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
                       <time>{new Date(n.criadoEm).toLocaleString("pt-BR")}</time>
                       {n.chamadoId && (
-                        <Link
-                          href={`/aluno/chamados/${n.chamadoId}`}
-                          className="text-[var(--brand-cyan)] hover:underline"
-                        >
+                        <Link href={`/aluno/chamados/${n.chamadoId}`} className="text-[var(--brand-cyan)] hover:underline">
                           Ver solicitação →
                         </Link>
                       )}
                       {n.meta?.url && (
-                        <Link
-                          href={n.meta.url}
-                          className="text-[var(--brand-cyan)] hover:underline"
-                        >
+                        <Link href={n.meta.url} className="text-[var(--brand-cyan)] hover:underline">
                           Abrir detalhe →
                         </Link>
                       )}
@@ -225,9 +217,7 @@ export default function NotificacoesAlunoPage() {
                         : "border-[var(--border)] hover:bg-[var(--muted)] text-foreground"
                     )}
                   >
-                    {marking === n.id
-                      ? <Loader2 className="size-3.5 animate-spin" />
-                      : <Check className="size-3.5" />}
+                    {marking === n.id ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
                     Lida
                   </button>
                 </div>

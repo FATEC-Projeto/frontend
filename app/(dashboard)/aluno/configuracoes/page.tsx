@@ -107,9 +107,7 @@ export default function ConfiguracoesAlunoPage() {
               : <Sun className="size-5 text-muted-foreground" />}
             <div>
               <div className="font-medium">Tema escuro</div>
-              <div className="text-sm text-muted-foreground">
-                Alterna entre o modo claro e escuro da interface.
-              </div>
+              <div className="text-sm text-muted-foreground">Alterna entre o modo claro e escuro da interface.</div>
             </div>
           </div>
           <Toggle checked={theme === "dark"} onChange={() => setTheme((t) => t === "dark" ? "light" : "dark")} />
@@ -122,20 +120,12 @@ export default function ConfiguracoesAlunoPage() {
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-medium">Idioma</span>
-                <span className="rounded-md border border-[var(--border)] bg-[var(--muted)] px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                  em breve
-                </span>
+                <span className="rounded-md border border-[var(--border)] bg-[var(--muted)] px-1.5 py-0.5 text-[10px] text-muted-foreground">em breve</span>
               </div>
-              <div className="text-sm text-muted-foreground">
-                O sistema está disponível apenas em Português (Brasil).
-              </div>
+              <div className="text-sm text-muted-foreground">O sistema está disponível apenas em Português (Brasil).</div>
             </div>
           </div>
-          <select
-            disabled
-            className="h-9 rounded-lg border border-[var(--border)] bg-input px-3 text-sm opacity-50 cursor-not-allowed"
-            value="pt-BR"
-          >
+          <select disabled className="h-9 rounded-lg border border-[var(--border)] bg-input px-3 text-sm opacity-50 cursor-not-allowed" value="pt-BR">
             <option value="pt-BR">Português (Brasil)</option>
           </select>
         </div>
@@ -146,12 +136,8 @@ export default function ConfiguracoesAlunoPage() {
             <Bell className="size-5 text-muted-foreground" />
             <div>
               <div className="font-medium">Notificações na plataforma</div>
-              <div className="text-sm text-muted-foreground">
-                Receba alertas sobre atualizações de solicitações e mensagens diretamente aqui no sistema.
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">
-                Envio de e-mail é gerenciado pela instituição e não é configurável aqui.
-              </div>
+              <div className="text-sm text-muted-foreground">Receba alertas sobre atualizações de solicitações e mensagens diretamente aqui no sistema.</div>
+              <div className="text-xs text-muted-foreground mt-1">Envio de e-mail é gerenciado pela instituição e não é configurável aqui.</div>
             </div>
           </div>
           <Toggle checked={platNotif} onChange={() => setPlatNotif((v) => !v)} />
@@ -163,9 +149,7 @@ export default function ConfiguracoesAlunoPage() {
             <RotateCcw className="size-5 text-muted-foreground" />
             <div>
               <div className="font-medium">Restaurar preferências padrão</div>
-              <div className="text-sm text-muted-foreground">
-                Volta as configurações de tema e notificações para o padrão original.
-              </div>
+              <div className="text-sm text-muted-foreground">Volta as configurações de tema e notificações para o padrão original.</div>
             </div>
           </div>
           <button
