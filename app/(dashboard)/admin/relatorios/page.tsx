@@ -1,11 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Search, Filter, Download, RefreshCcw,
-  Clock, CheckCircle2, AlertTriangle, BarChart3, PieChart,
+  Clock, CheckCircle2, AlertTriangle, BarChart3, PieChart, Loader2,
 } from "lucide-react";
-import { cx } from '../../../../utils/cx'
+import { cx } from '../../../../utils/cx';
+import { apiFetch } from '../../../../utils/api';
+
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 /* ===================== Tipos ===================== */
 type Status = "ABERTO" | "EM_ATENDIMENTO" | "AGUARDANDO_USUARIO" | "RESOLVIDO" | "ENCERRADO";
@@ -16,34 +19,32 @@ type Chamado = {
   id: string;
   protocolo?: string;
   titulo: string;
-  criadoEm: string;        // ISO
-  encerradoEm?: string;    // ISO | undefined
+  criadoEm: string;
+  encerradoEm?: string;
+  vencimentoSla?: string;
   status: Status;
   prioridade: Prioridade;
   nivel: Nivel;
   setor?: string | null;
   responsavel?: string | null;
-  slaDias?: number;        // SLA contratado (dias) - opcional
-  ttrHoras?: number;       // tempo total de resolução (horas) - opcional
-  tfsHoras?: number;       // tempo para primeira resposta (horas) - opcional
-  noPrazo?: boolean;       // se respeitou o SLA - opcional
 };
 
-/* ===================== MOCK ===================== */
-const MOCK: Chamado[] = [
-  { id: "1", protocolo: "WF-2025-0101", titulo: "Acesso ao SIGA", criadoEm: "2025-10-18T09:12:00Z", status: "ABERTO", prioridade: "ALTA", nivel: "N1", setor: "TI Acadêmica", responsavel: "Bruno", tfsHoras: 0.8 },
-  { id: "2", protocolo: "WF-2025-0102", titulo: "Erro boleto", criadoEm: "2025-10-16T15:38:00Z", status: "AGUARDANDO_USUARIO", prioridade: "MEDIA", nivel: "N2", setor: "Financeiro", responsavel: "Ana", tfsHoras: 1.5 },
-  { id: "3", protocolo: "WF-2025-0103", titulo: "Histórico escolar", criadoEm: "2025-10-14T11:05:00Z", status: "EM_ATENDIMENTO", prioridade: "BAIXA", nivel: "N1", setor: "Secretaria", responsavel: "Diego", tfsHoras: 3.2 },
-  { id: "4", protocolo: "WF-2025-0104", titulo: "SSO OIDC", criadoEm: "2025-10-13T08:21:00Z", status: "RESOLVIDO", prioridade: "URGENTE", nivel: "N3", setor: "TI Acadêmica", responsavel: "Carla", encerradoEm: "2025-10-14T09:00:00Z", ttrHoras: 24.7, tfsHoras: 0.6, slaDias: 3, noPrazo: true },
-  { id: "5", protocolo: "WF-2025-0105", titulo: "Alteração matrícula", criadoEm: "2025-10-12T08:21:00Z", status: "RESOLVIDO", prioridade: "MEDIA", nivel: "N2", setor: "Secretaria", responsavel: "Diego", encerradoEm: "2025-10-13T10:00:00Z", ttrHoras: 28.0, tfsHoras: 1.1, slaDias: 2, noPrazo: false },
-  { id: "6", protocolo: "WF-2025-0106", titulo: "Impressão carteirinha", criadoEm: "2025-10-12T12:00:00Z", status: "ENCERRADO", prioridade: "BAIXA", nivel: "N1", setor: "Secretaria", responsavel: "Luiza", encerradoEm: "2025-10-12T16:00:00Z", ttrHoras: 4, tfsHoras: 0.4, slaDias: 5, noPrazo: true },
-  { id: "7", protocolo: "WF-2025-0107", titulo: "Falha integração ERP", criadoEm: "2025-10-11T09:00:00Z", status: "EM_ATENDIMENTO", prioridade: "ALTA", nivel: "N3", setor: "Financeiro", responsavel: "Ana", tfsHoras: 2.0 },
-];
+type StatsData = {
+  total: number;
+  porStatus: Record<Status, number>;
+  porNivel: Record<Nivel, number>;
+  porPrioridade: Record<Prioridade, number>;
+  porSetor: Array<{ setorId: string; setorNome: string; total: number }>;
+  porResponsavel: Array<{ responsavelId: string; responsavelNome: string; total: number }>;
+  ttrMedioHoras: number;
+  slaMedioDias: number;
+  pctNoPrazo: number;
+  pctResolvidos: number;
+  tendencia7dias: Array<{ data: string; total: number }>;
+  atualizadoEm: string;
+};
 
 /* ===================== Utils ===================== */
-
-function parseISO(s: string) { return new Date(s).getTime(); }
-
 function toCSV(rows: Array<Record<string, any>>) {
   const headers = Object.keys(rows[0] ?? {});
   const escape = (v: any) => {
@@ -65,121 +66,166 @@ type Tab = "OVERVIEW" | "SLA" | "OPS";
 export default function RelatoriosPage() {
   const [tab, setTab] = useState<Tab>("OVERVIEW");
 
-  // filtros
   const [q, setQ] = useState("");
-  const [status, setStatus] = useState<Status | "ALL">("ALL");
+  const [statusFiltro, setStatusFiltro] = useState<Status | "ALL">("ALL");
   const [prioridade, setPrioridade] = useState<Prioridade | "ALL">("ALL");
   const [nivel, setNivel] = useState<Nivel | "ALL">("ALL");
   const [setor, setSetor] = useState<string | "ALL">("ALL");
-  const [dtIni, setDtIni] = useState<string>(""); // yyyy-mm-dd
-  const [dtFim, setDtFim] = useState<string>(""); // yyyy-mm-dd
+  const [dtIni, setDtIni] = useState<string>("");
+  const [dtFim, setDtFim] = useState<string>("");
 
-  const setoresDisponiveis = useMemo(() => {
-    const s = new Set(MOCK.map(c => c.setor).filter(Boolean) as string[]);
-    return Array.from(s).sort();
+  const [stats, setStats] = useState<StatsData | null>(null);
+  const [tickets, setTickets] = useState<Chamado[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const [statsRes, ticketsRes] = await Promise.all([
+        apiFetch(`${API_BASE}/tickets/stats`),
+        apiFetch(`${API_BASE}/tickets?pageSize=100&include=setor,responsavel`),
+      ]);
+
+      if (statsRes.ok) {
+        const json = await statsRes.json();
+        setStats(json);
+      }
+
+      if (ticketsRes.ok) {
+        const json = await ticketsRes.json();
+        const list = Array.isArray(json) ? json : (json.data ?? []);
+        setTickets(
+          list.map((t: any) => ({
+            id: t.id,
+            protocolo: t.protocolo,
+            titulo: t.titulo ?? t.assunto ?? "—",
+            criadoEm: t.criadoEm,
+            encerradoEm: t.encerradoEm ?? undefined,
+            vencimentoSla: t.vencimentoSla ?? undefined,
+            status: t.status,
+            prioridade: t.prioridade,
+            nivel: t.nivel,
+            setor: t.setor?.nome ?? t.setorNome ?? (typeof t.setor === "string" ? t.setor : null),
+            responsavel:
+              t.responsavel?.nome ??
+              t.responsavelNome ??
+              (typeof t.responsavel === "string" ? t.responsavel : null),
+          }))
+        );
+      }
+
+      setLastUpdated(new Date());
+      setError(null);
+    } catch (e: any) {
+      setError(e?.message ?? "Erro ao carregar dados");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const dados = useMemo(() => {
-    return MOCK.filter((c) => {
+  useEffect(() => {
+    fetchData();
+    const id = setInterval(fetchData, 30_000);
+    return () => clearInterval(id);
+  }, [fetchData]);
+
+  const setoresDisponiveis = useMemo(() => {
+    if (!stats) return [];
+    return stats.porSetor.map((s) => s.setorNome).sort();
+  }, [stats]);
+
+  const dadosFiltrados = useMemo(() => {
+    return tickets.filter((c) => {
       const matchQ =
         !q ||
         c.titulo.toLowerCase().includes(q.toLowerCase()) ||
         c.protocolo?.toLowerCase().includes(q.toLowerCase()) ||
         c.responsavel?.toLowerCase().includes(q.toLowerCase()) ||
         c.setor?.toLowerCase().includes(q.toLowerCase());
-      const matchS = status === "ALL" || c.status === status;
+      const matchS = statusFiltro === "ALL" || c.status === statusFiltro;
       const matchP = prioridade === "ALL" || c.prioridade === prioridade;
       const matchN = nivel === "ALL" || c.nivel === nivel;
       const matchSetor = setor === "ALL" || c.setor === setor;
-
-      const matchDataIni = !dtIni || parseISO(c.criadoEm) >= parseISO(`${dtIni}T00:00:00`);
-      const matchDataFim = !dtFim || parseISO(c.criadoEm) <= parseISO(`${dtFim}T23:59:59`);
-
+      const ts = new Date(c.criadoEm).getTime();
+      const matchDataIni = !dtIni || ts >= new Date(`${dtIni}T00:00:00`).getTime();
+      const matchDataFim = !dtFim || ts <= new Date(`${dtFim}T23:59:59`).getTime();
       return matchQ && matchS && matchP && matchN && matchSetor && matchDataIni && matchDataFim;
     });
-  }, [q, status, prioridade, nivel, setor, dtIni, dtFim]);
+  }, [tickets, q, statusFiltro, prioridade, nivel, setor, dtIni, dtFim]);
 
-  /* ===== KPIs ===== */
   const kpis = useMemo(() => {
-    const total = dados.length;
-    const abertos = dados.filter(d => d.status === "ABERTO").length;
-    const atendimento = dados.filter(d => d.status === "EM_ATENDIMENTO").length;
-    const aguardUser = dados.filter(d => d.status === "AGUARDANDO_USUARIO").length;
-    const resolvidos = dados.filter(d => d.status === "RESOLVIDO" || d.status === "ENCERRADO").length;
+    if (!stats) return { total: 0, abertos: 0, atendimento: 0, aguardUser: 0, resolvidos: 0, ttrMedio: 0, slaMedioDias: 0, pctNoPrazo: 0, pctResolvidos: 0 };
+    return {
+      total: stats.total,
+      abertos: stats.porStatus.ABERTO ?? 0,
+      atendimento: stats.porStatus.EM_ATENDIMENTO ?? 0,
+      aguardUser: stats.porStatus.AGUARDANDO_USUARIO ?? 0,
+      resolvidos: (stats.porStatus.RESOLVIDO ?? 0) + (stats.porStatus.ENCERRADO ?? 0),
+      ttrMedio: stats.ttrMedioHoras ?? 0,
+      slaMedioDias: stats.slaMedioDias ?? 0,
+      pctNoPrazo: stats.pctNoPrazo ?? 0,
+      pctResolvidos: stats.pctResolvidos ?? 0,
+    };
+  }, [stats]);
 
-    const resolvidosComTTR = dados.filter(d => d.ttrHoras != null);
-    const ttrMedio = resolvidosComTTR.length
-      ? (resolvidosComTTR.reduce((acc, d) => acc + (d.ttrHoras ?? 0), 0) / resolvidosComTTR.length)
-      : 0;
-
-    const tfsComValor = dados.filter(d => d.tfsHoras != null);
-    const tfsMedio = tfsComValor.length
-      ? (tfsComValor.reduce((acc, d) => acc + (d.tfsHoras ?? 0), 0) / tfsComValor.length)
-      : 0;
-
-    const temSLA = dados.filter(d => d.noPrazo != null);
-    const pctNoPrazo = temSLA.length
-      ? Math.round(100 * (temSLA.filter(d => d.noPrazo).length / temSLA.length))
-      : 0;
-
-    return { total, abertos, atendimento, aguardUser, resolvidos, ttrMedio, tfsMedio, pctNoPrazo };
-  }, [dados]);
-
-  /* ===== Agregados ===== */
   const porSetor = useMemo(() => {
-    const map: Record<string, number> = {};
-    for (const d of dados) {
-      const key = d.setor ?? "—";
-      map[key] = (map[key] ?? 0) + 1;
-    }
-    const total = Object.values(map).reduce((a, b) => a + b, 0) || 1;
-    return Object.entries(map).map(([setor, qtd]) => ({ setor, qtd, pct: Math.round((qtd / total) * 100) }));
-  }, [dados]);
+    if (!stats) return [];
+    const total = stats.porSetor.reduce((a, b) => a + b.total, 0) || 1;
+    return stats.porSetor.map((s) => ({
+      setor: s.setorNome,
+      qtd: s.total,
+      pct: Math.round((s.total / total) * 100),
+    }));
+  }, [stats]);
 
   const porNivel = useMemo(() => {
+    if (!stats) return [];
     const keys: Nivel[] = ["N1", "N2", "N3"];
-    return keys.map(n => ({ nivel: n, qtd: dados.filter(d => d.nivel === n).length }));
-  }, [dados]);
+    return keys.map((n) => ({ nivel: n, qtd: stats.porNivel[n] ?? 0 }));
+  }, [stats]);
 
   const porPrioridade = useMemo(() => {
+    if (!stats) return [];
     const keys: Prioridade[] = ["BAIXA", "MEDIA", "ALTA", "URGENTE"];
-    return keys.map(p => ({ prioridade: p, qtd: dados.filter(d => d.prioridade === p).length }));
-  }, [dados]);
+    return keys.map((p) => ({ prioridade: p, qtd: stats.porPrioridade[p] ?? 0 }));
+  }, [stats]);
 
   const porTecnico = useMemo(() => {
-    const map: Record<string, number> = {};
-    for (const d of dados) {
-      const key = d.responsavel ?? "—";
-      map[key] = (map[key] ?? 0) + 1;
-    }
-    return Object.entries(map).map(([responsavel, qtd]) => ({ responsavel, qtd }))
+    if (!stats) return [];
+    return stats.porResponsavel
+      .map((r) => ({ responsavel: r.responsavelNome, qtd: r.total }))
       .sort((a, b) => b.qtd - a.qtd);
-  }, [dados]);
+  }, [stats]);
 
   const slaPorSetor = useMemo(() => {
-    // média de TTR por setor + % no prazo
     const map: Record<string, { total: number; somaTTR: number; comSLA: number; noPrazo: number }> = {};
-    for (const d of dados) {
+    for (const d of tickets) {
       const key = d.setor ?? "—";
       map[key] = map[key] || { total: 0, somaTTR: 0, comSLA: 0, noPrazo: 0 };
       map[key].total += 1;
-      if (d.ttrHoras != null) map[key].somaTTR += d.ttrHoras;
-      if (d.noPrazo != null) {
+      if (d.encerradoEm && d.criadoEm) {
+        const ttr = (new Date(d.encerradoEm).getTime() - new Date(d.criadoEm).getTime()) / 3_600_000;
+        map[key].somaTTR += ttr;
+      }
+      if (d.vencimentoSla && d.encerradoEm) {
         map[key].comSLA += 1;
-        if (d.noPrazo) map[key].noPrazo += 1;
+        if (new Date(d.encerradoEm) <= new Date(d.vencimentoSla)) map[key].noPrazo += 1;
       }
     }
-    return Object.entries(map).map(([setor, v]) => ({
-      setor,
-      ttrMedio: v.somaTTR && v.total ? +(v.somaTTR / v.total).toFixed(1) : 0,
-      pctNoPrazo: v.comSLA ? Math.round(100 * (v.noPrazo / v.comSLA)) : 0,
-      total: v.total,
-    })).sort((a, b) => b.total - a.total);
-  }, [dados]);
+    return Object.entries(map)
+      .map(([s, v]) => ({
+        setor: s,
+        ttrMedio: v.somaTTR && v.total ? +(v.somaTTR / v.total).toFixed(1) : 0,
+        pctNoPrazo: v.comSLA ? Math.round(100 * (v.noPrazo / v.comSLA)) : 0,
+        total: v.total,
+      }))
+      .sort((a, b) => b.total - a.total);
+  }, [tickets]);
 
   function exportarCSV() {
-    if (dados.length === 0) return;
-    const rows = dados.map(d => ({
+    if (dadosFiltrados.length === 0) return;
+    const rows = dadosFiltrados.map((d) => ({
       id: d.id,
       protocolo: d.protocolo ?? "",
       titulo: d.titulo,
@@ -190,15 +236,25 @@ export default function RelatoriosPage() {
       nivel: d.nivel,
       setor: d.setor ?? "",
       responsavel: d.responsavel ?? "",
-      ttrHoras: d.ttrHoras ?? "",
-      tfsHoras: d.tfsHoras ?? "",
-      noPrazo: d.noPrazo ?? "",
     }));
     toCSV(rows);
   }
 
   return (
     <div className="space-y-6">
+      {/* Barra de status */}
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <div className="flex items-center gap-2">
+          {loading && <Loader2 className="size-4 animate-spin" />}
+          {error && <span className="text-destructive">{error}</span>}
+        </div>
+        {lastUpdated && (
+          <span>
+            Última atualização: {lastUpdated.toLocaleTimeString("pt-BR")} · atualiza a cada 30s
+          </span>
+        )}
+      </div>
+
       {/* Toolbar de filtros */}
       <div className="rounded-xl border border-[var(--border)] bg-card p-4">
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
@@ -226,8 +282,8 @@ export default function RelatoriosPage() {
               <Filter className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <select
                 className="h-10 w-full pl-9 pr-8 rounded-lg border border-[var(--border)] bg-background"
-                value={status}
-                onChange={(e) => setStatus(e.target.value as any)}
+                value={statusFiltro}
+                onChange={(e) => setStatusFiltro(e.target.value as any)}
               >
                 <option value="ALL">Todos os status</option>
                 <option value="ABERTO">Aberto</option>
@@ -280,7 +336,6 @@ export default function RelatoriosPage() {
           </div>
         </div>
 
-        {/* Ações */}
         <div className="mt-3 flex items-center gap-2">
           <button
             type="button"
@@ -291,7 +346,7 @@ export default function RelatoriosPage() {
           </button>
           <button
             type="button"
-            onClick={() => {/* poderia reconsultar backend */}}
+            onClick={() => { setLoading(true); fetchData(); }}
             className="inline-flex items-center gap-2 h-9 px-3 rounded-md border border-[var(--border)] hover:bg-[var(--muted)] text-sm"
           >
             <RefreshCcw className="size-4" /> Atualizar
@@ -301,12 +356,12 @@ export default function RelatoriosPage() {
 
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-        <Kpi icon={<BarChart3 className="size-4" />} label="Total" value={dados.length} />
-        <Kpi icon={<AlertTriangle className="size-4" />} label="Abertos" value={kpis.abertos} tone="brand-cyan" />
-        <Kpi icon={<Clock className="size-4" />} label="Em atendimento" value={kpis.atendimento} tone="brand-teal" />
-        <Kpi icon={<Clock className="size-4" />} label="Aguard. usuário" value={kpis.aguardUser} tone="warning" />
-        <Kpi icon={<CheckCircle2 className="size-4" />} label="Resolvidos/Encerr." value={kpis.resolvidos} tone="success" />
-        <Kpi icon={<PieChart className="size-4" />} label="% no prazo (SLA)" value={`${kpis.pctNoPrazo}%`} />
+        <Kpi icon={<BarChart3 className="size-4" />} label="Total" value={kpis.total} loading={loading} />
+        <Kpi icon={<AlertTriangle className="size-4" />} label="Abertos" value={kpis.abertos} tone="brand-cyan" loading={loading} />
+        <Kpi icon={<Clock className="size-4" />} label="Em atendimento" value={kpis.atendimento} tone="brand-teal" loading={loading} />
+        <Kpi icon={<Clock className="size-4" />} label="Aguard. usuário" value={kpis.aguardUser} tone="warning" loading={loading} />
+        <Kpi icon={<CheckCircle2 className="size-4" />} label="Resolvidos/Encerr." value={kpis.resolvidos} tone="success" loading={loading} />
+        <Kpi icon={<PieChart className="size-4" />} label="% no prazo (SLA)" value={`${kpis.pctNoPrazo}%`} loading={loading} />
       </div>
 
       {/* Tabs */}
@@ -320,21 +375,21 @@ export default function RelatoriosPage() {
         <section className="grid grid-cols-1 xl:grid-cols-12 gap-6">
           <Card title="Distribuição por Setor" className="xl:col-span-7">
             <BarTable
-              rows={porSetor.map(r => ({ label: r.setor, value: r.qtd, suffix: ` (${r.pct}%)` }))}
+              rows={porSetor.map((r) => ({ label: r.setor, value: r.qtd, suffix: ` (${r.pct}%)` }))}
               total={porSetor.reduce((a, b) => a + b.qtd, 0)}
             />
           </Card>
 
           <Card title="Por Nível / Prioridade" className="xl:col-span-5">
             <div className="grid grid-cols-2 gap-4">
-              <MiniBar title="Por Nível" rows={porNivel.map(x => ({ label: x.nivel, value: x.qtd }))} />
-              <MiniBar title="Por Prioridade" rows={porPrioridade.map(x => ({ label: x.prioridade, value: x.qtd }))} />
+              <MiniBar title="Por Nível" rows={porNivel.map((x) => ({ label: x.nivel, value: x.qtd }))} />
+              <MiniBar title="Por Prioridade" rows={porPrioridade.map((x) => ({ label: x.prioridade, value: x.qtd }))} />
             </div>
           </Card>
 
           <Card title="Por Responsável (Top)" className="xl:col-span-12">
             <BarTable
-              rows={porTecnico.map(r => ({ label: r.responsavel, value: r.qtd }))}
+              rows={porTecnico.map((r) => ({ label: r.responsavel, value: r.qtd }))}
               total={porTecnico.reduce((a, b) => a + b.qtd, 0)}
             />
           </Card>
@@ -345,7 +400,7 @@ export default function RelatoriosPage() {
         <section className="grid grid-cols-1 xl:grid-cols-12 gap-6">
           <Card title="Tempo médio de resolução (h) por Setor" className="xl:col-span-7">
             <BarTable
-              rows={slaPorSetor.map(x => ({ label: x.setor, value: x.ttrMedio, suffix: " h" }))}
+              rows={slaPorSetor.map((x) => ({ label: x.setor, value: x.ttrMedio, suffix: " h" }))}
               total={slaPorSetor.reduce((a, b) => a + b.ttrMedio, 0)}
               normalizeByMax
             />
@@ -354,7 +409,7 @@ export default function RelatoriosPage() {
           <Card title="% no prazo (SLA) por Setor" className="xl:col-span-5">
             <MiniBar
               title="No prazo (SLA)"
-              rows={slaPorSetor.map(x => ({ label: x.setor, value: x.pctNoPrazo }))}
+              rows={slaPorSetor.map((x) => ({ label: x.setor, value: x.pctNoPrazo }))}
               valueSuffix="%"
               clamp100
             />
@@ -363,7 +418,7 @@ export default function RelatoriosPage() {
           <Card title="Tempos médios" className="xl:col-span-12">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Stat label="TTR médio (h)" value={kpis.ttrMedio ? kpis.ttrMedio.toFixed(1) : "—"} />
-              <Stat label="TFS médio (h)" value={kpis.tfsMedio ? kpis.tfsMedio.toFixed(1) : "—"} />
+              <Stat label="SLA médio (dias)" value={kpis.slaMedioDias ? kpis.slaMedioDias.toFixed(1) : "—"} />
               <Stat label="% no prazo (SLA)" value={`${kpis.pctNoPrazo}%`} />
             </div>
           </Card>
@@ -375,25 +430,22 @@ export default function RelatoriosPage() {
           <Card title="Fila atual por status" className="xl:col-span-6">
             <MiniBar
               rows={[
-                { label: "Aberto", value: dados.filter(d => d.status === "ABERTO").length },
-                { label: "Em atendimento", value: dados.filter(d => d.status === "EM_ATENDIMENTO").length },
-                { label: "Aguard. usuário", value: dados.filter(d => d.status === "AGUARDANDO_USUARIO").length },
-                { label: "Resolvido/Encerr.", value: dados.filter(d => d.status === "RESOLVIDO" || d.status === "ENCERRADO").length },
+                { label: "Aberto", value: kpis.abertos },
+                { label: "Em atendimento", value: kpis.atendimento },
+                { label: "Aguard. usuário", value: kpis.aguardUser },
+                { label: "Resolvido/Encerr.", value: kpis.resolvidos },
               ]}
             />
           </Card>
           <Card title="Backlog por Nível" className="xl:col-span-6">
-            <MiniBar
-              rows={[
-                { label: "N1", value: dados.filter(d => d.nivel === "N1" && d.status !== "RESOLVIDO" && d.status !== "ENCERRADO").length },
-                { label: "N2", value: dados.filter(d => d.nivel === "N2" && d.status !== "RESOLVIDO" && d.status !== "ENCERRADO").length },
-                { label: "N3", value: dados.filter(d => d.nivel === "N3" && d.status !== "RESOLVIDO" && d.status !== "ENCERRADO").length },
-              ]}
-            />
+            <MiniBar rows={porNivel.map((x) => ({ label: x.nivel, value: x.qtd }))} />
           </Card>
 
-          <Card title="Detalhes (dados filtrados)" className="xl:col-span-12">
-            <DataTable dados={dados} />
+          <Card
+            title={`Detalhes — ${dadosFiltrados.length} chamado${dadosFiltrados.length !== 1 ? "s" : ""} (com filtros aplicados)`}
+            className="xl:col-span-12"
+          >
+            <DataTable dados={dadosFiltrados} />
           </Card>
         </section>
       )}
@@ -402,9 +454,10 @@ export default function RelatoriosPage() {
 }
 
 /* ===================== Componentes UI ===================== */
-function Kpi({ icon, label, value, tone }: {
+function Kpi({ icon, label, value, tone, loading }: {
   icon: React.ReactNode; label: string; value: number | string;
   tone?: "brand-cyan" | "brand-teal" | "warning" | "success";
+  loading?: boolean;
 }) {
   const bg: Record<string, string> = {
     "brand-cyan": "bg-[var(--brand-cyan)]/10",
@@ -423,9 +476,12 @@ function Kpi({ icon, label, value, tone }: {
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <div className="text-sm text-muted-foreground">{label}</div>
-          <div className="text-2xl font-semibold">{value}</div>
+          {loading
+            ? <div className="h-8 w-16 rounded bg-[var(--muted)] animate-pulse" />
+            : <div className="text-2xl font-semibold">{value}</div>
+          }
         </div>
-        <div className={cx("size-10 rounded-lg grid place-items-center", tone ? bg[tone] : "bg-[var(--muted)]")}>
+        <div className={cx("size-10 rounded-lg grid place-items-center", tone ? bg[tone] : "bg-[var(--muted)]") }>
           <div className={cx("opacity-90", tone ? fg[tone] : "text-muted-foreground")}>{icon}</div>
         </div>
       </div>
@@ -468,7 +524,7 @@ function BarTable({ rows, total, normalizeByMax = false }: {
   total: number;
   normalizeByMax?: boolean;
 }) {
-  const max = Math.max(...rows.map(r => r.value), 1);
+  const max = Math.max(...rows.map((r) => r.value), 1);
   return (
     <div className="space-y-3">
       {rows.map((r) => (
@@ -479,7 +535,7 @@ function BarTable({ rows, total, normalizeByMax = false }: {
           </div>
           <div className="col-span-2 text-right text-sm">
             <span className="font-medium">{r.value}</span>
-            {r.suffix && <span className="text-muted-foreground"> {r.suffix}</span>}
+            {r.suffix && <span className="text-muted-foreground">{r.suffix}</span>}
           </div>
         </div>
       ))}
@@ -496,7 +552,7 @@ function MiniBar({ title, rows, valueSuffix = "", clamp100 = false }: {
   valueSuffix?: string;
   clamp100?: boolean;
 }) {
-  const max = Math.max(...rows.map(r => r.value), 1);
+  const max = Math.max(...rows.map((r) => r.value), 1);
   return (
     <div>
       {title && <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">{title}</div>}
@@ -548,15 +604,12 @@ function DataTable({ dados }: { dados: Chamado[] }) {
               <th className="text-left font-medium px-4 py-3 hidden lg:table-cell">Resp.</th>
               <th className="text-left font-medium px-4 py-3 hidden lg:table-cell">Criado em</th>
               <th className="text-left font-medium px-4 py-3 hidden lg:table-cell">Encerrado em</th>
-              <th className="text-left font-medium px-4 py-3 hidden xl:table-cell">TFS (h)</th>
-              <th className="text-left font-medium px-4 py-3 hidden xl:table-cell">TTR (h)</th>
-              <th className="text-left font-medium px-4 py-3 hidden xl:table-cell">SLA</th>
             </tr>
           </thead>
           <tbody>
             {dados.map((c) => (
               <tr key={c.id} className="border-t border-[var(--border)]">
-                <td className="px-4 py-3 font-medium">{c.protocolo ?? `#${c.id}`}</td>
+                <td className="px-4 py-3 font-medium">{c.protocolo ?? `#${c.id.slice(0, 8)}`}</td>
                 <td className="px-4 py-3 max-w-[380px]"><div className="line-clamp-1">{c.titulo}</div></td>
                 <td className="px-4 py-3 hidden md:table-cell">{c.setor ?? "—"}</td>
                 <td className="px-4 py-3">{c.nivel}</td>
@@ -571,16 +624,11 @@ function DataTable({ dados }: { dados: Chamado[] }) {
                     ? new Date(c.encerradoEm).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
                     : "—"}
                 </td>
-                <td className="px-4 py-3 hidden xl:table-cell">{c.tfsHoras ?? "—"}</td>
-                <td className="px-4 py-3 hidden xl:table-cell">{c.ttrHoras ?? "—"}</td>
-                <td className="px-4 py-3 hidden xl:table-cell">
-                  {c.noPrazo == null ? "—" : c.noPrazo ? "No prazo" : "Fora do prazo"}
-                </td>
               </tr>
             ))}
             {dados.length === 0 && (
               <tr>
-                <td colSpan={12} className="px-4 py-10 text-center text-muted-foreground">
+                <td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">
                   Sem dados com os filtros atuais.
                 </td>
               </tr>
