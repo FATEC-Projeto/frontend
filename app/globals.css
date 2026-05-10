@@ -122,6 +122,18 @@ body{ background:var(--background); color:var(--foreground); }
 
   /* Raio padrão (shadcn) */
   --radius: 0.625rem;
+
+  /* Estados semânticos */
+  --success:            #16a34a;
+  --success-foreground: #ffffff;
+  --warning:            #d97706;
+  --warning-foreground: #ffffff;
+  --info:               #2563eb;
+  --info-foreground:    #ffffff;
+
+  /* Skeleton (placeholder de loading) */
+  --skeleton:           #e5e7eb;
+  --skeleton-highlight: #f3f4f6;
 }
 
 /* ======= Modo Escuro ======= */
@@ -154,6 +166,18 @@ body{ background:var(--background); color:var(--foreground); }
   --border: #2A3447;
   --input:  #222C40;
   --ring:   #3C4B68;
+
+  /* Estados semânticos (modo escuro — tons mais claros para contraste) */
+  --success:            #4ade80;
+  --success-foreground: #052e16;
+  --warning:            #fbbf24;
+  --warning-foreground: #451a03;
+  --info:               #60a5fa;
+  --info-foreground:    #1e3a8a;
+
+  /* Skeleton escuro */
+  --skeleton:           #1e2736;
+  --skeleton-highlight: #253044;
 }
 
 /* ===== Utilitários opcionais (usáveis sem Tailwind)
