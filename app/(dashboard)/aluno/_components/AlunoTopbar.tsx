@@ -87,6 +87,13 @@ export default function AlunoTopbar({
     return () => clearInterval(timer);
   }, [fetchUnread, pollMs]);
 
+  // Re-fetch imediatamente quando a página de notificações marcar como lida
+  useEffect(() => {
+    const handler = () => fetchUnread();
+    window.addEventListener("notificacoes-lidas", handler);
+    return () => window.removeEventListener("notificacoes-lidas", handler);
+  }, [fetchUnread]);
+
   const badgeText =
     unread === null ? "" : unread > 99 ? "99+" : unread > 0 ? String(unread) : "";
 

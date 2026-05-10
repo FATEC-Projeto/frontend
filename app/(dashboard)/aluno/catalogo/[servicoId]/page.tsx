@@ -165,9 +165,9 @@ function findServico(catalog: CatalogResponse, servicoId: string): ServicoComCat
 }
 
 /**
- * Gera uma descrição concisa. Os dados completos já vão em
- * dadosAcademicos e camposEspecificos (JSON), então descricao
- * só precisa de contexto suficiente para o atendente.
+ * Gera uma descrição concisa para o chamado.
+ * Os dados estruturados completos já vão em dadosAcademicos e camposEspecificos (JSON),
+ * então descricao só precisa de contexto suficiente para o atendente entender o caso.
  */
 function buildDescricao(params: {
   servico: ServicoComCategoria;
@@ -176,7 +176,14 @@ function buildDescricao(params: {
   camposEspecificos: Record<string, string>;
 }): string {
   const { servico, setorProvavel, dadosAcademicos, camposEspecificos } = params;
-  const header = `Serviço: ${servico.nome} (${servico.categoriaNome}) | Setor: ${setorProvavel} | RA: ${dadosAcademicos.ra} — ${dadosAcademicos.curso} / ${dadosAcademicos.turno} / ${dadosAcademicos.semestre}`;
+
+  const header = [
+    `Serviço: ${servico.nome} (${servico.categoriaNome})`,
+    `Setor: ${setorProvavel}`,
+    `RA: ${dadosAcademicos.ra} — ${dadosAcademicos.curso} / ${dadosAcademicos.turno} / ${dadosAcademicos.semestre}`,
+  ].join(" | ");
+
+  // Usa o campo de texto livre mais relevante que o aluno preencheu
   const textoLivre = [
     camposEspecificos.justificativa,
     camposEspecificos.descricao,
@@ -185,6 +192,7 @@ function buildDescricao(params: {
     camposEspecificos.mensagemErro,
     camposEspecificos.tentativaRealizada,
   ].find((v) => v?.trim());
+
   return textoLivre ? `${header}\n\n${textoLivre.trim()}` : header;
 }
 
