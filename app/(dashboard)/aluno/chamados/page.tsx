@@ -2,74 +2,50 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import {
-  Search,
-  AlertTriangle,
-  Paperclip,
-  Plus,
-  Loader2,
-  MessageSquareText,
-} from "lucide-react";
+import { Search, AlertTriangle, Paperclip, Plus, MessageSquareText, Ticket } from "lucide-react";
 import { toast } from "sonner";
 import MobileSidebarTriggerAluno from "../_components/MobileSidebarTriggerAluno";
 import { apiFetch } from "../../../../utils/api";
-import { cx } from '../../../../utils/cx'
+import { cx } from "../../../../utils/cx";
 import TicketStatusBadge from "../../../components/shared/TicketStatusBadge";
+import PageHeader from "../../../components/ui/PageHeader";
+import Button from "../../../components/ui/Button";
+import EmptyState from "../../../components/ui/EmptyState";
+import Alert from "../../../components/ui/Alert";
+import { SkeletonTable } from "../../../components/ui/Skeleton";
 import type { Chamado, PageResponse, Status } from "../../../../utils/types";
 
 type PageResp = PageResponse<Chamado>;
 
-
 function AcoesChamado({ c }: { c: Chamado }) {
-  const base =
-    "inline-flex items-center h-9 px-3 rounded-md border border-[var(--border)] bg-background hover:bg-[var(--muted)] text-sm transition";
-
   return (
-    <div className="flex gap-2 justify-end">
-      {/* Link sempre visível: permite consultar a solicitação acadêmica mesmo encerrada */}
-      <Link
-        href={`/aluno/chamados/${c.id}`}
-        className={cx(base, "text-[var(--brand-teal)] border-[var(--brand-teal)]/40")}
-      >
-        Ver detalhes
+    <div className="flex gap-2 justify-end flex-wrap">
+      <Link href={`/aluno/chamados/${c.id}`}>
+        <Button variant="outline" size="sm">Ver detalhes</Button>
       </Link>
-
-      {/* Se ainda pode responder */}
       {["ABERTO", "EM_ATENDIMENTO", "AGUARDANDO_USUARIO"].includes(c.status) && (
-        <Link
-          href={`/aluno/chamados/${c.id}#responder`}
-          className={cx(base, "text-[var(--brand-teal)] border-[var(--brand-teal)]/40")}
-        >
-          Responder
+        <Link href={`/aluno/chamados/${c.id}#responder`}>
+          <Button variant="outline" size="sm">Responder</Button>
         </Link>
       )}
-
-      {/* Se precisa enviar arquivo */}
       {c.precisaAcaoDoAluno && (
-        <Link
-          href={`/aluno/chamados/${c.id}#anexos`}
-          className={cx(
-            base,
-            "border-[var(--warning)]/40 text-[var(--warning)] hover:bg-[var(--warning)]/10"
-          )}
-        >
-          <Paperclip className="size-4 mr-1" /> Enviar arquivo
+        <Link href={`/aluno/chamados/${c.id}#anexos`}>
+          <Button variant="outline" size="sm" icon={<Paperclip className="size-3.5" />}
+            className="border-[var(--warning)]/40 text-[var(--warning)] hover:bg-[var(--warning)]/10">
+            Enviar arquivo
+          </Button>
         </Link>
       )}
     </div>
   );
 }
 
-
-/* ---------- Página ---------- */
 export default function MeusChamadosPage() {
   const [dados, setDados] = useState<Chamado[]>([]);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<Status | "ALL">("ALL");
   const [loading, setLoading] = useState(true);
 
-  // Busca tickets do usuário autenticado.
-  // O backend já usa o JWT para filtrar (não precisamos mandar feitoPorId).
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -80,29 +56,24 @@ export default function MeusChamadosPage() {
         );
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          throw new Error(err?.error || `Erro HTTP ${res.status}`);
+          throw new Error((err as { error?: string })?.error ?? `Erro HTTP ${res.status}`);
         }
         const data: PageResp = await res.json();
         if (alive) setDados(data.items ?? []);
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : undefined;
-        toast.error("Erro ao carregar solicitações acadêmicas", { description: message });
+        toast.error("Erro ao carregar solicitações", { description: message });
       } finally {
         if (alive) setLoading(false);
       }
     })();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, []);
 
   const filtrados = useMemo(() => {
     const termo = q.trim().toLowerCase();
     return dados.filter((c) => {
-      const qOk =
-        !termo ||
-        c.titulo.toLowerCase().includes(termo) ||
-        (c.protocolo ?? "").toLowerCase().includes(termo);
+      const qOk = !termo || c.titulo.toLowerCase().includes(termo) || (c.protocolo ?? "").toLowerCase().includes(termo);
       const sOk = status === "ALL" || c.status === status;
       return qOk && sOk;
     });
@@ -115,167 +86,164 @@ export default function MeusChamadosPage() {
 
   return (
     <>
-      {/* Topbar mínima (sem saudação; cabeçalho global está no layout) */}
       <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="font-grotesk text-2xl font-semibold tracking-tight">Minhas solicitações acadêmicas</h1>
-          <p className="text-muted-foreground">Acompanhe suas solicitações acadêmicas junto à Fatec.</p>
-        </div>
         <MobileSidebarTriggerAluno />
       </div>
 
-      {/* Banner aguardando ação (se houver) */}
-      {aguardandoCount > 0 && (
-        <div className="mb-4 rounded-xl border border-[var(--warning)]/40 bg-[var(--warning)]/10 p-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="size-5 text-[var(--warning)] mt-0.5" />
+      <div className="space-y-5">
+        <PageHeader
+          title="Minhas solicitações"
+          description="Acompanhe o andamento das suas solicitações acadêmicas."
+          actions={
+            <Link href="/aluno/catalogo">
+              <Button icon={<Plus className="size-4" />}>Abrir solicitação</Button>
+            </Link>
+          }
+        />
+
+        {/* Banner aguardando ação */}
+        {aguardandoCount > 0 && (
+          <Alert variant="warning">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
-                <div className="font-medium">Você tem {aguardandoCount} solicitação(ões) acadêmica(s) aguardando sua ação.</div>
-                <div className="text-sm text-muted-foreground">
+                <p className="font-medium">
+                  {aguardandoCount} solicitação(ões) aguardando sua ação
+                </p>
+                <p className="text-sm opacity-80 mt-0.5">
                   Envie documentos, responda mensagens ou conclua a tarefa.
-                </div>
+                </p>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-[var(--warning)]/40 text-[var(--warning)] hover:bg-[var(--warning)]/10 shrink-0"
+                onClick={() => setStatus("AGUARDANDO_USUARIO")}
+              >
+                Filtrar
+              </Button>
             </div>
-            <button
-              type="button"
-              className="inline-flex items-center h-9 px-3 rounded-md border border-[var(--warning)]/40 text-[var(--warning)] hover:bg-[var(--warning)]/10"
-              onClick={() => setStatus("AGUARDANDO_USUARIO")}
-            >
-              Filtrar solicitações aguardando você
-            </button>
-          </div>
-        </div>
-      )}
+          </Alert>
+        )}
 
-      {/* Ações + Filtros */}
-      <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex gap-2">
-          <Link
-            href="/aluno/catalogo"
-            className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground hover:opacity-90"
-          >
-            <Plus className="size-4" /> Abrir solicitação acadêmica
-          </Link>
-        </div>
-
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <div className="relative sm:w-[320px]">
-            <Search className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+        {/* Filtros */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative flex-1 min-w-0 sm:max-w-xs">
+            <Search className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
-              placeholder="Buscar por protocolo ou título"
-              aria-label="Buscar por protocolo ou título"
-              className="w-full h-10 rounded-lg border border-[var(--border)] bg-input px-9 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+              placeholder="Buscar por protocolo ou título…"
+              aria-label="Buscar solicitações"
+              className="w-full h-9 rounded-lg border border-[var(--border)] bg-input pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
           </div>
-
           <select
-            className="h-10 w-full sm:w-[200px] px-3 rounded-lg border border-[var(--border)] bg-background focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+            className="h-9 rounded-lg border border-[var(--border)] bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)] sm:w-56"
             value={status}
             onChange={(e) => setStatus(e.target.value as Status | "ALL")}
           >
             <option value="ALL">Todos os status</option>
-            <option value="ABERTO">Solicitação recebida pela Fatec.</option>
-            <option value="EM_ATENDIMENTO">Em análise pelo setor responsável.</option>
-            <option value="AGUARDANDO_USUARIO">Aguardando documento ou resposta do aluno.</option>
-            <option value="RESOLVIDO">Solicitação respondida.</option>
-            <option value="ENCERRADO">Atendimento finalizado.</option>
+            <option value="ABERTO">Recebida pela Fatec</option>
+            <option value="EM_ATENDIMENTO">Em análise</option>
+            <option value="AGUARDANDO_USUARIO">Aguardando minha ação</option>
+            <option value="RESOLVIDO">Respondida</option>
+            <option value="ENCERRADO">Encerrada</option>
           </select>
         </div>
-      </div>
 
-      {/* Lista */}
-      <div className="rounded-xl border border-[var(--border)] bg-card overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center text-muted-foreground">
-            <Loader2 className="size-4 animate-spin inline-block mr-2" />
-            Carregando...
-          </div>
-        ) : filtrados.length === 0 ? (
-          <div className="p-8 text-center text-muted-foreground">
-            Nenhuma solicitação acadêmica encontrada com os filtros atuais.
-          </div>
-        ) : (
-          <>
-            {/* Desktop */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="bg-[var(--muted)] text-foreground/90">
-                  <tr>
-                    <th className="text-left font-medium px-4 py-3">Protocolo</th>
-                    <th className="text-left font-medium px-4 py-3">Título</th>
-                    <th className="text-left font-medium px-4 py-3">Setor</th>
-                    <th className="text-left font-medium px-4 py-3">Status</th>
-                    <th className="text-left font-medium px-4 py-3">Criado em</th>
-                    <th className="text-right font-medium px-4 py-3">Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtrados.map((c) => (
-                    <tr key={c.id} className="border-t border-[var(--border)]">
-                      <td className="px-4 py-3 font-medium">{c.protocolo ?? `#${c.id}`}</td>
-                      <td className="px-4 py-3 max-w-[420px]">
-                        <div className="line-clamp-1">{c.titulo}</div>
-                        {!!c.mensagensNaoLidas && (
-                          <span className="ml-2 align-middle text-xs rounded-md px-1.5 py-0.5 bg-[var(--brand-cyan)]/15 text-[var(--brand-cyan)] border border-[var(--brand-cyan)]/30">
-                            {c.mensagensNaoLidas} nova(s)
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">{c.setor?.nome ?? "—"}</td>
-                      <td className="px-4 py-3">
-                        <TicketStatusBadge status={c.status} />
-                      </td>
-                      <td className="px-4 py-3">
-                        {new Date(c.criadoEm).toLocaleDateString("pt-BR")}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <AcoesChamado c={c} />
-                      </td>
+        {/* Lista */}
+        <div className="rounded-xl border border-[var(--border)] bg-card overflow-hidden">
+          {loading ? (
+            <SkeletonTable rows={5} cols={5} />
+          ) : filtrados.length === 0 ? (
+            <EmptyState
+              icon={<Ticket className="size-6" />}
+              title={dados.length === 0 ? "Nenhuma solicitação ainda" : "Nenhum resultado"}
+              description={
+                dados.length === 0
+                  ? "Abra sua primeira solicitação pelo catálogo de serviços."
+                  : "Tente ajustar os filtros de busca."
+              }
+              action={
+                dados.length === 0 ? (
+                  <Link href="/aluno/catalogo">
+                    <Button size="sm" icon={<Plus className="size-4" />}>Abrir solicitação</Button>
+                  </Link>
+                ) : (
+                  <Button variant="secondary" size="sm" onClick={() => { setQ(""); setStatus("ALL"); }}>
+                    Limpar filtros
+                  </Button>
+                )
+              }
+            />
+          ) : (
+            <>
+              {/* Desktop */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-[var(--muted)]/60 border-b border-[var(--border)]">
+                    <tr>
+                      {["Protocolo", "Título", "Setor", "Status", "Criado em", "Ações"].map((h, i) => (
+                        <th key={h} className={cx("text-xs font-medium text-muted-foreground px-4 py-2.5", i === 5 ? "text-right" : "text-left")}>
+                          {h}
+                        </th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border)]">
+                    {filtrados.map((c) => (
+                      <tr key={c.id} className="hover:bg-[var(--muted)]/20 transition">
+                        <td className="px-4 py-3 text-xs font-medium text-muted-foreground">
+                          {c.protocolo ?? `#${c.id.slice(0, 8)}`}
+                        </td>
+                        <td className="px-4 py-3 max-w-[340px]">
+                          <span className="line-clamp-1 font-medium">{c.titulo}</span>
+                          {!!c.mensagensNaoLidas && (
+                            <span className="ml-2 align-middle text-[10px] rounded-md px-1.5 py-0.5 bg-[var(--brand-cyan)]/15 text-[var(--brand-cyan)] border border-[var(--brand-cyan)]/30">
+                              {c.mensagensNaoLidas} nova(s)
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">{c.setor?.nome ?? "—"}</td>
+                        <td className="px-4 py-3"><TicketStatusBadge status={c.status} /></td>
+                        <td className="px-4 py-3 text-muted-foreground">{new Date(c.criadoEm).toLocaleDateString("pt-BR")}</td>
+                        <td className="px-4 py-3"><AcoesChamado c={c} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
-            {/* Mobile */}
-            <div className="md:hidden divide-y divide-[var(--border)]">
-              {filtrados.map((c) => (
-                <div key={c.id} className="p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-xs text-muted-foreground">
-                        {c.protocolo ?? `#${c.id}`}
+              {/* Mobile */}
+              <div className="md:hidden divide-y divide-[var(--border)]">
+                {filtrados.map((c) => (
+                  <div key={c.id} className="p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-[11px] text-muted-foreground">{c.protocolo ?? `#${c.id.slice(0, 8)}`}</p>
+                        <p className="font-medium truncate">{c.titulo}</p>
                       </div>
-                      <div className="font-medium">{c.titulo}</div>
+                      <TicketStatusBadge status={c.status} />
                     </div>
-                    <TicketStatusBadge status={c.status} />
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                    <div className="text-muted-foreground">Setor</div>
-                    <div>{c.setor?.nome ?? "—"}</div>
-                    <div className="text-muted-foreground">Criado em</div>
-                    <div>{new Date(c.criadoEm).toLocaleDateString("pt-BR")}</div>
-                  </div>
-
-                  {!!c.mensagensNaoLidas && (
-                    <div className="mt-2 inline-flex items-center gap-1.5 text-xs rounded-md px-1.5 py-0.5 bg-[var(--brand-cyan)]/15 text-[var(--brand-cyan)] border border-[var(--brand-cyan)]/30">
-                      <MessageSquareText className="size-3.5" />
-                      {c.mensagensNaoLidas} nova(s) mensagem(ns)
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                      <span className="text-muted-foreground">Setor</span>
+                      <span>{c.setor?.nome ?? "—"}</span>
+                      <span className="text-muted-foreground">Criado em</span>
+                      <span>{new Date(c.criadoEm).toLocaleDateString("pt-BR")}</span>
                     </div>
-                  )}
-
-                  <div className="mt-3">
+                    {!!c.mensagensNaoLidas && (
+                      <div className="inline-flex items-center gap-1.5 text-[11px] rounded-md px-1.5 py-0.5 bg-[var(--brand-cyan)]/15 text-[var(--brand-cyan)] border border-[var(--brand-cyan)]/30">
+                        <MessageSquareText className="size-3" />
+                        {c.mensagensNaoLidas} nova(s) mensagem(ns)
+                      </div>
+                    )}
                     <AcoesChamado c={c} />
                   </div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </>
   );

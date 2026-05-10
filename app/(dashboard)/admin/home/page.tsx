@@ -2,19 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  Filter,
-  Search,
-  ChevronRight,
-  Ticket,
-  User,
-  FileChartColumn,
-} from "lucide-react";
+import { Search, ChevronRight, Ticket, User, FileChartColumn } from "lucide-react";
 import MobileSidebarTriggerAdmin from "../_components/MobileSidebarTriggerAdmin";
 import { apiFetch } from "../../../../utils/api";
-
 import TicketStatusBadge from "../../../components/shared/TicketStatusBadge";
 import PriorityDot from "../../../components/shared/PriorityDot";
+import Alert from "../../../components/ui/Alert";
+import EmptyState from "../../../components/ui/EmptyState";
+import { SkeletonTable } from "../../../components/ui/Skeleton";
 
 /* ----------------------------- Tipos ----------------------------- */
 type Status =
@@ -96,8 +91,8 @@ export default function AdminHomePage() {
         pageSize: Number(data?.pageSize ?? 50),
         items: Array.isArray(data?.items) ? data.items : [],
       });
-    } catch (e: any) {
-      setError(e?.message || "Falha ao carregar chamados");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Falha ao carregar chamados");
     } finally {
       setLoading(false);
     }
@@ -155,145 +150,108 @@ export default function AdminHomePage() {
       </section>
 
       {/* Filtros */}
-      <section className="rounded-xl border border-[var(--border)] bg-card mb-6">
-        <div className="p-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="relative flex-1">
-            <Search className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              placeholder="Buscar por protocolo, título ou solicitante"
-              className="w-full h-10 rounded-lg border border-[var(--border)] bg-input px-9 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-            />
-          </div>
-
-          <div className="flex gap-2 w-full sm:w-auto">
-            <div className="relative">
-              <Filter className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <select
-                className="h-10 w-[220px] pl-9 pr-8 rounded-lg border border-[var(--border)] bg-background focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-                value={status}
-                onChange={(e) => setStatus(e.target.value as any)}
-              >
-                <option value="ALL">Todos os status</option>
-                <option value="ABERTO">Aberto</option>
-                <option value="EM_ATENDIMENTO">Em atendimento</option>
-                <option value="AGUARDANDO_USUARIO">Aguardando usuário</option>
-                <option value="RESOLVIDO">Resolvido</option>
-                <option value="ENCERRADO">Encerrado</option>
-              </select>
-            </div>
-
-            <select
-              className="h-10 w-[200px] px-3 rounded-lg border border-[var(--border)] bg-background focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-              value={prioridade}
-              onChange={(e) => setPrioridade(e.target.value as any)}
-            >
-              <option value="ALL">Todas as prioridades</option>
-              <option value="BAIXA">Baixa</option>
-              <option value="MEDIA">Média</option>
-              <option value="ALTA">Alta</option>
-              <option value="URGENTE">Urgente</option>
-            </select>
-          </div>
+      <section className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            placeholder="Buscar por protocolo, título ou solicitante…"
+            aria-label="Buscar chamados"
+            className="w-full h-9 rounded-lg border border-[var(--border)] bg-input pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+        </div>
+        <div className="flex gap-2">
+          <select
+            className="h-9 rounded-lg border border-[var(--border)] bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)] sm:w-48"
+            value={status}
+            onChange={(e) => setStatus(e.target.value as Status | "ALL")}
+          >
+            <option value="ALL">Todos os status</option>
+            <option value="ABERTO">Aberto</option>
+            <option value="EM_ATENDIMENTO">Em atendimento</option>
+            <option value="AGUARDANDO_USUARIO">Aguardando usuário</option>
+            <option value="RESOLVIDO">Resolvido</option>
+            <option value="ENCERRADO">Encerrado</option>
+          </select>
+          <select
+            className="h-9 rounded-lg border border-[var(--border)] bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)] sm:w-44"
+            value={prioridade}
+            onChange={(e) => setPrioridade(e.target.value as Prioridade | "ALL")}
+          >
+            <option value="ALL">Todas as prioridades</option>
+            <option value="BAIXA">Baixa</option>
+            <option value="MEDIA">Média</option>
+            <option value="ALTA">Alta</option>
+            <option value="URGENTE">Urgente</option>
+          </select>
         </div>
       </section>
 
       {/* Tabela */}
       <section className="rounded-xl border border-[var(--border)] bg-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-[var(--muted)] text-foreground/90">
-              <tr>
-                <th className="text-left font-medium px-4 py-3">Protocolo</th>
-                <th className="text-left font-medium px-4 py-3">Título</th>
-                <th className="text-left font-medium px-4 py-3 hidden md:table-cell">
-                  Solicitante
-                </th>
-                <th className="text-left font-medium px-4 py-3 hidden xl:table-cell">
-                  Setor
-                </th>
-                <th className="text-left font-medium px-4 py-3">Status</th>
-                <th className="text-left font-medium px-4 py-3">Prioridade</th>
-                <th className="text-left font-medium px-4 py-3 hidden lg:table-cell">
-                  Criado em
-                </th>
-                <th className="text-right font-medium px-4 py-3">Ação</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
+        {loading ? (
+          <SkeletonTable rows={6} cols={6} />
+        ) : error ? (
+          <div className="p-4">
+            <Alert variant="error" title="Erro ao carregar chamados">{error}</Alert>
+          </div>
+        ) : items.length === 0 ? (
+          <EmptyState
+            icon={<Ticket className="size-6" />}
+            title="Nenhum chamado encontrado"
+            description="Tente ajustar os filtros de busca."
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-[var(--muted)]/60 border-b border-[var(--border)]">
                 <tr>
-                  <td
-                    colSpan={8}
-                    className="px-4 py-10 text-center text-muted-foreground"
-                  >
-                    Carregando…
-                  </td>
+                  <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5">Protocolo</th>
+                  <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5">Título</th>
+                  <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5 hidden md:table-cell">Solicitante</th>
+                  <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5 hidden xl:table-cell">Setor</th>
+                  <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5">Status</th>
+                  <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5">Prioridade</th>
+                  <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5 hidden lg:table-cell">Criado em</th>
+                  <th className="text-right text-xs font-medium text-muted-foreground px-4 py-2.5">Ação</th>
                 </tr>
-              ) : error ? (
-                <tr>
-                  <td
-                    colSpan={8}
-                    className="px-4 py-10 text-center text-destructive"
-                  >
-                    Falha ao carregar: {error}
-                  </td>
-                </tr>
-              ) : items.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={8}
-                    className="px-4 py-10 text-center text-muted-foreground"
-                  >
-                    Nenhum chamado encontrado com os filtros atuais.
-                  </td>
-                </tr>
-              ) : (
-                items.map((c) => (
-                  <tr key={c.id} className="border-t border-[var(--border)]">
-                    <td className="px-4 py-3 font-medium">
-                      {c.protocolo ?? `#${c.id}`}
+              </thead>
+              <tbody className="divide-y divide-[var(--border)]">
+                {items.map((c) => (
+                  <tr key={c.id} className="hover:bg-[var(--muted)]/20 transition">
+                    <td className="px-4 py-3 text-xs font-medium text-muted-foreground">
+                      {c.protocolo ?? `#${c.id.slice(0, 8)}`}
                     </td>
                     <td className="px-4 py-3 max-w-[360px]">
-                      <div className="line-clamp-1">{c.titulo}</div>
+                      <div className="line-clamp-1 font-medium">{c.titulo}</div>
                     </td>
-                    <td className="px-4 py-3 hidden md:table-cell">
-                      {c.criadoPor?.nome ?? "—"}
-                    </td>
-                    <td className="px-4 py-3 hidden xl:table-cell">
-                      {c.setor?.nome ?? "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <TicketStatusBadge status={c.status} />
-                    </td>
+                    <td className="px-4 py-3 hidden md:table-cell text-muted-foreground">{c.criadoPor?.nome ?? "—"}</td>
+                    <td className="px-4 py-3 hidden xl:table-cell text-muted-foreground">{c.setor?.nome ?? "—"}</td>
+                    <td className="px-4 py-3"><TicketStatusBadge status={c.status} /></td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className="inline-flex items-center gap-2">
                         <PriorityDot prioridade={c.prioridade} />
-                        <span>{c.prioridade}</span>
+                        <span className="text-muted-foreground capitalize">{c.prioridade.toLowerCase()}</span>
                       </span>
                     </td>
-                    <td className="px-4 py-3 hidden lg:table-cell">
-                      {new Date(c.criadoEm).toLocaleDateString("pt-BR", {
-                        day: "2-digit",
-                        month: "2-digit",
-                        year: "numeric",
-                      })}
+                    <td className="px-4 py-3 hidden lg:table-cell text-muted-foreground">
+                      {new Date(c.criadoEm).toLocaleDateString("pt-BR")}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Link
                         href={`/admin/chamados/${c.id}`}
-                        className="inline-flex items-center h-9 px-3 rounded-md hover:bg-[var(--muted)]"
+                        className="inline-flex items-center gap-1 h-8 px-3 rounded-lg border border-[var(--border)] hover:bg-[var(--muted)] text-sm transition"
                       >
-                        Detalhes <ChevronRight className="size-4 ml-1" />
+                        Detalhes <ChevronRight className="size-3.5" />
                       </Link>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
     </div>
   );

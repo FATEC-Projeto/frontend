@@ -2,7 +2,16 @@
 
 import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Mail, Hash, Lock, ArrowRight, Eye, EyeOff, Info } from "lucide-react";
+import {
+  Mail,
+  Hash,
+  Lock,
+  ArrowRight,
+  Eye,
+  EyeOff,
+  Info,
+  Loader2,
+} from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import type { Papel } from "../../../utils/types";
@@ -66,19 +75,19 @@ export default function LoginContent() {
     if (!t.includes("@") && /^[A-Za-z0-9._/-]+$/.test(t)) setMode("ra");
   }
 
-  function storeAuthTokens(data: any) {
+  function storeAuthTokens(data: Record<string, unknown>) {
     if (!data?.accessToken) return;
     const isProd = process.env.NODE_ENV === "production";
     const secure = isProd ? "; Secure" : "";
     document.cookie = `accessToken=${data.accessToken}; Path=/; Max-Age=${15 * 60}; SameSite=Lax${secure}`;
-    localStorage.setItem("accessToken", data.accessToken);
+    localStorage.setItem("accessToken", String(data.accessToken));
     if (data.refreshToken) {
       document.cookie = `refreshToken=${data.refreshToken}; Path=/; Max-Age=${7 * 24 * 60 * 60}; SameSite=Lax${secure}`;
-      localStorage.setItem("refreshToken", data.refreshToken);
+      localStorage.setItem("refreshToken", String(data.refreshToken));
     }
   }
 
-  function handleFirstAccess(data: any) {
+  function handleFirstAccess(data: Record<string, unknown>) {
     const token = data?.token;
     toast.message("Primeiro acesso", {
       description: "Você precisa criar uma nova senha antes de continuar.",
@@ -86,12 +95,13 @@ export default function LoginContent() {
     window.location.href = `/primeiro-acesso${token ? `?token=${token}` : ""}`;
   }
 
-  function handleSuccessfulLogin(data: any) {
+  function handleSuccessfulLogin(data: Record<string, unknown>) {
+    const user = data?.user as Usuario | undefined;
     toast.success("Login realizado com sucesso!", {
-      description: `Bem-vindo(a), ${data?.user?.nome ?? "usuário"} 👋`,
+      description: `Bem-vindo(a), ${user?.nome ?? "usuário"} 👋`,
     });
     storeAuthTokens(data);
-    window.location.href = safeRedirect(redirectParam, getRedirectPath(data?.user));
+    window.location.href = safeRedirect(redirectParam, getRedirectPath(user));
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -125,8 +135,8 @@ export default function LoginContent() {
       if (!res.ok) throw new Error((await res.text().catch(() => "")) || "Erro no servidor");
 
       handleSuccessfulLogin(await res.json());
-    } catch (e: any) {
-      const msg = e?.message ?? "Erro ao autenticar";
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Erro ao autenticar";
       setErr(msg);
       toast.error("Falha no login", { description: msg });
     } finally {
@@ -135,57 +145,73 @@ export default function LoginContent() {
   }
 
   return (
-    <div className="min-h-dvh bg-[radial-gradient(ellipse_at_top,_rgba(198,40,40,0.08),_transparent_55%)] flex flex-col items-center justify-center px-4">
-      <div className="mb-6 grid place-items-center select-none">
-        <div className="flex items-center gap-2">
-          <div className="size-8 rounded-lg bg-primary grid place-items-center text-primary-foreground text-xs font-bold">
-            WF
-          </div>
-          <span className="font-grotesk text-base font-semibold tracking-tight">
-            Workflow Fatec
-          </span>
+    <div className="min-h-dvh bg-[radial-gradient(ellipse_at_top,_rgba(178,0,0,0.07),_transparent_60%)] flex flex-col items-center justify-center px-4 py-10">
+
+      {/* Marca */}
+      <div className="mb-8 flex flex-col items-center gap-2 select-none">
+        <div className="size-12 rounded-2xl bg-primary grid place-items-center text-primary-foreground text-sm font-bold shadow-md ring-4 ring-primary/10">
+          WF
         </div>
-        <p className="text-muted-foreground text-sm mt-1">Acessar o portal</p>
+        <div className="text-center">
+          <p className="font-grotesk text-lg font-semibold tracking-tight">Workflow Fatec</p>
+          <p className="text-sm text-muted-foreground">Portal de atendimento acadêmico</p>
+        </div>
       </div>
 
-      <div className="w-full max-w-md rounded-2xl bg-card shadow-sm ring-1 ring-border">
-        <form onSubmit={onSubmit} className="p-5 sm:p-6">
-          <div className="mb-4 grid grid-cols-2 gap-1 rounded-lg bg-[var(--muted)]/60 p-1">
+      {/* Card do formulário */}
+      <div className="w-full max-w-sm rounded-2xl bg-card shadow-lg ring-1 ring-border">
+        <form onSubmit={onSubmit} className="p-6 space-y-5">
+
+          {/* Seletor de modo */}
+          <div className="grid grid-cols-2 gap-1 rounded-xl bg-[var(--muted)] p-1">
             <button
               type="button"
               onClick={() => setMode("email")}
-              className={`h-9 rounded-md text-sm font-medium transition ${
-                mode === "email" ? "bg-background ring-1 ring-border" : "opacity-70 hover:opacity-100"
-              }`}
+              className={[
+                "flex items-center justify-center gap-2 h-9 rounded-lg text-sm font-medium transition",
+                mode === "email"
+                  ? "bg-background shadow-sm ring-1 ring-border text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              ].join(" ")}
             >
-              Funcionário (Email)
+              <Mail className="size-3.5 shrink-0" />
+              Funcionário
             </button>
             <button
               type="button"
               onClick={() => setMode("ra")}
-              className={`h-9 rounded-md text-sm font-medium transition ${
-                mode === "ra" ? "bg-background ring-1 ring-border" : "opacity-70 hover:opacity-100"
-              }`}
+              className={[
+                "flex items-center justify-center gap-2 h-9 rounded-lg text-sm font-medium transition",
+                mode === "ra"
+                  ? "bg-background shadow-sm ring-1 ring-border text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              ].join(" ")}
             >
+              <Hash className="size-3.5 shrink-0" />
               Aluno (RA)
             </button>
           </div>
 
           <div className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
+            {/* Campo identificador */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
                 <label className="text-sm font-medium" htmlFor="identifier">
-                  {mode === "email" ? "Email institucional" : "RA do Aluno"}
+                  {mode === "email" ? "Email institucional" : "Registro de Aluno (RA)"}
                 </label>
-                <div className="relative group inline-flex items-center">
-                  <Info className="size-4 text-muted-foreground" aria-hidden />
-                  <div className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md bg-popover px-2 py-1 text-xs text-popover-foreground shadow ring-1 ring-border opacity-0 group-hover:opacity-100 transition">
-                    {mode === "email" ? "Use seu e-mail cadastrado" : "Seu RA sem espaços (3–32 caracteres)."}
+                {/* Tooltip de info */}
+                <div className="relative group inline-flex">
+                  <Info className="size-3.5 text-muted-foreground cursor-help" aria-hidden />
+                  <div className="pointer-events-none absolute bottom-full right-0 mb-2 z-20 w-52 rounded-lg bg-popover px-3 py-2 text-xs text-popover-foreground shadow-lg ring-1 ring-border opacity-0 group-hover:opacity-100 transition-opacity">
+                    {mode === "email"
+                      ? "Use o e-mail institucional cadastrado pela Fatec."
+                      : "Seu RA sem espaços — letras, números, ponto, underscore ou hífen."}
+                    <span className="absolute top-full right-3 border-4 border-transparent border-t-popover" />
                   </div>
                 </div>
               </div>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted-foreground">
                   {mode === "email" ? <Mail className="size-4" /> : <Hash className="size-4" />}
                 </span>
                 <input
@@ -193,31 +219,40 @@ export default function LoginContent() {
                   type={mode === "email" ? "email" : "text"}
                   inputMode={mode === "email" ? "email" : "text"}
                   autoComplete={mode === "email" ? "email" : "username"}
-                  placeholder={mode === "email" ? "nome.sobrenome@fatec.sp.gov.br" : "Ex.: 123456"}
-                  className="w-full pl-9 pr-3 h-11 rounded-lg bg-input ring-1 ring-border focus:outline-none focus:ring-2 focus:ring-ring text-base"
+                  placeholder={mode === "email" ? "nome.sobrenome@fatec.sp.gov.br" : "Ex.: 1234567"}
+                  className="w-full h-10 pl-9 pr-3 rounded-lg bg-input ring-1 ring-border focus:outline-none focus:ring-2 focus:ring-ring text-sm transition"
                   value={identifier}
                   onChange={(e) => handleIdentifierChange(e.target.value)}
                   required
                 />
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {mode === "email"
-                    ? "Informe o e-mail institucional cadastrado."
-                    : "Apenas letras, números, ponto (.), underscore (_) e hífen (-)."}
-                </p>
               </div>
+              <p className="text-[11px] text-muted-foreground">
+                {mode === "email"
+                  ? "Ex.: joao.silva@fatec.sp.gov.br"
+                  : "Apenas letras, números, ponto (.), underscore (_) e hífen (-)."}
+              </p>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium" htmlFor="password">Senha</label>
+            {/* Campo senha */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium" htmlFor="password">Senha</label>
+                <Link
+                  href="/esqueci-senha"
+                  className="text-[11px] text-muted-foreground underline-offset-4 hover:underline hover:text-foreground transition"
+                >
+                  Esqueci a senha
+                </Link>
+              </div>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted-foreground">
                   <Lock className="size-4" aria-hidden />
                 </span>
                 <input
                   id="password"
                   type={showPass ? "text" : "password"}
                   placeholder="••••••••"
-                  className="w-full pl-9 pr-10 h-11 rounded-lg bg-input ring-1 ring-border focus:outline-none focus:ring-2 focus:ring-ring text-base"
+                  className="w-full h-10 pl-9 pr-10 rounded-lg bg-input ring-1 ring-border focus:outline-none focus:ring-2 focus:ring-ring text-sm transition"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -225,41 +260,53 @@ export default function LoginContent() {
                 <button
                   type="button"
                   onClick={() => setShowPass((v) => !v)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-[var(--muted)]/60"
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground transition"
                   aria-label={showPass ? "Ocultar senha" : "Mostrar senha"}
                 >
                   {showPass ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 </button>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Mínimo de 8 caracteres.</span>
-                <Link href="/esqueci-senha" className="text-xs underline underline-offset-4 hover:opacity-80">
-                  Esqueci a senha
-                </Link>
-              </div>
+              <p className="text-[11px] text-muted-foreground">Mínimo de 8 caracteres.</p>
             </div>
 
+            {/* Erro inline */}
             {err && (
-              <div className="text-sm text-destructive-foreground bg-destructive/15 border border-destructive rounded-md px-3 py-2">
+              <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                <Info className="size-4 shrink-0 mt-0.5" aria-hidden />
                 {err}
               </div>
             )}
 
+            {/* Botão de submit */}
             <button
               type="submit"
               disabled={!isValid || loading}
-              className="group inline-flex w-full items-center justify-center gap-2 h-11 rounded-lg bg-primary text-primary-foreground font-medium shadow-sm hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60 disabled:cursor-not-allowed"
+              className="group inline-flex w-full items-center justify-center gap-2 h-10 rounded-lg bg-primary text-primary-foreground text-sm font-medium shadow-sm hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
-              {loading ? "Entrando..." : "Entrar"}
-              <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+              {loading ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Entrando…
+                </>
+              ) : (
+                <>
+                  Entrar
+                  <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+                </>
+              )}
             </button>
           </div>
         </form>
       </div>
 
-      <Link href="/" className="mt-6 text-sm text-muted-foreground hover:underline">
-        Voltar para a página inicial
-      </Link>
+      {/* Links rodapé */}
+      <div className="mt-6 flex items-center gap-4 text-xs text-muted-foreground">
+        <Link href="/" className="hover:text-foreground hover:underline transition">Página inicial</Link>
+        <span>·</span>
+        <Link href="/termos" className="hover:text-foreground hover:underline transition">Termos de uso</Link>
+        <span>·</span>
+        <Link href="/privacidade" className="hover:text-foreground hover:underline transition">Privacidade</Link>
+      </div>
     </div>
   );
 }
