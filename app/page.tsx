@@ -320,8 +320,8 @@ export default function Home() {
               <li><a href="mailto:workflow@fatec.sp.gov.br" className="hover:underline">workflow@fatec.sp.gov.br</a></li>
               <li className="text-muted-foreground">© 2025 Workflow Fatec. Projeto acadêmico DSM – FATEC Cotia.</li>
               <li className="flex gap-4">
-                <a href="#" className="text-sm hover:underline">Privacidade</a>
-                <a href="#" className="text-sm hover:underline">Termos de Uso</a>
+                <Link href="/privacidade" className="text-sm hover:underline">Privacidade</Link>
+                <Link href="/termos" className="text-sm hover:underline">Termos de Uso</Link>
               </li>
             </ul>
           </div>
