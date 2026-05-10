@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { apiFetch } from "../../../../utils/api";
 import {
@@ -11,9 +11,12 @@ import {
   Paperclip,
   Check,
   Info,
+  AlertCircle,
 } from "lucide-react";
 import MobileSidebarTriggerAluno from "../_components/MobileSidebarTriggerAluno";
-import { cx } from '../../../../utils/cx'
+import { cx } from '../../../../utils/cx';
+
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 /* ---------- Tipos ---------- */
 type Tipo =
@@ -44,7 +47,6 @@ type PageResp = {
   items: Notificacao[];
 };
 
-
 function TipoIcon({ tipo }: { tipo: Tipo }) {
   const cls = "size-4";
   switch (tipo) {
@@ -67,109 +69,102 @@ function TipoIcon({ tipo }: { tipo: Tipo }) {
 /* ---------- Página ---------- */
 export default function NotificacoesAlunoPage() {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [notifs, setNotifs] = useState<Notificacao[]>([]);
   const [marking, setMarking] = useState<string | null>(null);
-  const [unread, setUnread] = useState(0); // Contador de notificações não lidas
-  const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL;
+  const [markingAll, setMarkingAll] = useState(false);
 
-  // carregar notificações
+  const unread = notifs.filter((n) => !n.lidaEm).length;
+
   async function load() {
     setLoading(true);
+    setError(null);
     try {
-      const res = await apiFetch(`${apiBase}/notifications?orderDir=desc&page=1&pageSize=100`, {
-        cache: "no-store",
-      });
+      const res = await apiFetch(
+        `${API_BASE}/notifications?orderDir=desc&page=1&pageSize=100`,
+        { cache: "no-store" }
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as any).error ?? `Erro ${res.status}`);
+      }
       const data: PageResp = await res.json();
       setNotifs(data.items ?? []);
-      setUnread(data.items.filter((n) => !n.lidaEm).length); // Recalcular as notificações não lidas
-    } catch {
+    } catch (e: any) {
+      setError(e?.message ?? "Não foi possível carregar as notificações");
       setNotifs([]);
-      setUnread(0); // Caso não haja notificações, garantir que o contador seja zero
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => {
-    load();
-  }, [apiBase]);
+  useEffect(() => { load(); }, []);
 
-  // Marcar notificação como lida
   async function markAsRead(id: string) {
+    setMarking(id);
     try {
-      setMarking(id);
-      await apiFetch(`${apiBase}/notifications/${id}/lida`, {
-        method: "PATCH",
-        body: JSON.stringify({ lida: true }),
-      });
-      setNotifs((xs) => xs.map((n) => (n.id === id ? { ...n, lidaEm: new Date().toISOString() } : n)));
-      setUnread((prevUnread) => prevUnread - 1); // Decrementar o contador de notificações não lidas
+      await apiFetch(`${API_BASE}/notifications/${id}/lida`, { method: "PATCH" });
+      setNotifs((xs) =>
+        xs.map((n) => (n.id === id ? { ...n, lidaEm: new Date().toISOString() } : n))
+      );
     } finally {
       setMarking(null);
     }
   }
 
-  // Marcar todas as notificações como lidas
   async function markAllAsRead() {
+    setMarkingAll(true);
     try {
-      setLoading(true);
-      // Enviar corpo com JSON
-await apiFetch(`${apiBase}/notifications/read-all`, {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json", // Especificar o tipo do conteúdo
-  },
-  body: JSON.stringify({ lida: true }), // Enviar corpo com a chave lida
-});
-
-
-      // Atualizar todas as notificações no estado como lidas
-      setNotifs((prevNotifs) =>
-        prevNotifs.map((n) => ({ ...n, lidaEm: new Date().toISOString() }))
+      await apiFetch(`${API_BASE}/notifications/read-all`, { method: "POST" });
+      setNotifs((prev) =>
+        prev.map((n) => ({ ...n, lidaEm: n.lidaEm ?? new Date().toISOString() }))
       );
-
-      // Resetando o contador de notificações não lidas
-      setUnread(0);
-    } catch (error) {
-      console.error("Erro ao marcar todas as notificações como lidas", error);
     } finally {
-      setLoading(false);
+      setMarkingAll(false);
     }
   }
 
   return (
     <div className="space-y-6">
-      {/* Topbar compacta */}
       <div className="mb-2 flex items-center justify-between">
         <MobileSidebarTriggerAluno />
       </div>
 
-      {/* Botão de "Marcar todas como lidas" */}
-      <div className="mb-4">
-        <button
-          onClick={markAllAsRead}
-          className="bg-[#D91F2B] text-white px-4 py-2 rounded hover:bg-[#B11D22]" // Vermelho mais escuro
-
-
-        >
-          Marcar todas como lidas
-        </button>
-      </div>
-
-      {/* Lista */}
       <div className="rounded-xl border border-[var(--border)] bg-card p-4 sm:p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <Bell className="size-4 text-muted-foreground" />
-          <h2 className="text-base font-semibold">Novidades e alertas</h2>
+        <div className="flex items-center justify-between gap-2 mb-4">
+          <div className="flex items-center gap-2">
+            <Bell className="size-4 text-muted-foreground" />
+            <h2 className="text-base font-semibold">Novidades e alertas</h2>
+            {unread > 0 && (
+              <span className="rounded-md border border-[var(--border)] bg-background px-1.5 py-0.5 text-xs font-medium">
+                {unread} não lida{unread !== 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
+          {notifs.length > 0 && unread > 0 && (
+            <button
+              onClick={markAllAsRead}
+              disabled={markingAll}
+              className="inline-flex items-center gap-2 h-8 px-3 rounded-md border border-[var(--border)] hover:bg-[var(--muted)] text-sm"
+            >
+              {markingAll ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+              Marcar todas como lidas
+            </button>
+          )}
         </div>
 
         {loading ? (
-          <div className="flex items-center gap-2 text-muted-foreground text-sm">
+          <div className="flex items-center gap-2 text-muted-foreground text-sm py-8 justify-center">
             <Loader2 className="size-4 animate-spin" />
             Carregando notificações…
           </div>
+        ) : error ? (
+          <div className="flex items-center gap-2 text-sm text-destructive py-8 justify-center">
+            <AlertCircle className="size-4" />
+            {error}
+          </div>
         ) : notifs.length === 0 ? (
-          <div className="text-sm text-muted-foreground">
+          <div className="text-sm text-muted-foreground py-8 text-center">
             Nenhuma notificação no momento.
           </div>
         ) : (
@@ -179,7 +174,7 @@ await apiFetch(`${apiBase}/notifications/read-all`, {
                 key={n.id}
                 className={cx(
                   "p-3 sm:p-4 transition",
-                  !n.lidaEm ? "bg-[var(--brand-cyan)]/8" : "bg-card"
+                  !n.lidaEm ? "bg-[var(--brand-cyan)]/10" : ""
                 )}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -224,12 +219,15 @@ await apiFetch(`${apiBase}/notifications/read-all`, {
                     disabled={!!n.lidaEm || marking === n.id}
                     title="Marcar como lida"
                     className={cx(
-                      "shrink-0 inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border text-[#4B5563] text-xs", // Cor de texto mais forte
-                      n.lidaEm ? "opacity-50 cursor-default border-[#6B7280]" : "border-[#D91F2B] text-[#D91F2B] hover:bg-[#D91F2B]/10"
+                      "shrink-0 inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border text-xs transition",
+                      n.lidaEm
+                        ? "opacity-40 cursor-default border-[var(--border)] text-muted-foreground"
+                        : "border-[var(--border)] hover:bg-[var(--muted)] text-foreground"
                     )}
                   >
-
-                    {marking === n.id ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+                    {marking === n.id
+                      ? <Loader2 className="size-3.5 animate-spin" />
+                      : <Check className="size-3.5" />}
                     Lida
                   </button>
                 </div>
