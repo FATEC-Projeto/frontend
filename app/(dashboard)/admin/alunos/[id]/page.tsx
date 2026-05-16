@@ -460,7 +460,7 @@ export default function PageAlunoDetalhe() {
           aluno={aluno}
           onClose={() => setEditOpen(false)}
           onSaved={(updated) => {
-            setAluno((prev) => prev ? { ...prev, ...updated } : prev);
+            setAluno((prev : any) => prev ? { ...prev, ...updated } : prev);
             setEditOpen(false);
           }}
         />

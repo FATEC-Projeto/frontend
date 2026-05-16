@@ -9,7 +9,7 @@ type Consent = "accepted" | "essential" | null;
 const STORAGE_KEY = "cookie_consent";
 
 function injectClarity() {
-  if (typeof window === "undefined" || (window as Record<string, unknown>)["clarity"]) return;
+  if (typeof window === "undefined" || (window as unknown as Record<string, unknown>)["clarity"]) return;
   const script = document.createElement("script");
   script.async = true;
   script.src = "https://www.clarity.ms/tag/ueh2hk6os4";

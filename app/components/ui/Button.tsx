@@ -53,7 +53,7 @@ export default function Button({
       className={cx(
         "inline-flex items-center justify-center rounded-lg font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:cursor-not-allowed",
         variantCls[variant],
-        size !== "link" ? sizeCls[size] : "",
+        sizeCls[size],
         className,
       )}
       {...rest}

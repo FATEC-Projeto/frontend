@@ -5,10 +5,10 @@ function campo(
   label: string,
   tipo: FormularioCampo["tipo"],
   obrigatorio: boolean,
-  placeholder?: string,
+  ajuda?: string,
   opcoes?: string[],
 ): FormularioCampo {
-  return { id, label, tipo, obrigatorio, placeholder, opcoes };
+  return { id, label, tipo, obrigatorio, ajuda, opcoes };
 }
 
 export const SETOR_PROVAVEL: Record<string, string> = {
