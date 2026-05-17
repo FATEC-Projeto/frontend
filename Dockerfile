@@ -14,6 +14,11 @@ FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# NEXT_PUBLIC_* precisam estar disponíveis em BUILD TIME para serem
+# embutidas no bundle pelo Next.js. Passe via --build-arg no docker build.
+ARG NEXT_PUBLIC_API_BASE_URL
+ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
+
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm build
 
@@ -37,4 +42,6 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
+# Variáveis server-side (JWT_ACCESS_SECRET, JWT_ISSUER, etc.) são lidas
+# em runtime — basta passá-las no docker run -e ou no docker-compose.yml.
 CMD ["node", "server.js"]
