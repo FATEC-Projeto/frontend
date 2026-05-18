@@ -77,8 +77,10 @@ export default function LoginContent() {
 
   function storeAuthTokens(data: Record<string, unknown>) {
     if (!data?.accessToken) return;
-    const isProd = process.env.NODE_ENV === "production";
-    const secure = isProd ? "; Secure" : "";
+    // Usa o protocolo real da página — cookie Secure só funciona em HTTPS.
+    // NODE_ENV=production não garante HTTPS (ex: IP direto na AWS).
+    const isSecure = window.location.protocol === "https:";
+    const secure = isSecure ? "; Secure" : "";
     document.cookie = `accessToken=${data.accessToken}; Path=/; Max-Age=${15 * 60}; SameSite=Lax${secure}`;
     localStorage.setItem("accessToken", String(data.accessToken));
     if (data.refreshToken) {
