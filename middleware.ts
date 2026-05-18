@@ -8,14 +8,13 @@ const ADMIN_HOME = '/admin/home'
 const ALUNO_HOME = '/aluno/home'
 const LOGIN_PATH = '/login'
 
-const AUTH_PAGES = ['/login', '/primeiro-acesso', '/recuperar-senha']
+const AUTH_PAGES = ['/login', '/primeiro-acesso', '/esqueci-senha', '/reset-senha']
 const protectedPrefixes = ['/admin', '/aluno']
 
 async function getJwtPayload(token: string) {
   try {
     if (!process.env.JWT_ACCESS_SECRET) return null
     const secret = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET)
-    if (!process.env.JWT_ACCESS_SECRET) return null
     const { payload } = await jwtVerify(token, secret, {
       issuer: process.env.JWT_ISSUER || 'helpdesk',
       audience: process.env.JWT_AUDIENCE || 'helpdesk-app',
