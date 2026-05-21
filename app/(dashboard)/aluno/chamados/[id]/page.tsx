@@ -18,7 +18,7 @@ import type { Chamado, Status } from "../../../../../utils/types";
 
 /* ================= Constantes ================= */
 
-const API = process.env.NEXT_PUBLIC_API_BASE_URL;
+const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = new Set([
@@ -131,7 +131,7 @@ export default function ChamadoDetalhePage() {
 
   /* ===== Fetch Chamado ===== */
   const fetchChamado = useCallback(async () => {
-    if (!API || !id) return;
+    if (!API || !id) { setLoading(false); return; }
     setLoading(true);
     try {
       const res = await apiFetch(`${API}/tickets/${id}`);
@@ -148,7 +148,7 @@ export default function ChamadoDetalhePage() {
 
   /* ===== Fetch Mensagens ===== */
   const fetchMensagens = useCallback(async () => {
-    if (!API || !id) return;
+    if (!API || !id) { setMsgLoading(false); return; }
     setMsgLoading(true);
     try {
       const res = await apiFetch(
@@ -241,7 +241,7 @@ export default function ChamadoDetalhePage() {
 
   /* ===== Fetch Anexos ===== */
   const fetchAnexos = useCallback(async () => {
-    if (!API || !id) return;
+    if (!API || !id) { setLoadingAnexos(false); return; }
     setLoadingAnexos(true);
     try {
       const res = await apiFetch(`${API}/tickets/${id}/anexos`);
