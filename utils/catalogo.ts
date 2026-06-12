@@ -70,6 +70,42 @@ function servico(
   };
 }
 
+/**
+ * Merges a raw API catalog response (which lacks palavrasChave and formulario)
+ * with the enriched mock, using IDs to match categories and services.
+ * Falls back to empty arrays/FORMULARIO_FUTURO when no match is found.
+ */
+export function enriquecerCatalogo(apiData: CatalogResponse): CatalogResponse {
+  const mockCatById = new Map(
+    CATALOGO_INSTITUCIONAL.categorias.map((c) => [c.id, c]),
+  );
+
+  return {
+    categorias: apiData.categorias.map((cat) => {
+      const mockCat = mockCatById.get(cat.id);
+      const mockSvcById = new Map(
+        (mockCat?.servicos ?? []).map((s) => [s.id, s]),
+      );
+      return {
+        ...cat,
+        palavrasChave: cat.palavrasChave?.length
+          ? cat.palavrasChave
+          : (mockCat?.palavrasChave ?? []),
+        servicos: cat.servicos.map((svc) => {
+          const mockSvc = mockSvcById.get(svc.id);
+          return {
+            ...svc,
+            palavrasChave: (svc as any).palavrasChave?.length
+              ? (svc as any).palavrasChave
+              : (mockSvc?.palavrasChave ?? []),
+            formulario: (svc as any).formulario ?? mockSvc?.formulario ?? FORMULARIO_FUTURO,
+          };
+        }),
+      };
+    }),
+  };
+}
+
 export const CATALOGO_INSTITUCIONAL: CatalogResponse = {
   categorias: [
     {
