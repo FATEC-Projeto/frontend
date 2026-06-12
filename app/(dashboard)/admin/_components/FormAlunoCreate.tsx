@@ -118,7 +118,7 @@ export default function FormAlunoCreate({ onSuccess, onCancel }: Props) {
       };
 
       if (usarSenhaPersonalizada && senhaInicial.trim()) {
-        payload.senhaInicial = senhaInicial.trim();
+        payload.senha = senhaInicial.trim();
       }
 
       if (cursoNome.trim())           payload.cursoNome           = cursoNome.trim();
