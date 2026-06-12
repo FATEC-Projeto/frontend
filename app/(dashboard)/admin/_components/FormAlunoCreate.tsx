@@ -68,6 +68,7 @@ export default function FormAlunoCreate({ onSuccess, onCancel }: Props) {
 
   const [submitting, setSubmitting] = useState(false);
   const [successInfo, setSuccessInfo] = useState<SuccessInfo | null>(null);
+  const [lastCreated, setLastCreated] = useState<any>(null);
   const [copied, setCopied] = useState(false);
 
   function handleCourseChange(val: string) {
@@ -99,7 +100,7 @@ export default function FormAlunoCreate({ onSuccess, onCancel }: Props) {
     setUnidadeFatec(""); setTurno(""); setTurma("");
     setSemestreAtual(""); setAnoSemestreIngresso("");
     setUsarSenhaPersonalizada(false); setSenhaInicial(""); setMostrarSenha(false);
-    setSuccessInfo(null); setCopied(false);
+    setSuccessInfo(null); setLastCreated(null); setCopied(false);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -150,14 +151,13 @@ export default function FormAlunoCreate({ onSuccess, onCancel }: Props) {
 
       const created = await res.json();
 
+      setLastCreated(created);
       setSuccessInfo({
         nome: nome.trim() || created?.nome || "",
         ra: ra.trim(),
         email: emailEducacional,
         senhaUsada: usarSenhaPersonalizada && senhaInicial.trim() ? senhaInicial.trim() : null,
       });
-
-      onSuccess?.(created);
     } catch (err: any) {
       console.error(err);
       toast.error(err?.message ?? "Erro ao criar aluno");
@@ -226,10 +226,10 @@ export default function FormAlunoCreate({ onSuccess, onCancel }: Props) {
           >
             <RotateCcw className="size-3.5" /> Cadastrar outro
           </button>
-          {onCancel && (
+          {(onSuccess || onCancel) && (
             <button
               type="button"
-              onClick={onCancel}
+              onClick={() => onSuccess ? onSuccess(lastCreated) : onCancel?.()}
               className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm hover:brightness-95"
             >
               Concluído
