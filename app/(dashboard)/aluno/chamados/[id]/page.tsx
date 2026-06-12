@@ -11,9 +11,10 @@ import {
   Paperclip,
   Download,
   Upload,
+  GraduationCap,
 } from "lucide-react";
 import { toast } from "sonner";
-import { apiFetch } from "../../../../../utils/api";
+import { apiFetch, downloadAnexo, fetchAnexoImageUrl } from "../../../../../utils/api";
 import type { Chamado, Status } from "../../../../../utils/types";
 
 /* ================= Constantes ================= */
@@ -57,6 +58,39 @@ type AnexoInfo = {
   enviadoEm: string;
   enviadoPor?: { id: string; nome?: string | null } | null;
 };
+
+type DadosAcademicosUser = {
+  ra?: string | null;
+  unidadeFatec?: string | null;
+  curso?: string | null;
+  turno?: string | null;
+  turma?: string | null;
+  semestreAtual?: string | number | null;
+  situacaoAcademica?: string | null;
+  coordenadorCurso?: string | null;
+};
+
+/** Imagem de anexo com download autenticado */
+function AnexoImagem({ anexoId, alt }: { anexoId: string; alt: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let url: string | null = null;
+    fetchAnexoImageUrl(anexoId).then((u) => {
+      url = u;
+      if (u) setSrc(u);
+    });
+    return () => { if (url) URL.revokeObjectURL(url); };
+  }, [anexoId]);
+  if (!src) return null;
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className="w-full max-h-48 object-contain bg-[var(--muted)]"
+      loading="lazy"
+    />
+  );
+}
 
 type MensagemGroup = {
   autorId: string | null;
@@ -120,6 +154,7 @@ export default function ChamadoDetalhePage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [isDragging, setIsDragging] = useState(false);
+  const [dadosAcademicos, setDadosAcademicos] = useState<DadosAcademicosUser | null>(null);
 
   /* ===== Scroll ===== */
   function scrollToEnd(smooth = true) {
@@ -145,6 +180,17 @@ export default function ChamadoDetalhePage() {
   }, [id]);
 
   useEffect(() => { fetchChamado(); }, [fetchChamado]);
+
+  /* ===== Dados acadêmicos básicos do aluno ===== */
+  useEffect(() => {
+    if (!API) return;
+    apiFetch(`${API}/auth/me`, { cache: "no-store" })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data: DadosAcademicosUser | null) => {
+        if (data) setDadosAcademicos(data);
+      })
+      .catch(() => {});
+  }, []);
 
   /* ===== Fetch Mensagens ===== */
   const fetchMensagens = useCallback(async () => {
@@ -466,6 +512,35 @@ export default function ChamadoDetalhePage() {
         </div>
       </div>
 
+      {/* Dados acadêmicos básicos */}
+      {dadosAcademicos && (dadosAcademicos.ra || dadosAcademicos.curso) && (
+        <div className="rounded-lg border border-[var(--border)] bg-muted/30 px-4 py-3">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium mb-2">
+            <GraduationCap className="size-3.5" /> Seus dados acadêmicos
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-1 text-xs">
+            {dadosAcademicos.ra && (
+              <div><span className="text-muted-foreground">RA:</span>{" "}<span className="font-medium">{dadosAcademicos.ra}</span></div>
+            )}
+            {dadosAcademicos.unidadeFatec && (
+              <div><span className="text-muted-foreground">Unidade:</span>{" "}<span className="font-medium">{dadosAcademicos.unidadeFatec}</span></div>
+            )}
+            {dadosAcademicos.curso && (
+              <div><span className="text-muted-foreground">Curso:</span>{" "}<span className="font-medium">{dadosAcademicos.curso}</span></div>
+            )}
+            {dadosAcademicos.turno && (
+              <div><span className="text-muted-foreground">Turno:</span>{" "}<span className="font-medium">{dadosAcademicos.turno}</span></div>
+            )}
+            {dadosAcademicos.turma && (
+              <div><span className="text-muted-foreground">Turma:</span>{" "}<span className="font-medium">{dadosAcademicos.turma}</span></div>
+            )}
+            {dadosAcademicos.semestreAtual && (
+              <div><span className="text-muted-foreground">Semestre:</span>{" "}<span className="font-medium">{dadosAcademicos.semestreAtual}</span></div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Aviso solicitação respondida */}
       {chamado.status === "RESOLVIDO" && (
         <div className="rounded-lg border border-yellow-400/30 bg-yellow-100/20 text-yellow-700 dark:text-yellow-300 dark:bg-yellow-900/20 px-4 py-3 text-sm flex items-start gap-2">
@@ -638,12 +713,7 @@ export default function ChamadoDetalhePage() {
             {anexos.map((a) => (
               <li key={a.id} className="border rounded-md bg-background overflow-hidden">
                 {a.mimeType.startsWith("image/") && (
-                  <img
-                    src={`${API}/anexos/${a.id}/download`}
-                    alt={a.nomeArquivo}
-                    className="w-full max-h-48 object-contain bg-[var(--muted)]"
-                    loading="lazy"
-                  />
+                  <AnexoImagem anexoId={a.id} alt={a.nomeArquivo} />
                 )}
                 <div className="flex items-center justify-between gap-2 p-2 text-sm">
                   <div className="min-w-0">
@@ -654,15 +724,19 @@ export default function ChamadoDetalhePage() {
                       {a.enviadoPor?.nome ? ` · ${a.enviadoPor.nome}` : ""}
                     </span>
                   </div>
-                  <a
-                    href={`${API}/anexos/${a.id}/download`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    download
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await downloadAnexo(a.id, a.nomeArquivo);
+                      } catch {
+                        toast.error("Não foi possível baixar o arquivo.");
+                      }
+                    }}
                     className="inline-flex items-center gap-1 h-8 px-2 rounded-md border hover:bg-[var(--muted)] text-xs shrink-0"
                   >
                     <Download className="size-3.5" /> Baixar
-                  </a>
+                  </button>
                 </div>
               </li>
             ))}

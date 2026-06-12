@@ -6,9 +6,9 @@ import Link from "next/link";
 import {
   ArrowLeft, Loader2, Send, User, Building2, Tag, Clock,
   CheckCircle2, RotateCcw, Pencil, Save, MessageSquareText,
-  Paperclip, Download, Upload, Route,
+  Paperclip, Download, Upload, Route, GraduationCap,
 } from "lucide-react";
-import { apiFetch } from "../../../../../utils/api";
+import { apiFetch, downloadAnexo } from "../../../../../utils/api";
 import { toast } from "sonner";
 
 import { cx } from '../../../../../utils/cx'
@@ -21,6 +21,27 @@ type Status = "ABERTO" | "EM_ATENDIMENTO" | "AGUARDANDO_USUARIO" | "RESOLVIDO" |
 type Prioridade = "BAIXA" | "MEDIA" | "ALTA" | "URGENTE";
 
 type UsuarioMin = { id: string; nome?: string | null; emailPessoal?: string | null };
+
+type PerfilAcademico = {
+  id: string;
+  nome?: string | null;
+  ra?: string | null;
+  emailPessoal?: string | null;
+  emailEducacional?: string | null;
+  unidadeFatec?: string | null;
+  curso?: string | null;
+  eixoTecnologico?: string | null;
+  turno?: string | null;
+  turma?: string | null;
+  semestreAtual?: string | number | null;
+  matrizCurricular?: string | null;
+  situacaoAcademica?: string | null;
+  anoSemestreIngresso?: string | null;
+  coordenadorCurso?: string | null;
+  telefoneCelular?: string | null;
+  whatsapp?: string | null;
+  canalPreferencialContato?: string | null;
+};
 type SetorMin = { id: string; nome?: string | null };
 type ServicoMin = { id: string; nome?: string | null };
 type ClienteMin = { id: string; nome?: string | null };
@@ -122,6 +143,7 @@ export default function AdminChamadoPage() {
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [perfilAluno, setPerfilAluno] = useState<PerfilAcademico | null>(null);
 
   const include = useMemo(
     () =>
@@ -186,6 +208,15 @@ export default function AdminChamadoPage() {
   }, [id, include, fetchAnexos]);
 
   useEffect(() => { load(); }, [load]);
+
+  /* ===== Perfil acadêmico do aluno (banco de dados) ===== */
+  useEffect(() => {
+    if (!ticket?.criadoPorId || !API) return;
+    apiFetch(`${API}/usuarios/${ticket.criadoPorId}`, { cache: "no-store" })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data: PerfilAcademico | null) => { if (data) setPerfilAluno(data); })
+      .catch(() => {});
+  }, [ticket?.criadoPorId]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -558,11 +589,48 @@ export default function AdminChamadoPage() {
             </section>
           )}
 
-          {/* DADOS ACADÊIMICOS */}
+          {/* DADOS ACADÊMICOS DO BANCO DE DADOS */}
+          {perfilAluno && (
+            <section className="rounded-xl border border-[var(--border)] bg-card p-4">
+              <h2 className="text-base font-semibold mb-3 flex items-center gap-2">
+                <GraduationCap className="size-4 text-[var(--brand-red)]" /> Dados acadêmicos do aluno
+              </h2>
+              <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3 text-sm">
+                {[
+                  ["RA", perfilAluno.ra],
+                  ["Nome", perfilAluno.nome],
+                  ["E-mail pessoal", perfilAluno.emailPessoal],
+                  ["E-mail educacional", perfilAluno.emailEducacional],
+                  ["Unidade Fatec", perfilAluno.unidadeFatec],
+                  ["Curso", perfilAluno.curso],
+                  ["Eixo tecnológico", perfilAluno.eixoTecnologico],
+                  ["Turno", perfilAluno.turno],
+                  ["Turma", perfilAluno.turma],
+                  ["Semestre atual", perfilAluno.semestreAtual != null ? String(perfilAluno.semestreAtual) : null],
+                  ["Matriz curricular", perfilAluno.matrizCurricular],
+                  ["Situação acadêmica", perfilAluno.situacaoAcademica],
+                  ["Ano/semestre ingresso", perfilAluno.anoSemestreIngresso],
+                  ["Coordenador do curso", perfilAluno.coordenadorCurso],
+                  ["Telefone", perfilAluno.telefoneCelular],
+                  ["WhatsApp", perfilAluno.whatsapp],
+                  ["Canal preferencial", perfilAluno.canalPreferencialContato],
+                ]
+                  .filter(([, v]) => v)
+                  .map(([label, value]) => (
+                    <div key={label as string}>
+                      <dt className="text-xs text-muted-foreground mb-0.5">{label as string}</dt>
+                      <dd className="font-medium break-words">{value as string}</dd>
+                    </div>
+                  ))}
+              </dl>
+            </section>
+          )}
+
+          {/* DADOS ACADÊMICOS CAPTURADOS NO CHAMADO (wizard) */}
           {dadosAcademicosEntries.length > 0 && (
             <section className="rounded-xl border border-[var(--border)] bg-card p-4">
               <h2 className="text-base font-semibold mb-3 flex items-center gap-2">
-                <User className="size-4" /> Dados acadêmicos do aluno
+                <User className="size-4" /> Dados acadêmicos declarados no chamado
               </h2>
               <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3 text-sm">
                 {dadosAcademicosEntries.map(([key, value]) => (
@@ -603,16 +671,20 @@ export default function AdminChamadoPage() {
                         {new Date(a.enviadoEm).toLocaleDateString("pt-BR")} por {a.enviadoPor?.nome ?? "Usuário"}
                       </span>
                     </div>
-                    <a
-                      href={`${API}/anexos/${a.id}/download`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      download
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await downloadAnexo(a.id, a.nomeArquivo);
+                        } catch {
+                          toast.error("Não foi possível baixar o arquivo.");
+                        }
+                      }}
                       className="inline-flex items-center gap-1 h-8 px-2 rounded-md border hover:bg-[var(--muted)] text-xs shrink-0"
                       title="Baixar anexo"
                     >
                       <Download className="size-3.5" /> Baixar
-                    </a>
+                    </button>
                   </li>
                 ))}
               </ul>
