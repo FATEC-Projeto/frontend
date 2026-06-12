@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, Layers, BookOpen, Plus, Loader2, ArrowRight } from "lucide-react";
+import { Search, Layers, BookOpen, Plus, Loader2, ArrowRight, HelpCircle } from "lucide-react";
 import MobileSidebarTriggerAluno from "../_components/MobileSidebarTriggerAluno";
 import { CATALOGO_INSTITUCIONAL, type CatalogResponse, type ServicoCatalogo } from "../../../../utils/catalogo";
 import { cx } from "../../../../utils/cx";
@@ -202,6 +202,28 @@ export default function CatalogoAlunoPage() {
             {filtrados.map((s) => (
               <ServicoCard key={s.id} s={s} />
             ))}
+            {/* Card especial: Outros / não encontrou o serviço */}
+            {(catId === "ALL" && !q.trim()) && (
+              <div className="rounded-xl border border-dashed border-[var(--border)] bg-card/50 p-4 flex flex-col justify-between">
+                <div className="mb-4">
+                  <div className="flex items-start gap-2">
+                    <HelpCircle className="size-4 text-muted-foreground mt-0.5 shrink-0" />
+                    <h3 className="font-medium leading-tight">Não encontrei o que preciso</h3>
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Não encontrou o serviço acima? Descreva sua necessidade e vamos identificar a categoria certa — ou abriremos uma solicitação avulsa.
+                  </p>
+                </div>
+                <div className="flex items-center justify-end">
+                  <Link
+                    href="/aluno/catalogo/outros"
+                    className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-[var(--border)] bg-background hover:bg-[var(--muted)] text-sm transition"
+                  >
+                    <ArrowRight className="size-4" /> Identificar minha solicitação
+                  </Link>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -97,3 +97,36 @@ export async function apiFetch(input: RequestInfo, init: RequestInit = {}) {
   // 403 = permissão de recurso negada, não implica sessão inválida
   return res;
 }
+
+/**
+ * Faz download autenticado de um anexo.
+ * Cria um URL temporário a partir do blob e dispara o download no browser.
+ */
+export async function downloadAnexo(anexoId: string, fileName: string): Promise<void> {
+  const res = await apiFetch(`${API_BASE}/anexos/${anexoId}/download`);
+  if (!res.ok) throw new Error(`Erro ao baixar arquivo (${res.status})`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+/**
+ * Busca um anexo de imagem de forma autenticada e retorna um object URL para uso em <img>.
+ * Retorna null enquanto carrega. Chame URL.revokeObjectURL no cleanup.
+ */
+export async function fetchAnexoImageUrl(anexoId: string): Promise<string | null> {
+  try {
+    const res = await apiFetch(`${API_BASE}/anexos/${anexoId}/download`);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return URL.createObjectURL(blob);
+  } catch {
+    return null;
+  }
+}

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Bell, Loader2, Moon, Sun, User } from "lucide-react";
 import { apiFetch } from "../../../../utils/api";
+import { cx } from "../../../../utils/cx";
 
 type Props = {
   notificationsHref?: string;
@@ -128,11 +129,16 @@ export default function AlunoTopbar({
         {/* Notifications */}
         <Link
           href={notificationsHref}
-          className="relative inline-flex items-center justify-center h-9 w-9 rounded-lg border border-[var(--border)] bg-background hover:bg-[var(--muted)]"
+          className={cx(
+            "relative inline-flex items-center justify-center h-9 w-9 rounded-lg border bg-background hover:bg-[var(--muted)]",
+            !loadingUnread && unread && unread > 0
+              ? "border-red-400/70 dark:border-red-700/50"
+              : "border-[var(--border)]",
+          )}
           aria-label="Notificações"
-          title="Notificações"
+          title={unread && unread > 0 ? `${unread} notificação(ões) não lida(s)` : "Notificações"}
         >
-          <Bell className="size-4" />
+          <Bell className={cx("size-4", !loadingUnread && unread && unread > 0 ? "text-red-500 dark:text-red-400" : "")} />
           {loadingUnread ? (
             <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-primary-foreground text-[10px] grid place-items-center">
               <Loader2 className="size-3 animate-spin" />
