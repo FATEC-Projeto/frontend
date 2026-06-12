@@ -45,7 +45,6 @@ type AlunoRow = {
 
 /* ========= ENV ========= */
 const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
-const USERS_PATH = process.env.NEXT_PUBLIC_USERS_PATH ?? "/auth/usuarios";
 const ALUNO_DETAIL_PREFIX = "/admin/alunos/";
 
 function StatusBadge({ status }: { status: StatusAtivo }) {
@@ -96,24 +95,20 @@ export default function AdminAlunosPage() {
 
       const qs = new URLSearchParams();
       qs.set("papel", "USUARIO");
-      if (q) qs.set("search", q);
+      if (q) qs.set("q", q);
       if (status !== "ALL") qs.set("ativo", String(status === "ATIVO"));
       qs.set("page", String(page));
       qs.set("perPage", String(perPage));
 
-      let res = await fetch(`${API_URL}${USERS_PATH}?${qs}`, { headers, cache: "no-store" });
+      const res = await fetch(`${API_URL}/usuarios?${qs}`, { headers, cache: "no-store" });
       if (!res.ok) {
-        const fallback = USERS_PATH === "/usuarios" ? "/auth/usuarios" : "/usuarios";
-        const res2 = await fetch(`${API_URL}${fallback}?${qs}`, { headers, cache: "no-store" });
-        if (!res2.ok) {
-          const text = await res2.text().catch(() => "");
-          throw new Error(text || `Falha ao buscar alunos (${res2.status})`);
-        }
-        res = res2;
+        const text = await res.text().catch(() => "");
+        throw new Error(text || `Falha ao buscar alunos (${res.status})`);
       }
 
       const json = await res.json();
-      const usuarios: Usuario[] = Array.isArray(json) ? json : json.data ?? [];
+      // GET /usuarios retorna { items, page, perPage, total, pages }
+      const usuarios: Usuario[] = Array.isArray(json) ? json : (json.items ?? json.data ?? []);
       const alunosApenas = usuarios.filter((u) => (u.papel ?? "USUARIO") === "USUARIO");
 
       const mapped: AlunoRow[] = alunosApenas.map((u) => ({
