@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Search, Layers, BookOpen, Plus, Loader2, ArrowRight, HelpCircle } from "lucide-react";
 import MobileSidebarTriggerAluno from "../_components/MobileSidebarTriggerAluno";
-import { CATALOGO_INSTITUCIONAL, type CatalogResponse, type ServicoCatalogo } from "../../../../utils/catalogo";
+import { CATALOGO_INSTITUCIONAL, enriquecerCatalogo, type CatalogResponse, type ServicoCatalogo } from "../../../../utils/catalogo";
 import { cx } from "../../../../utils/cx";
 import { apiFetch } from "../../../../utils/api";
 
@@ -80,9 +80,9 @@ export default function CatalogoAlunoPage() {
         const res = await apiFetch(url, { cache: "no-store" });
         if (!res.ok) throw new Error("fallback");
         const data = (await res.json()) as CatalogResponse;
-        setCatalog({
+        setCatalog(enriquecerCatalogo({
           categorias: (data.categorias ?? []).map((c) => ({ ...c, servicos: c.servicos ?? [] })),
-        });
+        }));
       } catch {
         setCatalog(MOCK);
       } finally {

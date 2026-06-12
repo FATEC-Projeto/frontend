@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { apiFetch } from "../../../../../utils/api";
 import {
   CATALOGO_INSTITUCIONAL,
+  enriquecerCatalogo,
   type CatalogResponse,
   type ServicoCatalogo,
 } from "../../../../../utils/catalogo";
@@ -117,7 +118,7 @@ export default function OutrosPage() {
     apiFetch(`${API}/catalogo`, { cache: "no-store" })
       .then((r) => r.ok ? r.json() : null)
       .then((data: CatalogResponse | null) => {
-        if (data?.categorias) setCatalog(data);
+        if (data?.categorias) setCatalog(enriquecerCatalogo(data));
       })
       .catch(() => {});
 
