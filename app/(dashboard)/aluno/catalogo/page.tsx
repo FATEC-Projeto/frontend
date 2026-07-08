@@ -48,7 +48,7 @@ function ServicoCard({ s }: { s: Servico }) {
         <div className="text-xs text-muted-foreground">ID: {s.id}</div>
         {s.ativo ? (
           <Link
-            href={`/aluno/catalogo/${s.id}`}
+            href={s.id === "outros-solicitacao-geral" ? "/aluno/catalogo/outros" : `/aluno/catalogo/${s.id}`}
             className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm transition hover:opacity-90"
           >
             <ArrowRight className="size-4" /> Preencher solicitação
