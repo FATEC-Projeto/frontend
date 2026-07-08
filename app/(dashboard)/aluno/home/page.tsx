@@ -10,6 +10,7 @@ import KpiCard from "../../../components/shared/KpiCard";
 import { SkeletonKpi, SkeletonTable } from "../../../components/ui/Skeleton";
 import EmptyState from "../../../components/ui/EmptyState";
 import Button from "../../../components/ui/Button";
+import { apiFetch } from "../../../../utils/api";
 
 type Status = "ABERTO" | "EM_ATENDIMENTO" | "AGUARDANDO_USUARIO" | "RESOLVIDO" | "ENCERRADO";
 type Prioridade = "BAIXA" | "MEDIA" | "ALTA" | "URGENTE";
@@ -33,19 +34,15 @@ export default function AlunoHomePage() {
     async function fetchChamados() {
       try {
         setLoading(true);
-        const token = localStorage.getItem("accessToken");
-        if (!token) throw new Error("Token não encontrado");
 
-        const base = `${process.env.NEXT_PUBLIC_API_BASE_URL}/tickets?include=setor`;
+        const base = `${process.env.NEXT_PUBLIC_API_BASE_URL ?? ""}/tickets?include=setor`;
         const pageSize = 100;
         let page = 1;
         let total = 0;
         const all: Chamado[] = [];
 
         while (true) {
-          const res = await fetch(`${base}&page=${page}&pageSize=${pageSize}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
+          const res = await apiFetch(`${base}&page=${page}&pageSize=${pageSize}`, { cache: "no-store" });
           if (!res.ok) throw new Error("Erro ao buscar solicitações");
           const data = await res.json();
           if (page === 1) total = data.total ?? 0;

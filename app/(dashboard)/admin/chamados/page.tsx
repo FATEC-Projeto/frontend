@@ -13,6 +13,7 @@ import TicketStatusBadge from "../../../components/shared/TicketStatusBadge";
 import PriorityDot from "../../../components/shared/PriorityDot";
 import NivelBadge from "../../../components/shared/NivelBadge";
 import SetorChip from "../../../components/shared/SetorChip";
+import { SkeletonTable } from "../../../components/ui/Skeleton";
 import type { Chamado, Nivel, PageResponse, Prioridade, Status } from "../../../../utils/types";
 
 /* ===== Tipos ===== */
@@ -248,9 +249,7 @@ export default function AdminChamadosPage() {
 
       {/* Conteúdo */}
       {loading ? (
-        <div className="rounded-xl border border-[var(--border)] bg-card p-10 text-center text-muted-foreground">
-          Carregando chamados...
-        </div>
+        <SkeletonTable rows={6} cols={5} />
       ) : error ? (
         <div className="rounded-xl border border-[var(--border)] bg-card p-10 text-center text-destructive">
           Falha ao carregar: {error}

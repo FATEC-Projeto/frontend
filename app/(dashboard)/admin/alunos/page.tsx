@@ -18,6 +18,8 @@ import FormAlunoCreate from "./../_components/FormAlunoCreate";
 import ImportAlunos from "./../_components/ImportAlunos";
 import ConfirmDialog from "../../../components/ui/ConfirmDialog";
 import { toast } from "sonner";
+import { apiFetch } from "../../../../utils/api";
+import { Skeleton } from "../../../components/ui/Skeleton";
 
 import { cx } from '../../../../utils/cx'
 
@@ -90,12 +92,6 @@ export default function AdminAlunosPage() {
       setLoading(true);
       setError(null);
 
-      const token =
-        (typeof window !== "undefined" && localStorage.getItem("accessToken")) || "";
-
-      const headers: Record<string, string> = { Accept: "application/json" };
-      if (token) headers.Authorization = `Bearer ${token}`;
-
       const qs = new URLSearchParams();
       qs.set("papel", "USUARIO");
       if (q) qs.set("q", q);
@@ -103,7 +99,7 @@ export default function AdminAlunosPage() {
       qs.set("page", String(page));
       qs.set("perPage", String(perPage));
 
-      const res = await fetch(`${API_URL}/usuarios?${qs}`, { headers, cache: "no-store" });
+      const res = await apiFetch(`${API_URL}/usuarios?${qs}`, { cache: "no-store" });
       if (!res.ok) {
         const text = await res.text().catch(() => "");
         throw new Error(text || `Falha ao buscar alunos (${res.status})`);
@@ -255,14 +251,9 @@ export default function AdminAlunosPage() {
   async function doDeleteSelected() {
     try {
       setDeleting(true);
-      const token =
-        (typeof window !== "undefined" && localStorage.getItem("accessToken")) || "";
-      const headers: Record<string, string> = { Accept: "application/json" };
-      if (token) headers.Authorization = `Bearer ${token}`;
-
       const results = await Promise.allSettled(
         Array.from(selectedIds).map((id) =>
-          fetch(`${API_URL}/usuarios/${id}`, { method: "DELETE", headers }),
+          apiFetch(`${API_URL}/usuarios/${id}`, { method: "DELETE" }),
         ),
       );
 
@@ -423,13 +414,13 @@ export default function AdminAlunosPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {loading && (
-                    <tr>
-                      <td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">
-                        Carregando...
-                      </td>
+                  {loading && Array.from({ length: 6 }).map((_, r) => (
+                    <tr key={`sk-${r}`} className="border-t border-[var(--border)]">
+                      {Array.from({ length: 7 }).map((_, c) => (
+                        <td key={c} className="px-4 py-3"><Skeleton className="h-3.5 w-full" /></td>
+                      ))}
                     </tr>
-                  )}
+                  ))}
 
                   {!loading && visibleRows.map((a) => (
                     <tr key={a.id} className="border-t border-[var(--border)]">
