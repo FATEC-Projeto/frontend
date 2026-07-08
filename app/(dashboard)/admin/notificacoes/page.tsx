@@ -79,8 +79,9 @@ export default function NotificacoesAlunoPage() {
         cache: "no-store",
       });
       const data: PageResp = await res.json();
-      setNotifs(data.items ?? []);
-      setUnread(data.items.filter((n) => !n.lidaEm).length); // Recalcular as notificações não lidas
+      const items = data.items ?? [];
+      setNotifs(items);
+      setUnread(items.filter((n) => !n.lidaEm).length); // Recalcular as notificações não lidas
     } catch {
       setNotifs([]);
       setUnread(0); // Caso não haja notificações, garantir que o contador seja zero
