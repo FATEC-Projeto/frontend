@@ -1,26 +1,30 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  Search, Plus, Building2, Users, Pencil, Trash2, X, Check, ChevronRight,
-  User as UserIcon, BadgeCheck, Filter, ArrowRightLeft
+  Search, Plus, Building2, Users, Pencil, Trash2, X, Check,
+  User as UserIcon, BadgeCheck, Filter, ArrowRightLeft, Loader2
 } from "lucide-react";
+import { toast } from "sonner";
 import { cx } from '../../../../utils/cx'
-/* ===================== Tipos alinhados ao seu schema ===================== */
-type PapelKey = "BACKOFFICE" | "TECNICO" | "ADMINISTRADOR";
+import { apiFetch } from "../../../../utils/api";
 
+const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+
+/* ===================== Tipos alinhados ao schema ===================== */
 type PapelCatalogo = {
   id: string;
-  nome: PapelKey;           // em seu schema o nome é único
+  nome: string;
   descricao?: string | null;
 };
 
 type Usuario = {
   id: string;
   nome?: string | null;
-  emailEducacional: string;
+  emailEducacional?: string | null;
   emailPessoal?: string | null;
+  papel?: string | null;
   ativo: boolean;
 };
 
@@ -30,54 +34,25 @@ type Setor = {
   descricao?: string | null;
 };
 
-type UsuarioSetor = {
-  id: string;
+/** Vínculo usuário↔setor, com usuário e papel embutidos (include do backend). */
+type Membro = {
+  id: string;           // id do vínculo (usuarioSetor)
   usuarioId: string;
   setorId: string;
   papelId?: string | null;
+  usuario: Usuario;
+  papel?: PapelCatalogo | null;
 };
 
-/* ===================== MOCK ===================== */
-const PAPEIS: PapelCatalogo[] = [
-  { id: "p1", nome: "BACKOFFICE" },
-  { id: "p2", nome: "TECNICO" },
-  { id: "p3", nome: "ADMINISTRADOR" },
-];
-
-const SETORES: Setor[] = [
-  { id: "s1", nome: "Secretaria" },
-  { id: "s2", nome: "Financeiro" },
-  { id: "s3", nome: "TI Acadêmica" },
-];
-
-const USERS: Usuario[] = [
-  { id: "u1", nome: "Ana Pereira", emailEducacional: "ana.pereira@fatec.sp.gov.br", ativo: true },
-  { id: "u2", nome: "Bruno Santos", emailEducacional: "bruno.santos@fatec.sp.gov.br", ativo: true },
-  { id: "u3", nome: "Carla Mendes", emailEducacional: "carla.mendes@fatec.sp.gov.br", ativo: true },
-  { id: "u4", nome: "Diego Lima", emailEducacional: "diego.lima@fatec.sp.gov.br", ativo: false },
-];
-
-const USUARIOS_SETORES: UsuarioSetor[] = [
-  { id: "us1", usuarioId: "u1", setorId: "s1", papelId: "p3" }, // Ana — Secretaria — ADMIN
-  { id: "us2", usuarioId: "u2", setorId: "s3", papelId: "p2" }, // Bruno — TI — TECNICO
-  { id: "us3", usuarioId: "u3", setorId: "s2", papelId: "p1" }, // Carla — Financeiro — BACKOFFICE
-];
-
-/* ===================== Utils ===================== */
-const papelById = (id?: string | null) => PAPEIS.find(p => p.id === id) ?? null;
+/* ===================== Helpers de e-mail ===================== */
+const emailDe = (u: Usuario) => u.emailEducacional ?? u.emailPessoal ?? "—";
 
 /* ===================== Chips / Badges ===================== */
-function PapelBadge({ papelId }: { papelId?: string | null }) {
-  const papel = papelById(papelId)?.nome;
-  const map: Record<PapelKey, string> = {
-    BACKOFFICE: "bg-slate-500/12 text-slate-600 border-slate-500/30",
-    TECNICO: "bg-indigo-500/12 text-indigo-600 border-indigo-500/30",
-    ADMINISTRADOR: "bg-emerald-500/12 text-emerald-600 border-emerald-500/30",
-  };
-  if (!papel) return <span className="text-xs text-muted-foreground">—</span>;
+function PapelBadge({ nome }: { nome?: string | null }) {
+  if (!nome) return <span className="text-xs text-muted-foreground">—</span>;
   return (
-    <span className={cx("inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold border", map[papel])}>
-      <BadgeCheck className="size-3" /> {papel}
+    <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold border bg-indigo-500/12 text-indigo-600 border-indigo-500/30">
+      <BadgeCheck className="size-3" /> {nome}
     </span>
   );
 }
@@ -90,83 +65,210 @@ function AtivoDot({ ativo }: { ativo: boolean }) {
 
 /* ===================== Página ===================== */
 export default function SetoresPage() {
-  // Em um app real, estes estados viriam do backend (fetch + useEffect).
-  const [setores, setSetores] = useState<Setor[]>(SETORES);
-  const [usuarios, setUsuarios] = useState<Usuario[]>(USERS);
-  const [rel, setRel] = useState<UsuarioSetor[]>(USUARIOS_SETORES);
+  const [setores, setSetores] = useState<Setor[]>([]);
+  const [papeis, setPapeis] = useState<PapelCatalogo[]>([]);
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [membros, setMembros] = useState<Membro[]>([]);
+
+  const [loadingSetores, setLoadingSetores] = useState(true);
+  const [loadingMembros, setLoadingMembros] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   const [qSetor, setQSetor] = useState("");
-  const [currentSetorId, setCurrentSetorId] = useState<string>(setores[0]?.id ?? "");
+  const [currentSetorId, setCurrentSetorId] = useState<string>("");
   const currentSetor = setores.find(s => s.id === currentSetorId) ?? null;
 
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const setoresFiltrados = useMemo(() => {
-    return setores
-      .map(s => ({
-        ...s,
-        count: rel.filter(r => r.setorId === s.id).length,
-      }))
-      .filter(s => !qSetor || s.nome.toLowerCase().includes(qSetor.toLowerCase()));
-  }, [setores, rel, qSetor]);
+  /* ── Carga inicial: setores, papéis e funcionários ── */
+  const carregarSetores = useCallback(async (selecionar?: string) => {
+    setLoadingSetores(true);
+    try {
+      const res = await apiFetch(`${API_URL}/admin/setores?perPage=100`, { cache: "no-store" });
+      if (!res.ok) throw new Error(`Falha ao carregar setores (${res.status})`);
+      const json = await res.json();
+      const lista: Setor[] = json?.data ?? [];
+      setSetores(lista);
+      setCurrentSetorId(prev => selecionar ?? (lista.some(s => s.id === prev) ? prev : lista[0]?.id ?? ""));
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erro ao carregar setores");
+    } finally {
+      setLoadingSetores(false);
+    }
+  }, []);
 
-  const membrosDoSetor = useMemo(() => {
-    if (!currentSetor) return [];
-    const rows = rel.filter(r => r.setorId === currentSetor.id)
-      .map(r => {
-        const u = usuarios.find(x => x.id === r.usuarioId)!;
-        return { usId: r.id, usuario: u, papelId: r.papelId };
+  useEffect(() => {
+    carregarSetores();
+
+    apiFetch(`${API_URL}/admin/papeis`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setPapeis(Array.isArray(data) ? data : (data?.data ?? [])))
+      .catch(() => {});
+
+    // Candidatos para atribuição: apenas contas de equipe (não-aluno) e ativas.
+    apiFetch(`${API_URL}/usuarios?perPage=100&ativo=true`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        const items: Usuario[] = json?.items ?? [];
+        setUsuarios(items.filter((u) => u.papel && u.papel !== "USUARIO"));
       })
-      .sort((a, b) => (a.usuario.nome ?? "").localeCompare(b.usuario.nome ?? ""));
-    return rows;
-  }, [currentSetor, rel, usuarios]);
+      .catch(() => {});
+  }, [carregarSetores]);
 
-  function criarSetor() {
-    const nome = prompt("Nome do novo setor:");
-    if (!nome) return;
-    const novo: Setor = { id: `s${Date.now()}`, nome };
-    setSetores(prev => [...prev, novo]);
-    setCurrentSetorId(novo.id);
-  }
-
-  function renomearSetor() {
-    if (!currentSetor) return;
-    const nome = prompt("Novo nome do setor:", currentSetor.nome);
-    if (!nome) return;
-    setSetores(prev => prev.map(s => (s.id === currentSetor.id ? { ...s, nome } : s)));
-  }
-
-  function removerSetor() {
-    if (!currentSetor) return;
-    const temMembros = rel.some(r => r.setorId === currentSetor.id);
-    if (temMembros && !confirm("Este setor possui membros. Remover mesmo assim? As relações serão excluídas.")) {
-      return;
+  /* ── Membros do setor selecionado ── */
+  const carregarMembros = useCallback(async (setorId: string) => {
+    if (!setorId) { setMembros([]); return; }
+    setLoadingMembros(true);
+    try {
+      const res = await apiFetch(`${API_URL}/admin/setores/${setorId}/usuarios?perPage=100`, { cache: "no-store" });
+      if (!res.ok) throw new Error(`Falha ao carregar membros (${res.status})`);
+      const json = await res.json();
+      setMembros(json?.data ?? []);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erro ao carregar membros do setor");
+      setMembros([]);
+    } finally {
+      setLoadingMembros(false);
     }
-    setRel(prev => prev.filter(r => r.setorId !== currentSetor.id));
-    setSetores(prev => prev.filter(s => s.id !== currentSetor.id));
-    setCurrentSetorId(setores.find(s => s.id !== currentSetor.id)?.id ?? "");
-  }
+  }, []);
 
-  function trocarPapel(usId: string, novoPapelId: string) {
-    setRel(prev => prev.map(r => (r.id === usId ? { ...r, papelId: novoPapelId } : r)));
-  }
+  useEffect(() => {
+    carregarMembros(currentSetorId);
+  }, [currentSetorId, carregarMembros]);
 
-  function removerMembro(usId: string) {
-    setRel(prev => prev.filter(r => r.id !== usId));
-  }
+  const setoresFiltrados = useMemo(() => {
+    return setores.filter(s => !qSetor || s.nome.toLowerCase().includes(qSetor.toLowerCase()));
+  }, [setores, qSetor]);
 
-  function atribuirUsuariosAoSetor(userIds: string[], papelId?: string | null) {
-    if (!currentSetor) return;
-    const novos: UsuarioSetor[] = [];
-    for (const uid of userIds) {
-      const existe = rel.some(r => r.setorId === currentSetor.id && r.usuarioId === uid);
-      if (!existe) {
-        novos.push({ id: `us${Date.now()}-${uid}`, usuarioId: uid, setorId: currentSetor.id, papelId: papelId ?? null });
-      }
+  const membrosOrdenados = useMemo(
+    () => [...membros].sort((a, b) => (a.usuario.nome ?? "").localeCompare(b.usuario.nome ?? "")),
+    [membros],
+  );
+
+  /* ── CRUD de setores ── */
+  async function criarSetor() {
+    const nome = prompt("Nome do novo setor:")?.trim();
+    if (!nome) return;
+    setBusy(true);
+    try {
+      const res = await apiFetch(`${API_URL}/admin/setores`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nome }),
+      });
+      if (!res.ok) throw new Error(`Falha ao criar setor (${res.status})`);
+      const novo = await res.json();
+      toast.success("Setor criado.");
+      await carregarSetores(novo?.id);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erro ao criar setor");
+    } finally {
+      setBusy(false);
     }
-    if (novos.length === 0) return;
-    setRel(prev => [...prev, ...novos]);
   }
+
+  async function renomearSetor() {
+    if (!currentSetor) return;
+    const nome = prompt("Novo nome do setor:", currentSetor.nome)?.trim();
+    if (!nome || nome === currentSetor.nome) return;
+    setBusy(true);
+    try {
+      const res = await apiFetch(`${API_URL}/admin/setores/${currentSetor.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nome }),
+      });
+      if (!res.ok) throw new Error(`Falha ao renomear (${res.status})`);
+      toast.success("Setor renomeado.");
+      await carregarSetores(currentSetor.id);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erro ao renomear setor");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removerSetor() {
+    if (!currentSetor) return;
+    const temMembros = membros.length > 0;
+    const msg = temMembros
+      ? "Este setor possui membros. Remover mesmo assim? Os vínculos serão excluídos."
+      : `Remover o setor "${currentSetor.nome}"?`;
+    if (!confirm(msg)) return;
+    setBusy(true);
+    try {
+      const res = await apiFetch(`${API_URL}/admin/setores/${currentSetor.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(`Falha ao remover (${res.status})`);
+      toast.success("Setor removido.");
+      await carregarSetores();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erro ao remover setor");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /* ── Membros ── */
+  async function trocarPapel(usuarioSetorId: string, novoPapelId: string) {
+    setBusy(true);
+    try {
+      const res = await apiFetch(`${API_URL}/admin/usuarios-setores/${usuarioSetorId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ papelId: novoPapelId || null }),
+      });
+      if (!res.ok) throw new Error(`Falha ao alterar papel (${res.status})`);
+      await carregarMembros(currentSetorId);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erro ao alterar papel");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removerMembro(usuarioSetorId: string) {
+    if (!confirm("Remover este funcionário do setor?")) return;
+    setBusy(true);
+    try {
+      const res = await apiFetch(`${API_URL}/admin/usuarios-setores/${usuarioSetorId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(`Falha ao remover membro (${res.status})`);
+      toast.success("Membro removido do setor.");
+      await carregarMembros(currentSetorId);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erro ao remover membro");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function atribuirUsuariosAoSetor(userIds: string[], papelId?: string | null) {
+    if (!currentSetor || userIds.length === 0) return;
+    setBusy(true);
+    try {
+      const resultados = await Promise.allSettled(
+        userIds.map((uid) =>
+          apiFetch(`${API_URL}/admin/usuarios/${uid}/setores`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ setorId: currentSetor.id, papelId: papelId ?? null }),
+          }).then((r) => {
+            if (!r.ok) throw new Error(String(r.status));
+          }),
+        ),
+      );
+      const falhas = resultados.filter((r) => r.status === "rejected").length;
+      if (falhas === 0) toast.success("Funcionários atribuídos ao setor.");
+      else toast.warning(`${userIds.length - falhas} atribuído(s), ${falhas} com erro.`);
+      setDrawerOpen(false);
+      await carregarMembros(currentSetorId);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erro ao atribuir funcionários");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const idsNoSetor = useMemo(() => new Set(membros.map((m) => m.usuarioId)), [membros]);
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
@@ -185,50 +287,59 @@ export default function SetoresPage() {
             </div>
           </div>
 
-          <ul className="mt-2 space-y-1">
-            {setoresFiltrados.map((s) => (
-              <li key={s.id}>
-                <button
-                  className={cx(
-                    "w-full text-left rounded-lg px-3 py-2 transition flex items-center justify-between",
-                    currentSetorId === s.id ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-[var(--muted)]/70"
-                  )}
-                  onClick={() => setCurrentSetorId(s.id)}
-                >
-                  <span className="flex items-center gap-2">
-                    <Building2 className="size-4 opacity-80" />
-                    <span className="font-medium">{s.nome}</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-xs rounded-md border bg-background px-1.5 py-0.5">
-                    <Users className="size-3" /> {s.count}
-                  </span>
-                </button>
-              </li>
-            ))}
-            {setoresFiltrados.length === 0 && (
-              <li className="px-3 py-8 text-center text-sm text-muted-foreground">Nenhum setor encontrado.</li>
-            )}
-          </ul>
+          {loadingSetores ? (
+            <div className="px-3 py-10 flex items-center justify-center text-muted-foreground">
+              <Loader2 className="size-5 animate-spin" />
+            </div>
+          ) : (
+            <ul className="mt-2 space-y-1">
+              {setoresFiltrados.map((s) => (
+                <li key={s.id}>
+                  <button
+                    className={cx(
+                      "w-full text-left rounded-lg px-3 py-2 transition flex items-center justify-between",
+                      currentSetorId === s.id ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-[var(--muted)]/70"
+                    )}
+                    onClick={() => setCurrentSetorId(s.id)}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Building2 className="size-4 opacity-80" />
+                      <span className="font-medium">{s.nome}</span>
+                    </span>
+                    {currentSetorId === s.id && (
+                      <span className="inline-flex items-center gap-1 text-xs rounded-md border bg-background/20 px-1.5 py-0.5">
+                        <Users className="size-3" /> {membros.length}
+                      </span>
+                    )}
+                  </button>
+                </li>
+              ))}
+              {setoresFiltrados.length === 0 && (
+                <li className="px-3 py-8 text-center text-sm text-muted-foreground">Nenhum setor encontrado.</li>
+              )}
+            </ul>
+          )}
 
           {/* Ações do catálogo */}
           <div className="mt-3 flex items-center justify-between px-2">
             <button
               onClick={criarSetor}
-              className="inline-flex items-center gap-2 h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm hover:brightness-95"
+              disabled={busy}
+              className="inline-flex items-center gap-2 h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm hover:brightness-95 disabled:opacity-50"
             >
               <Plus className="size-4" /> Novo setor
             </button>
             <div className="flex items-center gap-2">
               <button
                 onClick={renomearSetor}
-                disabled={!currentSetor}
+                disabled={!currentSetor || busy}
                 className="inline-flex items-center gap-2 h-9 px-3 rounded-md border border-[var(--border)] text-sm hover:bg-[var(--muted)] disabled:opacity-50"
               >
                 <Pencil className="size-4" /> Renomear
               </button>
               <button
                 onClick={removerSetor}
-                disabled={!currentSetor}
+                disabled={!currentSetor || busy}
                 className="inline-flex items-center gap-2 h-9 px-3 rounded-md border border-[var(--border)] text-sm hover:bg-[var(--muted)] disabled:opacity-50"
               >
                 <Trash2 className="size-4" /> Remover
@@ -239,8 +350,8 @@ export default function SetoresPage() {
 
         {/* Dica UX */}
         <div className="mt-4 rounded-xl border border-[var(--border)] bg-card p-4 text-sm text-muted-foreground">
-          Dica: cada funcionário pode ter <b>papéis diferentes por setor</b> (ex.: Técnico em TI, Backoffice na Secretaria).  
-          Use o botão <i>Atribuir funcionários</i> para criar relações <code>UsuarioSetor</code>.
+          Dica: cada funcionário pode ter <b>papéis diferentes por setor</b> (ex.: Técnico em TI, Backoffice na Secretaria).
+          Use o botão <i>Atribuir funcionários</i> para criar os vínculos.
         </div>
       </aside>
 
@@ -248,7 +359,7 @@ export default function SetoresPage() {
       <section className="xl:col-span-8">
         {!currentSetor ? (
           <div className="rounded-xl border border-[var(--border)] bg-card p-6 text-center text-muted-foreground">
-            Selecione um setor à esquerda.
+            {loadingSetores ? "Carregando…" : "Nenhum setor cadastrado. Crie o primeiro à esquerda."}
           </div>
         ) : (
           <div className="space-y-4">
@@ -261,7 +372,8 @@ export default function SetoresPage() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setDrawerOpen(true)}
-                  className="inline-flex items-center gap-2 h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm hover:brightness-95"
+                  disabled={busy}
+                  className="inline-flex items-center gap-2 h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm hover:brightness-95 disabled:opacity-50"
                 >
                   <Plus className="size-4" /> Atribuir funcionários
                 </button>
@@ -272,7 +384,7 @@ export default function SetoresPage() {
             <div className="rounded-xl border border-[var(--border)] bg-card overflow-hidden">
               <div className="px-4 py-3 bg-[var(--muted)] text-sm font-semibold flex items-center justify-between">
                 <span>Membros do setor</span>
-                <span className="text-muted-foreground font-normal">{membrosDoSetor.length} membro(s)</span>
+                <span className="text-muted-foreground font-normal">{membros.length} membro(s)</span>
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full text-sm">
@@ -285,38 +397,45 @@ export default function SetoresPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {membrosDoSetor.map((m) => (
-                      <tr key={m.usId} className="border-t border-[var(--border)]">
+                    {loadingMembros ? (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">
+                          <Loader2 className="size-5 animate-spin inline" />
+                        </td>
+                      </tr>
+                    ) : membrosOrdenados.map((m) => (
+                      <tr key={m.id} className="border-t border-[var(--border)]">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             <AtivoDot ativo={m.usuario.ativo} />
                             <UserIcon className="size-4 text-muted-foreground" />
                             <div className="min-w-0">
                               <div className="font-medium leading-tight">{m.usuario.nome ?? "—"}</div>
-                              <div className="md:hidden text-xs text-muted-foreground">{m.usuario.emailEducacional}</div>
+                              <div className="md:hidden text-xs text-muted-foreground">{emailDe(m.usuario)}</div>
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3 hidden md:table-cell">{m.usuario.emailEducacional}</td>
+                        <td className="px-4 py-3 hidden md:table-cell">{emailDe(m.usuario)}</td>
                         <td className="px-4 py-3">
-                          <PapelBadge papelId={m.papelId} />
+                          <PapelBadge nome={m.papel?.nome} />
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="inline-flex items-center gap-1">
-                            {/* Trocar papel (dropdown simples) */}
                             <select
-                              className="h-9 px-2 rounded-md border border-[var(--border)] bg-background text-sm"
+                              className="h-9 px-2 rounded-md border border-[var(--border)] bg-background text-sm disabled:opacity-50"
                               value={m.papelId ?? ""}
-                              onChange={(e) => trocarPapel(m.usId, e.target.value || "")}
+                              disabled={busy}
+                              onChange={(e) => trocarPapel(m.id, e.target.value)}
                             >
-                              <option value="">—</option>
-                              {PAPEIS.map((p) => (
+                              <option value="">— sem papel —</option>
+                              {papeis.map((p) => (
                                 <option key={p.id} value={p.id}>{p.nome}</option>
                               ))}
                             </select>
                             <button
-                              className="h-9 px-3 rounded-md hover:bg-[var(--muted)]"
-                              onClick={() => removerMembro(m.usId)}
+                              className="h-9 px-3 rounded-md hover:bg-[var(--muted)] disabled:opacity-50"
+                              onClick={() => removerMembro(m.id)}
+                              disabled={busy}
                               title="Remover do setor"
                             >
                               Remover
@@ -325,7 +444,7 @@ export default function SetoresPage() {
                         </td>
                       </tr>
                     ))}
-                    {membrosDoSetor.length === 0 && (
+                    {!loadingMembros && membrosOrdenados.length === 0 && (
                       <tr>
                         <td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">
                           Nenhum membro neste setor.
@@ -358,13 +477,11 @@ export default function SetoresPage() {
         <AssignDrawer
           onClose={() => setDrawerOpen(false)}
           usuarios={usuarios}
-          rel={rel}
+          idsNoSetor={idsNoSetor}
           setor={currentSetor}
-          papeis={PAPEIS}
-          onAssign={(ids, papel) => {
-            atribuirUsuariosAoSetor(ids, papel);
-            setDrawerOpen(false);
-          }}
+          papeis={papeis}
+          busy={busy}
+          onAssign={atribuirUsuariosAoSetor}
         />
       )}
     </div>
@@ -375,51 +492,47 @@ export default function SetoresPage() {
 function AssignDrawer({
   onClose,
   usuarios,
-  rel,
+  idsNoSetor,
   setor,
   papeis,
+  busy,
   onAssign,
 }: {
   onClose: () => void;
   usuarios: Usuario[];
-  rel: UsuarioSetor[];
+  idsNoSetor: Set<string>;
   setor: Setor;
   papeis: PapelCatalogo[];
+  busy: boolean;
   onAssign: (userIds: string[], papelId?: string | null) => void;
 }) {
   const [q, setQ] = useState("");
   const [papelId, setPapelId] = useState<string>("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  const jaNoSetor = new Set(rel.filter(r => r.setorId === setor.id).map(r => r.usuarioId));
-
   const candidatos = useMemo(() => {
     return usuarios
-      .filter(u => !jaNoSetor.has(u.id))
+      .filter(u => !idsNoSetor.has(u.id))
       .filter(u =>
         !q ||
-        u.emailEducacional.toLowerCase().includes(q.toLowerCase()) ||
+        emailDe(u).toLowerCase().includes(q.toLowerCase()) ||
         (u.nome?.toLowerCase().includes(q.toLowerCase()) ?? false)
       )
       .sort((a, b) => (a.nome ?? "").localeCompare(b.nome ?? ""));
-  }, [usuarios, q, jaNoSetor]);
+  }, [usuarios, q, idsNoSetor]);
 
   function toggle(id: string) {
     setSelected(prev => {
       const n = new Set(prev);
-      n.has(id) ? n.delete(id) : n.add(id);
+      if (n.has(id)) n.delete(id); else n.add(id);
       return n;
     });
-  }
-
-  function confirmAssign() {
-    onAssign(Array.from(selected), papelId || null);
   }
 
   return (
     <div className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="absolute right-0 top-0 h-full w-[92%] sm:w-[520px] bg-background shadow-xl p-4">
+      <div className="absolute right-0 top-0 h-full w-[92%] sm:w-[520px] bg-background shadow-xl p-4 overflow-y-auto">
         <div className="flex items-center justify-between mb-2">
           <div className="font-grotesk font-semibold">Atribuir funcionários — {setor.nome}</div>
           <button
@@ -481,15 +594,15 @@ function AssignDrawer({
                         <AtivoDot ativo={u.ativo} />
                         <span className="font-medium">{u.nome ?? "—"}</span>
                       </div>
-                      <div className="sm:hidden text-xs text-muted-foreground">{u.emailEducacional}</div>
+                      <div className="sm:hidden text-xs text-muted-foreground">{emailDe(u)}</div>
                     </td>
-                    <td className="px-3 py-2 hidden sm:table-cell">{u.emailEducacional}</td>
+                    <td className="px-3 py-2 hidden sm:table-cell">{emailDe(u)}</td>
                   </tr>
                 ))}
                 {candidatos.length === 0 && (
                   <tr>
                     <td colSpan={3} className="px-3 py-8 text-center text-muted-foreground">
-                      Nenhum candidato disponível com esse filtro.
+                      Nenhum funcionário disponível com esse filtro.
                     </td>
                   </tr>
                 )}
@@ -507,18 +620,18 @@ function AssignDrawer({
                 Cancelar
               </button>
               <button
-                onClick={confirmAssign}
-                disabled={selected.size === 0}
+                onClick={() => onAssign(Array.from(selected), papelId || null)}
+                disabled={selected.size === 0 || busy}
                 className="inline-flex items-center gap-2 h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm hover:brightness-95 disabled:opacity-50"
               >
-                <Check className="size-4" /> Atribuir ao setor
+                {busy ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />} Atribuir ao setor
               </button>
             </div>
           </div>
         </div>
 
         <div className="mt-3 text-xs text-muted-foreground">
-          Dica: se nenhum papel for escolhido, a relação é criada sem papel e pode ser definida depois.
+          Dica: se nenhum papel for escolhido, o vínculo é criado sem papel e pode ser definido depois.
         </div>
       </div>
     </div>
