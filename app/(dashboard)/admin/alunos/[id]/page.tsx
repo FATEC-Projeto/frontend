@@ -1,5 +1,6 @@
 "use client";
 import { apiFetch } from "../../../../../utils/api"
+import { toast } from "sonner";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -109,7 +110,6 @@ function SectionCard({ title, icon, children }: { title: string; icon?: React.Re
   );
 }
 
-function toast(msg: string) { alert(msg); }
 
 /* ===================== Página ===================== */
 export default function PageAlunoDetalhe() {
