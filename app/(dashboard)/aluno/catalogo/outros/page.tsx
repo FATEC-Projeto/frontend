@@ -166,6 +166,10 @@ export default function OutrosPage() {
         catalogoServicoId: "outros-solicitacao-geral",
         catalogoCategoriaId: "outros",
         catalogoCategoriaNome: "Outra solicitação",
+        // Sem serviço de catálogo, o chamado nasceria sem setor e ficaria órfão
+        // (ninguém notificado, invisível em filtros por setor). Roteia para a
+        // Secretaria, que faz a triagem e redireciona se necessário.
+        setorProvavel: "Secretaria",
         dadosAcademicos,
         camposEspecificos: { descricao: descricao.trim() },
         origem: "catalogo_wizard_aluno",
