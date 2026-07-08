@@ -5,10 +5,12 @@ import { Bell, Globe, Loader2, Moon, RotateCcw, Save, Settings, Sun } from "luci
 import { toast } from "sonner";
 import MobileSidebarTriggerAluno from "../_components/MobileSidebarTriggerAluno";
 import { cx } from "../../../../utils/cx";
+import { apiFetch, extractApiError } from "../../../../utils/api";
+
+const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 const LS_KEYS = {
   theme: "theme",
-  emailNotif: "email_notifications",
 } as const;
 
 function getInitialTheme(): "light" | "dark" {
@@ -44,11 +46,18 @@ export default function ConfiguracoesAlunoPage() {
   const [saving, setSaving] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">(getInitialTheme);
   const [platNotif, setPlatNotif] = useState<boolean>(true);
+  const [userId, setUserId] = useState<string | null>(null);
 
+  // Preferência de notificações vem do backend (usuario.notificacoesInApp).
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const v = localStorage.getItem(LS_KEYS.emailNotif);
-    if (v !== null) setPlatNotif(v === "1");
+    apiFetch(`${API}/auth/me`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data) return;
+        setUserId(data.id ?? null);
+        if (typeof data.notificacoesInApp === "boolean") setPlatNotif(data.notificacoesInApp);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -62,23 +71,27 @@ export default function ConfiguracoesAlunoPage() {
   function handleRestoreDefaults() {
     if (typeof window === "undefined") return;
     localStorage.removeItem(LS_KEYS.theme);
-    localStorage.removeItem(LS_KEYS.emailNotif);
     const defaultTheme = window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
     setTheme(defaultTheme);
     setPlatNotif(true);
-    toast.info("Preferências restauradas para o padrão.");
+    toast.info("Preferências restauradas. Clique em Salvar para aplicar as notificações.");
   }
 
   async function saveConfig(e: React.FormEvent) {
     e.preventDefault();
+    if (!userId) { toast.error("Não foi possível identificar seu usuário."); return; }
     try {
       setSaving(true);
-      if (typeof window !== "undefined") {
-        localStorage.setItem(LS_KEYS.emailNotif, platNotif ? "1" : "0");
-      }
+      // Tema é local (visual); a preferência de notificações persiste no backend.
+      const res = await apiFetch(`${API}/usuarios/${userId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notificacoesInApp: platNotif }),
+      });
+      if (!res.ok) throw new Error(await extractApiError(res, `Erro ${res.status}`));
       toast.success("Configurações salvas!");
-    } catch {
-      toast.error("Falha ao salvar configurações");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Falha ao salvar configurações");
     } finally {
       setSaving(false);
     }
