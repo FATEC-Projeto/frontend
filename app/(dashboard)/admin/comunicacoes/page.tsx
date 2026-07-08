@@ -8,6 +8,7 @@ import {
 import { toast } from "sonner";
 import { cx } from '../../../../utils/cx'
 import { apiFetch } from "../../../../utils/api";
+import ConfirmDialog from "../../../components/ui/ConfirmDialog";
 
 const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
@@ -187,7 +188,21 @@ export default function ComunicacoesPage() {
   const [currentId, setCurrentId] = useState<string>(DEFAULT_TEMPLATES[0]?.id ?? "");
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [dirty, setDirty] = useState<Set<string>>(new Set());
+  const [pendingSwitch, setPendingSwitch] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  // Versão "limpa" (última salva/carregada) de cada template, para descartar edições.
+  const baselineRef = useRef<Map<string, Template>>(new Map(DEFAULT_TEMPLATES.map((t) => [t.id, t])));
+
+  const markClean = (id: string, snapshot: Template) => {
+    baselineRef.current.set(id, snapshot);
+    setDirty((prev) => {
+      if (!prev.has(id)) return prev;
+      const n = new Set(prev);
+      n.delete(id);
+      return n;
+    });
+  };
 
   /* Carrega os templates persistidos e mescla sobre os defaults (por chave). */
   useEffect(() => {
@@ -201,7 +216,7 @@ export default function ComunicacoesPage() {
           prev.map((t) => {
             const salvo = porChave.get(t.key);
             if (!salvo) return t;
-            return {
+            const merged = {
               ...t,
               nome: salvo.nome ?? t.nome,
               descricao: salvo.descricao ?? t.descricao,
@@ -210,11 +225,45 @@ export default function ComunicacoesPage() {
               corpo: salvo.corpo ?? t.corpo,
               variaveis: (salvo.variaveis as string[] | undefined) ?? t.variaveis,
             };
+            baselineRef.current.set(t.id, merged); // baseline = versão carregada
+            return merged;
           }),
         );
       })
       .catch(() => {});
   }, []);
+
+  // Avisa ao fechar/recarregar a aba com edições pendentes.
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (dirty.size === 0) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [dirty]);
+
+  // Troca de template pedindo confirmação se houver edições não salvas.
+  function requestSwitch(id: string) {
+    if (id === currentId) return;
+    if (dirty.has(currentId)) { setPendingSwitch(id); return; }
+    setCurrentId(id);
+  }
+
+  function discardAndSwitch() {
+    const base = baselineRef.current.get(currentId);
+    if (base) {
+      setTemplates((prev) => prev.map((t) => (t.id === currentId ? base : t)));
+    }
+    setDirty((prev) => {
+      const n = new Set(prev);
+      n.delete(currentId);
+      return n;
+    });
+    if (pendingSwitch) setCurrentId(pendingSwitch);
+    setPendingSwitch(null);
+  }
 
   async function persistir(t: Template) {
     const res = await apiFetch(`${API_URL}/admin/comunicacoes/${encodeURIComponent(t.key)}`, {
@@ -240,6 +289,7 @@ export default function ComunicacoesPage() {
     setSaving(true);
     try {
       await persistir(current);
+      markClean(current.id, current); // vira a nova baseline; limpa o "sujo"
       toast.success("Template salvo.");
     } catch (e: any) {
       toast.error(e?.message ?? "Falha ao salvar template");
@@ -268,6 +318,7 @@ export default function ComunicacoesPage() {
     setTemplates((prev) => prev.map(t => t.id === id ? atualizado : t));
     try {
       await persistir(atualizado);
+      baselineRef.current.set(id, atualizado); // mantém a baseline em sincronia
     } catch (e: any) {
       // Reverte em caso de falha na persistência.
       setTemplates((prev) => prev.map(t => t.id === id ? alvo : t));
@@ -277,6 +328,7 @@ export default function ComunicacoesPage() {
 
   function updateField<K extends keyof Template>(field: K, value: Template[K]) {
     setTemplates((prev) => prev.map(t => t.id === currentId ? { ...t, [field]: value } : t));
+    setDirty((prev) => (prev.has(currentId) ? prev : new Set(prev).add(currentId)));
   }
 
   async function sendTest() {
@@ -350,11 +402,14 @@ export default function ComunicacoesPage() {
                     "w-full text-left rounded-lg px-3 py-2 transition flex items-center justify-between",
                     currentId === t.id ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-[var(--muted)]/70"
                   )}
-                  onClick={() => setCurrentId(t.id)}
+                  onClick={() => requestSwitch(t.id)}
                 >
                   <span className="flex items-center gap-2">
                     <Mail className="size-4 opacity-80" />
                     <span className="font-medium">{t.nome}</span>
+                    {dirty.has(t.id) && (
+                      <span className="size-1.5 rounded-full bg-amber-500" title="Alterações não salvas" />
+                    )}
                   </span>
                   <span
                     className={cx(
@@ -456,10 +511,16 @@ export default function ComunicacoesPage() {
                 <button
                   className="inline-flex items-center gap-2 h-10 px-3 rounded-lg bg-primary text-primary-foreground text-sm hover:brightness-95 disabled:opacity-60"
                   onClick={salvarTemplate}
-                  disabled={saving}
+                  disabled={saving || !dirty.has(current.id)}
                 >
                   <Save className="size-4" /> {saving ? "Salvando…" : "Salvar"}
                 </button>
+                {dirty.has(current.id) && (
+                  <span className="inline-flex items-center gap-1.5 text-xs text-amber-600">
+                    <span className="size-1.5 rounded-full bg-amber-500" />
+                    Alterações não salvas
+                  </span>
+                )}
                 <button
                   className="inline-flex items-center gap-2 h-10 px-3 rounded-lg border border-[var(--border)] bg-background text-sm hover:bg-[var(--muted)] disabled:opacity-60"
                   onClick={sendTest}
@@ -504,6 +565,17 @@ export default function ComunicacoesPage() {
           </div>
         )}
       </section>
+
+      <ConfirmDialog
+        open={pendingSwitch !== null}
+        title="Descartar alterações não salvas?"
+        description="Você editou este template mas não salvou. Trocar de template vai descartar as alterações."
+        confirmLabel="Descartar"
+        cancelLabel="Continuar editando"
+        variant="danger"
+        onConfirm={discardAndSwitch}
+        onClose={() => setPendingSwitch(null)}
+      />
     </div>
   );
 }
