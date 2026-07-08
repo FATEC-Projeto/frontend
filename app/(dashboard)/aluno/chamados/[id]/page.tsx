@@ -166,7 +166,7 @@ export default function ChamadoDetalhePage() {
 
   /* ===== Fetch Chamado ===== */
   const fetchChamado = useCallback(async () => {
-    if (!API || !id) { setLoading(false); return; }
+    if (!id) { setLoading(false); return; }
     setLoading(true);
     try {
       const res = await apiFetch(`${API}/tickets/${id}`);
@@ -183,7 +183,6 @@ export default function ChamadoDetalhePage() {
 
   /* ===== Dados acadêmicos básicos do aluno ===== */
   useEffect(() => {
-    if (!API) return;
     apiFetch(`${API}/auth/me`, { cache: "no-store" })
       .then((r) => r.ok ? r.json() : null)
       .then((data: DadosAcademicosUser | null) => {
@@ -194,7 +193,7 @@ export default function ChamadoDetalhePage() {
 
   /* ===== Fetch Mensagens ===== */
   const fetchMensagens = useCallback(async () => {
-    if (!API || !id) { setMsgLoading(false); return; }
+    if (!id) { setMsgLoading(false); return; }
     setMsgLoading(true);
     try {
       const res = await apiFetch(
@@ -217,8 +216,10 @@ export default function ChamadoDetalhePage() {
 
   /* ===== WebSocket — JWT via ?token= + exponential backoff ===== */
   useEffect(() => {
-    if (!API || !id) return;
-    const wsBase = API.replace(/^http/, "ws");
+    if (!id) return;
+    // Com API vazio (modo proxy), conecta na mesma origem — funciona quando o
+    // reverse proxy encaminha /ws; o backoff cobre o caso de não encaminhar.
+    const wsBase = (API || window.location.origin).replace(/^http/, "ws");
 
     let ws: WebSocket | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -263,7 +264,7 @@ export default function ChamadoDetalhePage() {
 
   /* ===== Enviar Mensagem ===== */
   const sendMensagem = useCallback(async () => {
-    if (!msgText.trim() || !chamado?.id || !API) return;
+    if (!msgText.trim() || !chamado?.id) return;
     setMsgSending(true);
     try {
       const res = await apiFetch(`${API}/tickets/${chamado.id}/mensagens`, {
@@ -287,7 +288,7 @@ export default function ChamadoDetalhePage() {
 
   /* ===== Fetch Anexos ===== */
   const fetchAnexos = useCallback(async () => {
-    if (!API || !id) { setLoadingAnexos(false); return; }
+    if (!id) { setLoadingAnexos(false); return; }
     setLoadingAnexos(true);
     try {
       const res = await apiFetch(`${API}/tickets/${id}/anexos`);
@@ -305,7 +306,7 @@ export default function ChamadoDetalhePage() {
 
   /* ===== Upload via apiFetch + validação ===== */
   const handleUpload = useCallback(async () => {
-    if (!selectedFile || !chamado?.id || !API) return;
+    if (!selectedFile || !chamado?.id) return;
     if (selectedFile.size > MAX_FILE_SIZE_BYTES) {
       toast.error("Arquivo muito grande. Máximo permitido: 10 MB.");
       return;
@@ -337,7 +338,7 @@ export default function ChamadoDetalhePage() {
   /* ===== Alterar status ===== */
   const atualizarStatus = useCallback(
     async (novoStatus: Status): Promise<boolean> => {
-      if (!chamado?.id || !API) return false;
+      if (!chamado?.id) return false;
       try {
         const res = await apiFetch(`${API}/tickets/${chamado.id}`, {
           method: "PATCH",

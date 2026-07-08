@@ -211,7 +211,7 @@ export default function AdminChamadoPage() {
 
   /* ===== Perfil acadêmico do aluno (banco de dados) ===== */
   useEffect(() => {
-    if (!ticket?.criadoPorId || !API) return;
+    if (!ticket?.criadoPorId) return;
     apiFetch(`${API}/usuarios/${ticket.criadoPorId}`, { cache: "no-store" })
       .then((r) => r.ok ? r.json() : null)
       .then((data: PerfilAcademico | null) => { if (data) setPerfilAluno(data); })
@@ -224,7 +224,7 @@ export default function AdminChamadoPage() {
 
   // WebSocket em tempo real — token lido dentro de connect() para ficar fresco
   useEffect(() => {
-    if (!id || !API) return;
+    if (!id) return;
 
     let ws: WebSocket | null = null;
     let attempt = 0;
@@ -233,7 +233,7 @@ export default function AdminChamadoPage() {
     function connect() {
       const token = typeof window !== "undefined" ? (localStorage.getItem("accessToken") ?? "") : "";
       if (!token) return;
-      const wsUrl = API.replace(/^http/, "ws") + `/ws?token=${encodeURIComponent(token)}`;
+      const wsUrl = (API || window.location.origin).replace(/^http/, "ws") + `/ws?token=${encodeURIComponent(token)}`;
       ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
