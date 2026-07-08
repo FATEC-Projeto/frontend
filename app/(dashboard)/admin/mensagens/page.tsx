@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "../../../../utils/api";
+import { toast } from "sonner";
 import Link from "next/link";
 import {
   Search, Loader2, MessageSquareText, SendHorizonal, Paperclip, Building2, User, Clock, Info
@@ -9,6 +10,8 @@ import {
 
 import { cx } from '../../../../utils/cx'
 import TicketStatusBadge from "../../../components/shared/TicketStatusBadge";
+
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 
 /* =========================
    Tipos (ajuste conforme seu backend)
@@ -65,6 +68,8 @@ export default function AdminMensagensPage() {
 
   const chatRef = useRef<HTMLDivElement | null>(null);
   const pollRef = useRef<any>(null);
+  const attachRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   /* ---- Carrega usuário atual ---- */
   useEffect(() => {
@@ -204,6 +209,43 @@ export default function AdminMensagensPage() {
     }
   };
 
+  /* ---- Anexar arquivo ao chamado da conversa atual ---- */
+  const handleAttachClick = () => {
+    if (!currentId || uploading) return;
+    attachRef.current?.click();
+  };
+
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (attachRef.current) attachRef.current.value = "";
+    if (!file || !currentId) return;
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      toast.error("Arquivo muito grande. Máximo permitido: 10 MB.");
+      return;
+    }
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await apiFetch(`${API}/tickets/${currentId}/anexos`, {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) throw new Error(`Erro HTTP ${res.status}`);
+      toast.success(`"${file.name}" anexado ao chamado.`);
+      // Registra a anexação como mensagem no fluxo, para ambos os lados verem.
+      await apiFetch(`${API}/tickets/${currentId}/mensagens`, {
+        method: "POST",
+        body: JSON.stringify({ conteudo: `📎 Anexou o arquivo: ${file.name}` }),
+      }).catch(() => {});
+      fetchMessages(currentId).catch(() => {});
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Falha ao anexar arquivo.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase();
     if (!t) return conversas;
@@ -336,13 +378,20 @@ export default function AdminMensagensPage() {
         {/* Composer */}
         <div className="p-3 border-t border-[var(--border)]">
           <div className="flex items-end gap-2">
+            <input
+              ref={attachRef}
+              type="file"
+              className="hidden"
+              onChange={handleFileSelected}
+            />
             <button
               type="button"
-              title="Anexar arquivo (em breve)"
-              className="h-10 w-10 inline-grid place-items-center rounded-lg border border-[var(--border)] bg-background text-muted-foreground"
-              disabled
+              title="Anexar arquivo"
+              onClick={handleAttachClick}
+              disabled={!currentId || uploading}
+              className="h-10 w-10 inline-grid place-items-center rounded-lg border border-[var(--border)] bg-background text-muted-foreground hover:bg-[var(--muted)] disabled:opacity-50"
             >
-              <Paperclip className="size-4" />
+              {uploading ? <Loader2 className="size-4 animate-spin" /> : <Paperclip className="size-4" />}
             </button>
 
             <textarea

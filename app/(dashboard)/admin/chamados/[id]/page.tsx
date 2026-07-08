@@ -233,12 +233,16 @@ export default function AdminChamadoPage() {
     function connect() {
       const token = typeof window !== "undefined" ? (localStorage.getItem("accessToken") ?? "") : "";
       if (!token) return;
-      const wsUrl = (API || window.location.origin).replace(/^http/, "ws") + `/ws?token=${encodeURIComponent(token)}`;
+      // Token NÃO vai na URL (evita vazamento em logs); é enviado no 1º frame.
+      const wsUrl = (API || window.location.origin).replace(/^http/, "ws") + `/ws`;
       ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
         attempt = 0;
-        try { ws?.send(JSON.stringify({ type: "hello", chamadoId: id })); } catch {}
+        try {
+          ws?.send(JSON.stringify({ type: "auth", token }));
+          ws?.send(JSON.stringify({ type: "hello", chamadoId: id }));
+        } catch {}
       };
 
       ws.onmessage = (event) => {

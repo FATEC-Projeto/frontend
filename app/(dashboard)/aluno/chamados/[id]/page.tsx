@@ -214,7 +214,7 @@ export default function ChamadoDetalhePage() {
 
   useEffect(() => { fetchMensagens(); }, [fetchMensagens]);
 
-  /* ===== WebSocket — JWT via ?token= + exponential backoff ===== */
+  /* ===== WebSocket — auth por handshake no 1º frame + backoff ===== */
   useEffect(() => {
     if (!id) return;
     // Com API vazio (modo proxy), conecta na mesma origem — funciona quando o
@@ -231,9 +231,12 @@ export default function ChamadoDetalhePage() {
       // Lê token fresco a cada reconexão (cobre renovações via apiFetch)
       const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
       if (!token) return;
-      const wsUrl = `${wsBase}/ws?token=${encodeURIComponent(token)}`;
-      ws = new WebSocket(wsUrl);
-      ws.onopen = () => { attempt = 0; };
+      // Token NÃO vai na URL (evita vazamento em logs); é enviado no 1º frame.
+      ws = new WebSocket(`${wsBase}/ws`);
+      ws.onopen = () => {
+        attempt = 0;
+        ws?.send(JSON.stringify({ type: "auth", token }));
+      };
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
