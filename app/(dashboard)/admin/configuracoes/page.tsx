@@ -133,8 +133,7 @@ const POLICY: Record<ResourceKey, LinhaRecurso> = {
   RELATORIOS: {
     label: "Relatórios / estatísticas",
     rota: { metodo: "GET", caminho: "/tickets/stats" },
-    // Rota exige apenas autenticação (sem authorize de papel).
-    perfis: { USUARIO: "todos", BACKOFFICE: "todos", TECNICO: "todos", ADMINISTRADOR: "todos" },
+    perfis: { BACKOFFICE: "todos", TECNICO: "todos", ADMINISTRADOR: "todos" },
   },
 };
 
@@ -264,8 +263,8 @@ export default function ConfiguracoesPermissoesPage() {
               campos privilegiados (papel, ativo, senha).
             </p>
             <p>
-              <b>Relatórios</b> hoje exige apenas autenticação (a rota <code>/tickets/stats</code>{" "}
-              não filtra por papel) — considere restringir a equipe se as estatísticas forem sensíveis.
+              <b>Relatórios</b> (<code>/tickets/stats</code>) são restritos à equipe
+              (Backoffice, Técnico e Administrador); o aluno não acessa estatísticas globais.
             </p>
           </div>
         </div>
