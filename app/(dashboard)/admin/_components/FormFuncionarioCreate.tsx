@@ -1,5 +1,5 @@
 "use client";
-import { apiFetch } from "../../../../utils/api";
+import { apiFetch, extractApiError } from "../../../../utils/api";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -95,16 +95,7 @@ export default function FormFuncionarioCreate({ onSuccess, onCancel }: Props) {
       });
 
       if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        try {
-          const json = JSON.parse(text);
-          if (json?.issues?.length) {
-            throw new Error(json.issues.map((i: any) => `${i.path}: ${i.message}`).join(" | "));
-          }
-          throw new Error(json?.message || json?.error || `Falha ao criar funcionário (${res.status})`);
-        } catch {
-          throw new Error(text || `Falha ao criar funcionário (${res.status})`);
-        }
+        throw new Error(await extractApiError(res, `Falha ao criar funcionário (${res.status})`));
       }
 
       const created = await res.json();

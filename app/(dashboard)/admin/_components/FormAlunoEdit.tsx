@@ -1,5 +1,5 @@
 "use client";
-import { apiFetch } from "../../../../utils/api";
+import { apiFetch, extractApiError } from "../../../../utils/api";
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, X } from "lucide-react";
 
@@ -127,13 +127,7 @@ export default function FormAlunoEdit({ aluno, onClose, onSaved }: Props) {
       });
 
       if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        try {
-          const json = JSON.parse(text);
-          throw new Error(json?.message || `Falha ao atualizar (${res.status})`);
-        } catch {
-          throw new Error(text || `Falha ao atualizar (${res.status})`);
-        }
+        throw new Error(await extractApiError(res, `Falha ao atualizar (${res.status})`));
       }
 
       const updated = await res.json();
