@@ -138,7 +138,23 @@ export default function FuncionarioDetalhePage() {
   }, [id]);
 
   async function onResetSenha() {
-    showToast("Reset de senha enviado (stub).");
+    if (!func) return;
+    const email = func.emailPessoal ?? func.emailEducacional;
+    if (!email) {
+      showToast("Este funcionário não tem e-mail cadastrado para envio do link.");
+      return;
+    }
+    try {
+      const res = await apiFetch(`${API_URL}/auth/esqueci-senha`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) throw new Error(`Erro ${res.status}`);
+      showToast(`Link de redefinição de senha enviado para ${email}.`);
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : "Falha ao enviar link de redefinição.");
+    }
   }
 
   async function onExcluirUsuario() {
