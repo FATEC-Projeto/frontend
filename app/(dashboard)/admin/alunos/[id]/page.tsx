@@ -152,7 +152,10 @@ export default function PageAlunoDetalhe() {
         if (!cRes.ok) throw new Error("Falha ao buscar tickets");
         const json = await cRes.json();
         let cs: Chamado[] = [];
+        // GET /tickets responde { total, page, pageSize, items } — o array é
+        // 'items'. Sem essa chave, a lista ficava sempre vazia no detalhe.
         if (Array.isArray(json)) cs = json;
+        else if (Array.isArray(json.items)) cs = json.items;
         else if (Array.isArray(json.data)) cs = json.data;
         else if (Array.isArray(json.tickets)) cs = json.tickets;
 
