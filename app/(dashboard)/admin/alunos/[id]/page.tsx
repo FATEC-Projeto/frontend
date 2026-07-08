@@ -135,20 +135,12 @@ export default function PageAlunoDetalhe() {
     async function load() {
       try {
         setLoading(true);
-        const token =
-          (typeof window !== "undefined" && localStorage.getItem("accessToken")) || "";
 
-        const uRes = await fetch(`${API_URL}/usuarios/${id}`, {
-          headers: { Authorization: token ? `Bearer ${token}` : "" },
-          cache: "no-store",
-        });
+        const uRes = await apiFetch(`${API_URL}/usuarios/${id}`, { cache: "no-store" });
         if (!uRes.ok) throw new Error("Falha ao buscar usuário");
         const u: Usuario = await uRes.json();
 
-        const cRes = await fetch(`${API_URL}/tickets?criadoPorId=${u.id}`, {
-          headers: { Authorization: token ? `Bearer ${token}` : "" },
-          cache: "no-store",
-        });
+        const cRes = await apiFetch(`${API_URL}/tickets?criadoPorId=${u.id}`, { cache: "no-store" });
         if (!cRes.ok) throw new Error("Falha ao buscar tickets");
         const json = await cRes.json();
         let cs: Chamado[] = [];

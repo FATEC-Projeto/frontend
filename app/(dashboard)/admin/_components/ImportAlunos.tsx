@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { X, Info } from "lucide-react";
 import { toast } from "sonner";
+import { apiFetch } from "../../../../utils/api";
 
 type ResultRow = {
   idx: number;
@@ -155,15 +156,6 @@ export default function ImportAlunos({
     setRunning(true);
     setFinished(false);
 
-    const token =
-      (typeof window !== "undefined" && localStorage.getItem("accessToken")) || "";
-
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
-
     const clone = [...rows];
 
     for (let i = 0; i < clone.length; i++) {
@@ -204,9 +196,8 @@ export default function ImportAlunos({
       if (r.anoSemestreIngresso?.trim()) payload.anoSemestreIngresso = r.anoSemestreIngresso.trim();
 
       try {
-        const resp = await fetch(`${API_URL}/usuarios`, {
+        const resp = await apiFetch(`${API_URL}/usuarios`, {
           method: "POST",
-          headers,
           body: JSON.stringify(payload),
         });
 

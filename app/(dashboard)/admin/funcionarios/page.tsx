@@ -7,6 +7,7 @@ import {
   Mail, BadgeCheck, Building2, User as UserIcon
 } from "lucide-react";
 import { apiFetch } from "../../../../utils/api";
+import { Skeleton } from "../../../components/ui/Skeleton";
 import { cx } from '../../../../utils/cx';
 
 /* ========= Tipos ========= */
@@ -259,9 +260,13 @@ export default function AdminFuncionariosPage() {
               </tr>
             </thead>
             <tbody>
-              {loading && (
-                <tr><td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">Carregando...</td></tr>
-              )}
+              {loading && Array.from({ length: 6 }).map((_, r) => (
+                <tr key={`sk-${r}`} className="border-t border-[var(--border)]">
+                  {Array.from({ length: 6 }).map((_, c) => (
+                    <td key={c} className="px-4 py-3"><Skeleton className="h-3.5 w-full" /></td>
+                  ))}
+                </tr>
+              ))}
               {!loading && visibleRows.map((f) => (
                 <tr key={f.id} className="border-t border-[var(--border)]">
                   <td className="px-4 py-3">
