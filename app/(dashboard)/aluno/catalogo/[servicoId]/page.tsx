@@ -228,7 +228,6 @@ export default function SolicitacaoCatalogoPage() {
   }, []);
 
   useEffect(() => {
-    if (!API) return;
     apiFetch(`${API}/auth/me`, { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
@@ -294,7 +293,7 @@ export default function SolicitacaoCatalogoPage() {
   function removeFile(index: number) { setAnexos((prev) => prev.filter((_, i) => i !== index)); }
 
   async function uploadAnexos(ticketId: string | number) {
-    if (!API || anexos.length === 0) return;
+    if (anexos.length === 0) return;
     for (const file of anexos) {
       const formData = new FormData();
       formData.append("file", file);

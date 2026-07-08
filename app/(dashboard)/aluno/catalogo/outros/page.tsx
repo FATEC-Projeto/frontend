@@ -114,7 +114,6 @@ export default function OutrosPage() {
 
   /* Busca catálogo e dados acadêmicos do aluno */
   useEffect(() => {
-    if (!API) return;
     apiFetch(`${API}/catalogo`, { cache: "no-store" })
       .then((r) => r.ok ? r.json() : null)
       .then((data: CatalogResponse | null) => {
