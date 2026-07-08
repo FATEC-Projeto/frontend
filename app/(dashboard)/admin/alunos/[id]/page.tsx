@@ -1,5 +1,5 @@
 "use client";
-import { apiFetch } from "../../../../../utils/api"
+import { apiFetch, extractApiError } from "../../../../../utils/api"
 import { toast } from "sonner";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -201,8 +201,24 @@ export default function PageAlunoDetalhe() {
     }
   }
 
-  function onResetSenha() {
-    toast("Reset de senha enviado (stub).");
+  async function onResetSenha() {
+    if (!aluno) return;
+    const email = aluno.emailPessoal || aluno.emailEducacional;
+    if (!email) {
+      toast.error("Este aluno não tem e-mail cadastrado para envio do link.");
+      return;
+    }
+    try {
+      const res = await apiFetch(`${API_URL}/auth/esqueci-senha`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) throw new Error(await extractApiError(res, `Erro ${res.status}`));
+      toast.success(`Link de redefinição de senha enviado para ${email}.`);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Falha ao enviar link de redefinição.");
+    }
   }
 
   if (loading) {
