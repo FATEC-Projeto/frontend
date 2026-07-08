@@ -5,7 +5,11 @@ import {
   Search, Mail, Eye, Send, Download, Upload, Save, Check, X,
   Filter, ToggleLeft, ToggleRight, FileText, TriangleAlert
 } from "lucide-react";
+import { toast } from "sonner";
 import { cx } from '../../../../utils/cx'
+import { apiFetch } from "../../../../utils/api";
+
+const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 type TemplateKey =
   | "WELCOME_FIRST_ACCESS"
@@ -180,8 +184,69 @@ function applyVars(text: string, vars: string[]) {
 export default function ComunicacoesPage() {
   const [query, setQuery] = useState("");
   const [templates, setTemplates] = useState<Template[]>(DEFAULT_TEMPLATES);
-  const [currentId, setCurrentId] = useState<string>(templates[0]?.id ?? "");
+  const [currentId, setCurrentId] = useState<string>(DEFAULT_TEMPLATES[0]?.id ?? "");
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
+
+  /* Carrega os templates persistidos e mescla sobre os defaults (por chave). */
+  useEffect(() => {
+    apiFetch(`${API_URL}/admin/comunicacoes`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        const persistidos: Array<Partial<Template> & { chave: string }> = json?.data ?? [];
+        if (persistidos.length === 0) return;
+        const porChave = new Map(persistidos.map((p) => [p.chave, p]));
+        setTemplates((prev) =>
+          prev.map((t) => {
+            const salvo = porChave.get(t.key);
+            if (!salvo) return t;
+            return {
+              ...t,
+              nome: salvo.nome ?? t.nome,
+              descricao: salvo.descricao ?? t.descricao,
+              habilitado: salvo.habilitado ?? t.habilitado,
+              assunto: salvo.assunto ?? t.assunto,
+              corpo: salvo.corpo ?? t.corpo,
+              variaveis: (salvo.variaveis as string[] | undefined) ?? t.variaveis,
+            };
+          }),
+        );
+      })
+      .catch(() => {});
+  }, []);
+
+  async function persistir(t: Template) {
+    const res = await apiFetch(`${API_URL}/admin/comunicacoes/${encodeURIComponent(t.key)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nome: t.nome,
+        descricao: t.descricao ?? null,
+        habilitado: t.habilitado,
+        assunto: t.assunto,
+        corpo: t.corpo,
+        variaveis: t.variaveis,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as any)?.error || `Erro ${res.status}`);
+    }
+  }
+
+  async function salvarTemplate() {
+    if (!current) return;
+    setSaving(true);
+    try {
+      await persistir(current);
+      toast.success("Template salvo.");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha ao salvar template");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const current = useMemo(
     () => templates.find((t) => t.id === currentId) ?? null,
@@ -196,18 +261,43 @@ export default function ComunicacoesPage() {
     );
   }, [templates, query]);
 
-  function toggleEnabled(id: string) {
-    setTemplates((prev) => prev.map(t => t.id === id ? { ...t, habilitado: !t.habilitado } : t));
+  async function toggleEnabled(id: string) {
+    const alvo = templates.find((t) => t.id === id);
+    if (!alvo) return;
+    const atualizado = { ...alvo, habilitado: !alvo.habilitado };
+    setTemplates((prev) => prev.map(t => t.id === id ? atualizado : t));
+    try {
+      await persistir(atualizado);
+    } catch (e: any) {
+      // Reverte em caso de falha na persistência.
+      setTemplates((prev) => prev.map(t => t.id === id ? alvo : t));
+      toast.error(e?.message ?? "Falha ao atualizar status do template");
+    }
   }
 
   function updateField<K extends keyof Template>(field: K, value: Template[K]) {
     setTemplates((prev) => prev.map(t => t.id === currentId ? { ...t, [field]: value } : t));
   }
 
-  function sendTest() {
+  async function sendTest() {
     if (!current) return;
-    // TODO: POST /admin/comunicacoes/teste { templateKey, to }
-    alert(`(stub) Enviar teste do template: ${current.nome}`);
+    const to = prompt("Enviar e-mail de teste para qual endereço?");
+    if (!to) return;
+    setTesting(true);
+    try {
+      const res = await apiFetch(`${API_URL}/admin/comunicacoes/teste`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: to.trim(), assunto: current.assunto, corpo: current.corpo }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((json as any)?.error || `Erro ${res.status}`);
+      toast.success((json as any)?.message ?? `E-mail de teste enviado para ${to}`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha ao enviar e-mail de teste");
+    } finally {
+      setTesting(false);
+    }
   }
 
   function exportJSON() {
@@ -364,16 +454,18 @@ export default function ComunicacoesPage() {
 
               <div className="mt-4 flex items-center gap-2">
                 <button
-                  className="inline-flex items-center gap-2 h-10 px-3 rounded-lg bg-primary text-primary-foreground text-sm hover:brightness-95"
-                  onClick={() => alert("(stub) Salvar alterações")}
+                  className="inline-flex items-center gap-2 h-10 px-3 rounded-lg bg-primary text-primary-foreground text-sm hover:brightness-95 disabled:opacity-60"
+                  onClick={salvarTemplate}
+                  disabled={saving}
                 >
-                  <Save className="size-4" /> Salvar
+                  <Save className="size-4" /> {saving ? "Salvando…" : "Salvar"}
                 </button>
                 <button
-                  className="inline-flex items-center gap-2 h-10 px-3 rounded-lg border border-[var(--border)] bg-background text-sm hover:bg-[var(--muted)]"
+                  className="inline-flex items-center gap-2 h-10 px-3 rounded-lg border border-[var(--border)] bg-background text-sm hover:bg-[var(--muted)] disabled:opacity-60"
                   onClick={sendTest}
+                  disabled={testing}
                 >
-                  <Send className="size-4" /> Enviar teste
+                  <Send className="size-4" /> {testing ? "Enviando…" : "Enviar teste"}
                 </button>
                 <button
                   className={cx(

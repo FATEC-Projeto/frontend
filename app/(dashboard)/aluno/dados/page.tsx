@@ -228,32 +228,28 @@ export default function MeusDadosPage() {
 
     try {
       setChanging(true);
-      const token = localStorage.getItem("accessToken") || "";
-      const headers = new Headers();
-      headers.set("Authorization", `Bearer ${token}`);
-      headers.set("Content-Type", "application/json");
-      headers.set("Accept", "application/json");
 
-      const res = await fetch(`${apiBase}/usuarios/${user.id}`, {
-        method: "PATCH",
-        headers: headers,
+      // Fluxo reautenticado: exige a senha atual e é validado no backend.
+      const res = await apiFetch(`${apiBase}/auth/trocar-senha`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          senha: newPass,
+          senhaAtual: currentPass,
+          novaSenha: newPass,
         }),
       });
+
       if (res.ok) {
-        toast.success("Senha alterada com sucesso!");
         setCurrentPass("");
         setNewPass("");
         setNewPass2("");
-      } else if (res.status === 401 || res.status === 403) {
         toast.success("Senha alterada com sucesso!", {
-          description: "Como esperado, a sua sessão foi terminada. Por favor, faça login novamente.",
+          description: "Por segurança, suas sessões foram encerradas. Faça login novamente.",
         });
-
+        // A troca revoga as sessões no servidor — encerra a sessão local.
         setTimeout(() => {
           logoutAndRedirect();
-        }, 5000);
+        }, 4000);
       } else {
         const errData: unknown = await res.json().catch(() => ({}));
         throw new Error(getResponseErrorMessage(errData) || `Erro ${res.status} ao alterar senha`);
