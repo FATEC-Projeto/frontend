@@ -1,5 +1,6 @@
 "use client";
 import { apiFetch } from "../../../../../utils/api";
+import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -67,7 +68,7 @@ function StatusPill({ ativo }: { ativo: boolean }) {
   );
 }
 
-function showToast(msg: string) { alert(msg); }
+function showToast(msg: string) { toast(msg); }
 
 export default function FuncionarioDetalhePage() {
   const { id } = useParams<{ id: string }>();

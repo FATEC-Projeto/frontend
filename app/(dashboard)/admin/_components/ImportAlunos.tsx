@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { X, Info } from "lucide-react";
+import { toast } from "sonner";
 
 type ResultRow = {
   idx: number;
@@ -81,7 +82,7 @@ export default function ImportAlunos({
     const text = await file.text();
     const raw  = parseCsv(text);
     if (raw.length <= 1) {
-      alert("CSV vazio ou apenas header.");
+      toast.error("CSV vazio ou apenas cabeçalho.");
       e.target.value = "";
       return;
     }
@@ -103,7 +104,7 @@ export default function ImportAlunos({
     const iIngress = col("anossemestreingresso") >= 0 ? col("anossemestreingresso") : col("anosemestreingresso");
 
     if (iRA < 0 || iEdu < 0) {
-      alert("Cabeçalho inválido. Colunas obrigatórias: ra, emailEducacional.");
+      toast.error("Cabeçalho inválido. Colunas obrigatórias: ra, emailEducacional.");
       e.target.value = "";
       return;
     }
@@ -150,7 +151,7 @@ export default function ImportAlunos({
   }
 
   async function startImport() {
-    if (!rows.length) { alert("Selecione um CSV primeiro."); return; }
+    if (!rows.length) { toast.error("Selecione um CSV primeiro."); return; }
     setRunning(true);
     setFinished(false);
 

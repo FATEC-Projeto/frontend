@@ -16,6 +16,8 @@ import {
 
 import FormAlunoCreate from "./../_components/FormAlunoCreate";
 import ImportAlunos from "./../_components/ImportAlunos";
+import ConfirmDialog from "../../../components/ui/ConfirmDialog";
+import { toast } from "sonner";
 
 import { cx } from '../../../../utils/cx'
 
@@ -78,6 +80,7 @@ export default function AdminAlunosPage() {
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const [page, setPage] = useState(1);
   const perPage = 20;
@@ -249,15 +252,7 @@ export default function AdminAlunosPage() {
     });
   }
 
-  async function handleDeleteSelected() {
-    if (!hasSelected) return;
-    const count = selectedIds.size;
-    const confirmMsg =
-      count === 1
-        ? "Tem certeza que deseja excluir este aluno?"
-        : `Tem certeza que deseja excluir ${count} alunos?`;
-    if (!window.confirm(confirmMsg)) return;
-
+  async function doDeleteSelected() {
     try {
       setDeleting(true);
       const token =
@@ -274,8 +269,11 @@ export default function AdminAlunosPage() {
       const failed = results.filter(
         (r) => r.status === "rejected" || (r.status === "fulfilled" && !r.value.ok),
       );
+      const okCount = selectedIds.size - failed.length;
       if (failed.length) {
-        alert(`Alguns registros não puderam ser excluídos (${failed.length}/${selectedIds.size}).`);
+        toast.warning(`${okCount} excluído(s), ${failed.length} com erro.`);
+      } else {
+        toast.success(okCount === 1 ? "Aluno excluído." : `${okCount} alunos excluídos.`);
       }
 
       setSelectedIds(new Set());
@@ -283,7 +281,8 @@ export default function AdminAlunosPage() {
       fetchAlunos();
     } catch (e) {
       console.error(e);
-      alert("Erro ao excluir alunos selecionados.");
+      toast.error("Erro ao excluir alunos selecionados.");
+      throw e;
     } finally {
       setDeleting(false);
     }
@@ -360,7 +359,7 @@ export default function AdminAlunosPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={handleDeleteSelected}
+                  onClick={() => hasSelected && setConfirmDelete(true)}
                   disabled={!hasSelected || deleting}
                   className={cx(
                     "inline-flex items-center gap-2 h-10 px-3 rounded-lg border text-sm",
@@ -524,6 +523,16 @@ export default function AdminAlunosPage() {
           </div>
         </>
       )}
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title={selectedIds.size === 1 ? "Excluir aluno?" : `Excluir ${selectedIds.size} alunos?`}
+        description="Os registros serão removidos (soft delete). Você pode confirmar para prosseguir."
+        confirmLabel="Excluir"
+        variant="danger"
+        onConfirm={doDeleteSelected}
+        onClose={() => setConfirmDelete(false)}
+      />
     </div>
   );
 }

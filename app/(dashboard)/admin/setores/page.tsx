@@ -9,8 +9,11 @@ import {
 import { toast } from "sonner";
 import { cx } from '../../../../utils/cx'
 import { apiFetch } from "../../../../utils/api";
+import ConfirmDialog, { type ConfirmDialogProps } from "../../../components/ui/ConfirmDialog";
 
 const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+
+type DialogConfig = Omit<ConfirmDialogProps, "open" | "onClose">;
 
 /* ===================== Tipos alinhados ao schema ===================== */
 type PapelCatalogo = {
@@ -79,6 +82,7 @@ export default function SetoresPage() {
   const currentSetor = setores.find(s => s.id === currentSetorId) ?? null;
 
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [dlg, setDlg] = useState<DialogConfig | null>(null);
 
   /* ── Carga inicial: setores, papéis e funcionários ── */
   const carregarSetores = useCallback(async (selecionar?: string) => {
@@ -145,9 +149,8 @@ export default function SetoresPage() {
     [membros],
   );
 
-  /* ── CRUD de setores ── */
-  async function criarSetor() {
-    const nome = prompt("Nome do novo setor:")?.trim();
+  /* ── CRUD de setores (ação separada da confirmação/prompt via modal) ── */
+  async function doCriarSetor(nome?: string) {
     if (!nome) return;
     setBusy(true);
     try {
@@ -162,15 +165,14 @@ export default function SetoresPage() {
       await carregarSetores(novo?.id);
     } catch (e: any) {
       toast.error(e?.message ?? "Erro ao criar setor");
+      throw e;
     } finally {
       setBusy(false);
     }
   }
 
-  async function renomearSetor() {
-    if (!currentSetor) return;
-    const nome = prompt("Novo nome do setor:", currentSetor.nome)?.trim();
-    if (!nome || nome === currentSetor.nome) return;
+  async function doRenomearSetor(nome?: string) {
+    if (!currentSetor || !nome || nome === currentSetor.nome) return;
     setBusy(true);
     try {
       const res = await apiFetch(`${API_URL}/admin/setores/${currentSetor.id}`, {
@@ -183,18 +185,14 @@ export default function SetoresPage() {
       await carregarSetores(currentSetor.id);
     } catch (e: any) {
       toast.error(e?.message ?? "Erro ao renomear setor");
+      throw e;
     } finally {
       setBusy(false);
     }
   }
 
-  async function removerSetor() {
+  async function doRemoverSetor() {
     if (!currentSetor) return;
-    const temMembros = membros.length > 0;
-    const msg = temMembros
-      ? "Este setor possui membros. Remover mesmo assim? Os vínculos serão excluídos."
-      : `Remover o setor "${currentSetor.nome}"?`;
-    if (!confirm(msg)) return;
     setBusy(true);
     try {
       const res = await apiFetch(`${API_URL}/admin/setores/${currentSetor.id}`, { method: "DELETE" });
@@ -203,9 +201,55 @@ export default function SetoresPage() {
       await carregarSetores();
     } catch (e: any) {
       toast.error(e?.message ?? "Erro ao remover setor");
+      throw e;
     } finally {
       setBusy(false);
     }
+  }
+
+  /* ── Gatilhos que abrem o modal de confirmação/prompt ── */
+  function criarSetor() {
+    setDlg({
+      title: "Novo setor",
+      description: "Informe o nome do novo setor.",
+      confirmLabel: "Criar",
+      input: { label: "Nome do setor", placeholder: "Ex.: Secretaria", required: true },
+      onConfirm: (nome) => doCriarSetor(nome),
+    });
+  }
+
+  function renomearSetor() {
+    if (!currentSetor) return;
+    setDlg({
+      title: "Renomear setor",
+      confirmLabel: "Salvar",
+      input: { label: "Novo nome", defaultValue: currentSetor.nome, required: true },
+      onConfirm: (nome) => doRenomearSetor(nome),
+    });
+  }
+
+  function removerSetor() {
+    if (!currentSetor) return;
+    const temMembros = membros.length > 0;
+    setDlg({
+      title: `Remover "${currentSetor.nome}"?`,
+      description: temMembros
+        ? "Este setor possui membros — os vínculos serão excluídos. Esta ação não pode ser desfeita."
+        : "Esta ação não pode ser desfeita.",
+      confirmLabel: "Remover",
+      variant: "danger",
+      onConfirm: () => doRemoverSetor(),
+    });
+  }
+
+  function removerMembro(usuarioSetorId: string) {
+    setDlg({
+      title: "Remover do setor?",
+      description: "O funcionário perde o vínculo com este setor (a conta não é excluída).",
+      confirmLabel: "Remover",
+      variant: "danger",
+      onConfirm: () => doRemoverMembro(usuarioSetorId),
+    });
   }
 
   /* ── Membros ── */
@@ -226,8 +270,7 @@ export default function SetoresPage() {
     }
   }
 
-  async function removerMembro(usuarioSetorId: string) {
-    if (!confirm("Remover este funcionário do setor?")) return;
+  async function doRemoverMembro(usuarioSetorId: string) {
     setBusy(true);
     try {
       const res = await apiFetch(`${API_URL}/admin/usuarios-setores/${usuarioSetorId}`, { method: "DELETE" });
@@ -236,6 +279,7 @@ export default function SetoresPage() {
       await carregarMembros(currentSetorId);
     } catch (e: any) {
       toast.error(e?.message ?? "Erro ao remover membro");
+      throw e;
     } finally {
       setBusy(false);
     }
@@ -484,6 +528,8 @@ export default function SetoresPage() {
           onAssign={atribuirUsuariosAoSetor}
         />
       )}
+
+      {dlg && <ConfirmDialog open {...dlg} onClose={() => setDlg(null)} />}
     </div>
   );
 }
