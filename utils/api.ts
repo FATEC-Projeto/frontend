@@ -101,6 +101,26 @@ export async function apiFetch(input: RequestInfo, init: RequestInit = {}) {
 }
 
 /**
+ * Extrai uma mensagem de erro amigável do corpo de uma resposta não-ok.
+ * Lê o corpo UMA vez e cobre os formatos do backend: { issues: [{path,message}] }
+ * (validação Zod), { error } e { message }. Cai para o texto cru ou o fallback.
+ */
+export async function extractApiError(res: Response, fallback?: string): Promise<string> {
+  const base = fallback ?? `Erro ${res.status}`;
+  const text = await res.text().catch(() => "");
+  if (!text) return base;
+  try {
+    const json = JSON.parse(text);
+    if (Array.isArray(json?.issues) && json.issues.length) {
+      return json.issues.map((i: any) => `${i.path}: ${i.message}`).join(" | ");
+    }
+    return json?.error || json?.message || base;
+  } catch {
+    return text;
+  }
+}
+
+/**
  * Faz download autenticado de um anexo.
  * Cria um URL temporário a partir do blob e dispara o download no browser.
  */

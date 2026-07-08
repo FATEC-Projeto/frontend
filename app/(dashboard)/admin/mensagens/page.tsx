@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { apiFetch } from "../../../../utils/api";
+import { apiFetch, extractApiError } from "../../../../utils/api";
 import { toast } from "sonner";
 import Link from "next/link";
 import {
@@ -193,6 +193,8 @@ export default function AdminMensagensPage() {
         method: "POST",
         body: JSON.stringify({ conteudo: v }),
       });
+      // Sem checar res.ok, um erro (404/500) vira "mensagem" corrompida no chat.
+      if (!res.ok) throw new Error(await extractApiError(res, "Falha ao enviar mensagem"));
       const saved = await res.json();
       // troca o otimista pelo salvo
       setMessages((prev) =>
@@ -200,10 +202,11 @@ export default function AdminMensagensPage() {
       );
       // atualiza lista
       fetchConversas().catch(() => {});
-    } catch {
+    } catch (e: unknown) {
       // reverte em caso de erro
       setMessages((prev) => prev.filter((m) => m.id !== tempId));
       setText(v);
+      toast.error(e instanceof Error ? e.message : "Falha ao enviar mensagem.");
     } finally {
       setSending(false);
     }
