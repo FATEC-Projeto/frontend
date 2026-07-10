@@ -82,10 +82,10 @@ export default function ConfirmDialog({
   return (
     <div className="fixed inset-0 z-[60]" role="dialog" aria-modal="true" aria-label={title}>
       <div
-        className="absolute inset-0 bg-black/40 motion-safe:animate-[fadeIn_120ms_ease-out]"
+        className="absolute inset-0 bg-black/40 motion-safe:animate-[cd-fadeIn_120ms_ease-out]"
         onClick={() => !loading && onClose()}
       />
-      <div className="absolute left-1/2 top-1/2 w-[92%] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-[var(--border)] bg-background p-5 shadow-xl motion-safe:animate-[popIn_140ms_ease-out]">
+      <div className="absolute left-1/2 top-1/2 w-[92%] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-[var(--border)] bg-background p-5 shadow-xl motion-safe:animate-[cd-popIn_140ms_ease-out]">
         <div className="flex items-start gap-3">
           {variant === "danger" && (
             <span className="mt-0.5 inline-grid size-9 shrink-0 place-items-center rounded-full bg-destructive/10 text-destructive">
@@ -131,11 +131,6 @@ export default function ConfirmDialog({
           </Button>
         </div>
       </div>
-
-      <style jsx global>{`
-        @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
-        @keyframes popIn { from { opacity: 0; transform: translate(-50%, -48%) scale(0.98) } to { opacity: 1; transform: translate(-50%, -50%) scale(1) } }
-      `}</style>
     </div>
   );
 }

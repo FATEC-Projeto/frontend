@@ -197,3 +197,10 @@ body{ background:var(--background); color:var(--foreground); }
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
+
+/* Animações do ConfirmDialog (modal) */
+@keyframes cd-fadeIn { from { opacity: 0 } to { opacity: 1 } }
+@keyframes cd-popIn {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(0.98) }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1) }
+}
