@@ -20,3 +20,18 @@ export async function apiFetch(input: RequestInfo, init: RequestInit = {}) {
 
   return res;
 }
+
+export async function extractApiError(res: Response, fallback?: string): Promise<string> {
+  const base = fallback ?? `Erro ${res.status}`;
+  const text = await res.text().catch(() => "");
+  if (!text) return base;
+  try {
+    const json = JSON.parse(text);
+    if (Array.isArray(json?.issues) && json.issues.length) {
+      return json.issues.map((issue: { path: string; message: string }) => `${issue.path}: ${issue.message}`).join(" | ");
+    }
+    return json?.error || json?.message || base;
+  } catch {
+    return text;
+  }
+}

@@ -10,6 +10,7 @@ import {
   FileChartColumn,
   Settings,
   MessageSquareText,
+  MessageSquarePlus,
   Building2,
   Bell,
   LogOut,
@@ -56,6 +57,7 @@ export default function SidebarAdmin({
       { href: "/admin/relatorios", label: "Relatórios", icon: <FileChartColumn className="size-4" /> },
       { href: "/admin/setores", label: "Setores", icon: <Building2 className="size-4" /> },
       { href: "/admin/configuracoes", label: "Configurações", icon: <Settings className="size-4" /> },
+      { href: "/admin/sugestoes", label: "Caixa de Sugestões", icon: <MessageSquarePlus className="size-4" /> },
     ],
     [chamadosAbertosCount, notificacoesCount, pendenciasCount]
   );
