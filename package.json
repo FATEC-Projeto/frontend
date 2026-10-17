@@ -14,11 +14,12 @@
     "jose": "6.1.0",
     "js-cookie": "^3.0.5",
     "lucide-react": "^0.546.0",
-    "next": "15.5.4",
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
+    "next": "15.5.28",
+    "react": "19.1.10",
+    "react-dom": "19.1.10",
     "sonner": "^2.0.7",
-    "zod": "^4.1.12"
+    "zod": "^4.1.12",
+    "sharp": "0.35.5"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -33,11 +34,12 @@
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.21",
     "eslint": "^9",
-    "eslint-config-next": "15.5.4",
+    "eslint-config-next": "15.5.28",
     "jsdom": "^29.1.1",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.14",
     "typescript": "^5",
     "vitest": "^2.1.9"
-  }
+  },
+  "packageManager": "pnpm@10.28.0"
 }
